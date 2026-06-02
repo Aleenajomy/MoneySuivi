@@ -5,6 +5,17 @@ import toast from 'react-hot-toast'
 const AuthContext = createContext(null)
 export const useAuth = () => useContext(AuthContext)
 
+const readAuthPayload = (res) => {
+  const token = res?.data?.token
+  const user = res?.data?.user
+
+  if (!token || !user) {
+    throw new Error(res?.data?.message || 'Invalid response from server')
+  }
+
+  return { token, user }
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [token, setToken] = useState(() => localStorage.getItem('token'))
@@ -24,18 +35,20 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const res = await api.post('/auth/login', { email, password })
-    localStorage.setItem('token', res.data.token)
-    setToken(res.data.token)
-    setUser(res.data.user)
-    toast.success(`Welcome back, ${res.data.user.name.split(' ')[0]}! 👋`)
+    const auth = readAuthPayload(res)
+    localStorage.setItem('token', auth.token)
+    setToken(auth.token)
+    setUser(auth.user)
+    toast.success(`Welcome back, ${auth.user.name?.split(' ')[0] || 'there'}!`)
   }
 
   const register = async (name, email, password) => {
     const res = await api.post('/auth/register', { name, email, password })
-    localStorage.setItem('token', res.data.token)
-    setToken(res.data.token)
-    setUser(res.data.user)
-    toast.success('Account created successfully! 🎉')
+    const auth = readAuthPayload(res)
+    localStorage.setItem('token', auth.token)
+    setToken(auth.token)
+    setUser(auth.user)
+    toast.success('Account created successfully!')
   }
 
   const logout = () => {
