@@ -172,16 +172,21 @@ function Modal({ title, onClose, children }) {
 // ── Toggle row ──────────────────────────────────────────────────────────────────
 function ToggleRow({ label, description, value, onChange }) {
   return (
-    <div className="flex items-start justify-between py-3.5 border-b dark:border-dark-border border-light-border last:border-0">
+    <div className="flex items-center justify-between py-3.5 border-b dark:border-dark-border border-light-border last:border-0">
       <div className="flex-1 pr-4">
         <p className="text-sm font-semibold dark:text-gray-200 text-slate-700">{label}</p>
         {description && <p className="text-xs dark:text-gray-600 text-gray-500 mt-0.5">{description}</p>}
       </div>
-      <button onClick={() => onChange(!value)}
-        className={`w-11 h-6 rounded-full transition-all flex-shrink-0 relative mt-0.5
-          ${value ? 'bg-primary' : 'dark:bg-dark-border bg-light-border'}`}>
-        <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform
-          ${value ? 'translate-x-5' : 'translate-x-0.5'}`} />
+      <button
+        onClick={() => onChange(!value)}
+        className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full
+          border-2 border-transparent transition-colors duration-200 focus:outline-none
+          ${value ? 'bg-primary' : 'dark:bg-dark-border bg-slate-300'}`}>
+        <span
+          className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-md
+            ring-0 transition-transform duration-200
+            ${value ? 'translate-x-5' : 'translate-x-0'}`}
+        />
       </button>
     </div>
   )
