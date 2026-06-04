@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useExpense } from '../context/ExpenseContext'
 import { useTheme } from '../context/ThemeContext'
-import { ArrowDownRight, ArrowUpRight, AlertTriangle, Bell } from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight, AlertTriangle } from 'lucide-react'
 import ExpenseCard from '../components/ExpenseCard'
 import { ExpenseCardSkeleton, StatCardSkeleton } from '../components/Skeleton'
 import { formatCurrency } from '../utils/constants'
@@ -29,17 +29,11 @@ export default function Dashboard() {
     <div className="page">
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-6 animate-fadeIn">
+      <div className="flex items-center justify-between mb-6 animate-fadeIn pr-12">
         <div>
           <p className="text-gray-500 dark:text-gray-400 text-sm">Good day,</p>
           <h1 className="text-xl font-bold dark:text-white text-slate-800">{user?.name?.split(' ')[0]} 👋</h1>
         </div>
-        <button className="w-10 h-10 rounded-xl card border
-                           flex items-center justify-center relative
-                           transition-transform hover:scale-105">
-          <Bell size={18} className="dark:text-gray-400 text-gray-500" />
-          <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-primary animate-pulse" />
-        </button>
       </div>
 
       {/* Balance Card */}
