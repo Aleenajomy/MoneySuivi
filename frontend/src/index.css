@@ -8,7 +8,8 @@
   * { box-sizing: border-box; }
 
   body {
-    @apply antialiased -webkit-tap-highlight-color-transparent transition-colors duration-300;
+    @apply antialiased transition-colors duration-300;
+    -webkit-tap-highlight-color: transparent;
   }
 
   html {
