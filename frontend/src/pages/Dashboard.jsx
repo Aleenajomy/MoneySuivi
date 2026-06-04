@@ -77,7 +77,7 @@ export default function Dashboard() {
                   <ArrowDownRight size={16} className="text-secondary" />
                 </div>
               </div>
-              <p className="dark:text-gray font-bold text-lg">{formatCurrency(totalIncome)}</p>
+              <p className="dark:text-white text-slate-800 font-bold text-lg">{formatCurrency(totalIncome)}</p>
               <div className="mt-2 h-1 dark:bg-dark-border bg-light-border rounded-full">
                 <div className="h-full bg-secondary rounded-full transition-all" style={{ width: '60%' }} />
               </div>
@@ -90,7 +90,7 @@ export default function Dashboard() {
                   <ArrowUpRight size={16} className="text-danger" />
                 </div>
               </div>
-              <p className="dark:text-gray font-bold text-lg">{formatCurrency(totalExpense)}</p>
+              <p className="dark:text-white text-slate-800 font-bold text-lg">{formatCurrency(totalExpense)}</p>
               <div className="mt-2 h-1 dark:bg-dark-border bg-light-border rounded-full">
                 <div className="h-full bg-danger rounded-full transition-all"
                   style={{ width: budgetLimit > 0 ? `${Math.min(budgetUsed * 100, 100)}%` : '45%' }} />
