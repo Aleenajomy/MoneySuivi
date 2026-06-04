@@ -172,41 +172,16 @@ function Modal({ title, onClose, children }) {
 // ── Toggle row ──────────────────────────────────────────────────────────────────
 function ToggleRow({ label, description, value, onChange }) {
   return (
-    <div className="flex items-center justify-between py-3.5 border-b border-dark-border last:border-0">
-      <div className="flex-1 pr-4 min-w-0">
-        <p className="text-sm font-semibold text-gray-200">{label}</p>
-        {description && <p className="text-xs text-gray-600 mt-0.5 leading-snug">{description}</p>}
+    <div className="flex items-start justify-between py-3.5 border-b dark:border-dark-border border-light-border last:border-0">
+      <div className="flex-1 pr-4">
+        <p className="text-sm font-semibold dark:text-gray-200">{label}</p>
+        {description && <p className="text-xs dark:text-gray-600 text-gray-600 mt-0.5">{description}</p>}
       </div>
-      {/* Toggle switch */}
-      <button
-        type="button"
-        onClick={() => onChange(!value)}
-        style={{
-          width: '44px',
-          height: '24px',
-          borderRadius: '12px',
-          backgroundColor: value ? '#0066FF' : '#1F2937',
-          position: 'relative',
-          flexShrink: 0,
-          border: 'none',
-          cursor: 'pointer',
-          transition: 'background-color 0.2s ease',
-          padding: 0,
-        }}
-      >
-        <span
-          style={{
-            position: 'absolute',
-            top: '2px',
-            left: value ? '22px' : '2px',
-            width: '20px',
-            height: '20px',
-            borderRadius: '50%',
-            backgroundColor: '#ffffff',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-            transition: 'left 0.2s ease',
-          }}
-        />
+      <button onClick={() => onChange(!value)}
+        className={`w-11 h-6 rounded-full transition-all flex-shrink-0 relative mt-0.5
+          ${value ? 'bg-primary' : 'dark:bg-dark-border bg-light-border'}`}>
+        <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform
+          ${value ? 'translate-x-5' : 'translate-x-0.5'}`} />
       </button>
     </div>
   )
