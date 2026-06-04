@@ -77,11 +77,13 @@ export default function AddExpense() {
             <button key={type} type="button"
               onClick={() => setForm(p => ({ ...p, type }))}
               className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all
-                ${form.type === type
-                  ? type === 'expense'
-                    ? 'gradient-red text-white shadow-sm'
-                    : 'gradient-green text-white shadow-sm'
-                  : 'text-gray-600 hover:text-gray-400'}`}>
+                      ${
+                        form.type === type
+                          ? type === 'expense'
+                            ? 'bg-red-500 text-white shadow-sm'
+                            : 'bg-green-500 text-white shadow-sm'
+                          : 'text-gray-600 hover:text-gray-400'
+                      }`}>
               {type === 'expense' ? '💸 Expense' : '💰 Income'}
             </button>
           ))}
