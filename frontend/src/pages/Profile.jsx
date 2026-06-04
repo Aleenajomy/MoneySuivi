@@ -48,7 +48,7 @@ export default function Profile() {
             {user?.name?.[0]?.toUpperCase() || 'U'}
           </div>
           <div className="flex-1">
-            <h2 className="font-bold text-lg dark:text-white">{user?.name}</h2>
+            <h2 className="font-bold text-lg dark:text-gray-100 text-slate-800">{user?.name}</h2>
             <p className="text-gray-500 dark:text-gray-500 text-sm">{user?.email}</p>
             {user?.createdAt && (
               <p className="text-gray-600 dark:text-gray-700 text-xs mt-1">Joined {formatDate(user.createdAt)}</p>

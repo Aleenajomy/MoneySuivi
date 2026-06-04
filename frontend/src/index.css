@@ -44,7 +44,7 @@
     @apply bg-dark-card border-dark-border;
   }
 
-  :not(.dark) .card {
+  html:not(.dark) .card {
     @apply bg-light-card border-light-border shadow-sm;
   }
 
@@ -76,7 +76,7 @@
     box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
   }
 
-  :not(.dark) .btn-primary {
+  html:not(.dark) .btn-primary {
     @apply bg-indigo-500 hover:bg-indigo-600;
   }
 
@@ -89,7 +89,7 @@
     @apply border-dark-border text-gray-300 bg-dark-card hover:bg-dark-muted;
   }
 
-  :not(.dark) .btn-secondary {
+  html:not(.dark) .btn-secondary {
     @apply border-light-border text-slate-700 bg-light-card hover:bg-light-muted;
   }
 
@@ -104,7 +104,7 @@
            focus:border-indigo-500 focus:ring-indigo-500/20;
   }
 
-  :not(.dark) .input {
+  html:not(.dark) .input {
     @apply border-light-border bg-white text-slate-700 placeholder-slate-400
            focus:border-indigo-400 focus:ring-indigo-400/20;
   }
@@ -117,7 +117,7 @@
     @apply text-gray-500;
   }
 
-  :not(.dark) .label {
+  html:not(.dark) .label {
     @apply text-slate-600;
   }
 
@@ -131,7 +131,7 @@
     @apply bg-dark-card border-dark-border;
   }
 
-  :not(.dark) .bottom-nav {
+  html:not(.dark) .bottom-nav {
     @apply bg-light-card border-light-border shadow-lg;
   }
 
