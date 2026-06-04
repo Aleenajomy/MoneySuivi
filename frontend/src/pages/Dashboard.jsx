@@ -31,8 +31,8 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6 animate-fadeIn">
         <div>
-          <p className="text-gray-500 dark:text-gray-500 text-sm">Good day,</p>
-          <h1 className="text-xl font-bold dark:text-white">{user?.name?.split(' ')[0]} 👋</h1>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">Good day,</p>
+          <h1 className="text-xl font-bold dark:text-white text-slate-800">{user?.name?.split(' ')[0]} 👋</h1>
         </div>
         <button className="w-10 h-10 rounded-xl card border
                            flex items-center justify-center relative

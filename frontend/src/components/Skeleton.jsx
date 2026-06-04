@@ -1,6 +1,6 @@
 export function Skeleton({ className = '' }) {
   return (
-    <div className={`animate-pulse bg-dark-border rounded-xl ${className}`} />
+    <div className={`animate-pulse dark:bg-dark-border bg-light-border rounded-xl ${className}`} />
   )
 }
 

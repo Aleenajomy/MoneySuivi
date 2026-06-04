@@ -19,6 +19,9 @@
     --warning: #FBBF24;
   }
 
+  html.dark { --tick-color: #4B5563; }
+  html:not(.dark) { --tick-color: #94a3b8; }
+
   html.dark {
     @apply bg-dark-bg text-gray-100;
   }

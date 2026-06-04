@@ -29,11 +29,11 @@ export default function ExpenseCard({ expense, showActions = false }) {
 
       {/* Details */}
       <div className="flex-1 min-w-0">
-        <p className="font-semibold dark:text-white text-sm truncate">{expense.title}</p>
+        <p className="font-semibold dark:text-white text-slate-800 text-sm truncate">{expense.title}</p>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-xs dark:text-gray-600 text-gray-600">{expense.category}</span>
-          <span className="w-1 h-1 rounded-full dark:bg-gray-700 bg-gray-400" />
-          <span className="text-xs dark:text-gray-600 text-gray-600">{formatShortDate(expense.expenseDate)}</span>
+          <span className="text-xs dark:text-gray-500 text-gray-400">{expense.category}</span>
+          <span className="w-1 h-1 rounded-full dark:bg-gray-700 bg-gray-300" />
+          <span className="text-xs dark:text-gray-500 text-gray-400">{formatShortDate(expense.expenseDate)}</span>
         </div>
       </div>
 

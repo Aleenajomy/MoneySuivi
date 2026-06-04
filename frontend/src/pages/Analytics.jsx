@@ -9,8 +9,8 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const CustomTooltip = ({ active, payload }) => {
   if (active && payload?.length) {
     return (
-      <div className="bg-dark-card border border-dark-border rounded-xl px-3 py-2 text-xs">
-        <p className="text-white font-semibold">{formatCurrency(payload[0].value)}</p>
+      <div className="dark:bg-dark-card bg-white dark:border-dark-border border-light-border border rounded-xl px-3 py-2 text-xs shadow-lg">
+        <p className="dark:text-white text-slate-800 font-semibold">{formatCurrency(payload[0].value)}</p>
       </div>
     )
   }
@@ -48,11 +48,11 @@ export default function Analytics() {
 
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-bold text-white">Analytics</h1>
+        <h1 className="text-xl font-bold dark:text-white text-slate-800">Analytics</h1>
         <button onClick={fetchAnalytics}
-          className="w-9 h-9 rounded-xl bg-dark-card border border-dark-border
+          className="w-9 h-9 rounded-xl dark:bg-dark-card bg-light-card dark:border-dark-border border-light-border border
                      flex items-center justify-center">
-          <RefreshCw size={15} className="text-gray-400" />
+          <RefreshCw size={15} className="dark:text-gray-400 text-gray-500" />
         </button>
       </div>
 
@@ -77,8 +77,8 @@ export default function Analytics() {
               </ResponsiveContainer>
               {/* Center label */}
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <p className="text-[10px] text-gray-500">Total</p>
-                <p className="text-sm font-bold text-white">{formatCurrency(totalSpent)}</p>
+                <p className="text-[10px] dark:text-gray-500 text-gray-400">Total</p>
+                <p className="text-sm font-bold dark:text-white text-slate-800">{formatCurrency(totalSpent)}</p>
               </div>
             </div>
 
@@ -89,11 +89,11 @@ export default function Analytics() {
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full flex-shrink-0"
                       style={{ backgroundColor: item.color }} />
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs dark:text-gray-400 text-gray-500">
                       {CATEGORY_ICONS[item.name]} {item.name}
                     </span>
                   </div>
-                  <span className="text-xs font-semibold text-white">
+                  <span className="text-xs font-semibold dark:text-white text-slate-700">
                     {Math.round((item.value / totalSpent) * 100)}%
                   </span>
                 </div>
@@ -104,7 +104,7 @@ export default function Analytics() {
       ) : (
         <div className="card p-10 mb-4 text-center">
           <p className="text-3xl mb-3">📊</p>
-          <p className="text-gray-400 text-sm">No spending data this month</p>
+          <p className="dark:text-gray-400 text-gray-500 text-sm">No spending data this month</p>
         </div>
       )}
 
@@ -118,12 +118,12 @@ export default function Analytics() {
             {categoryData.map((item, i) => (
               <div key={i}>
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-sm text-gray-300 font-medium">
+                  <span className="text-sm dark:text-gray-300 text-slate-600 font-medium">
                     {CATEGORY_ICONS[item.name]} {item.name}
                   </span>
-                  <span className="text-sm font-bold text-white">{formatCurrency(item.value)}</span>
+                  <span className="text-sm font-bold dark:text-white text-slate-800">{formatCurrency(item.value)}</span>
                 </div>
-                <div className="h-1.5 bg-dark-border rounded-full">
+                <div className="h-1.5 dark:bg-dark-border bg-light-border rounded-full">
                   <div className="h-full rounded-full transition-all"
                     style={{
                       width: `${(item.value / totalSpent) * 100}%`,
@@ -145,13 +145,13 @@ export default function Analytics() {
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={trendData} barSize={24} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
               <XAxis dataKey="month" axisLine={false} tickLine={false}
-                tick={{ fontSize: 11, fill: '#4B5563' }} />
+                tick={{ fontSize: 11, fill: 'var(--tick-color)' }} />
               <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
               <Bar dataKey="amount" fill="#0066FF" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          <p className="text-center text-gray-600 text-sm py-8">No trend data available</p>
+          <p className="text-center dark:text-gray-600 text-gray-400 text-sm py-8">No trend data available</p>
         )}
       </div>
     </div>
