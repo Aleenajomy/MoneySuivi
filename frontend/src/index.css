@@ -20,7 +20,7 @@
   }
 
   html.dark {
-    @apply bg-dark-bg text-slate-900;
+    @apply bg-dark-bg text-gray-100;
   }
 
   html:not(.dark) {

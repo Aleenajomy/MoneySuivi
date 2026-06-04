@@ -55,8 +55,8 @@ export default function Profile() {
             )}
           </div>
           <button onClick={() => setEditing(!editing)}
-            className="w-9 h-9 rounded-xl bg-dark-border dark:bg-dark-border dark:bg-slate-700 flex items-center justify-center">
-            <User size={16} className="text-gray-400 dark:text-gray-400" />
+            className="w-9 h-9 rounded-xl dark:bg-dark-border bg-light-border flex items-center justify-center">
+            <User size={16} className="dark:text-gray-400 text-gray-500" />
           </button>
         </div>
       </div>
@@ -100,10 +100,10 @@ export default function Profile() {
           <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
             {mode === 'dark' ? <Moon size={17} /> : <Sun size={17} />}
           </div>
-          <span className="flex-1 text-sm font-medium text-gray-300 dark:text-gray-300 text-left">
+          <span className="flex-1 text-sm font-medium dark:text-gray-300 text-slate-700 text-left">
             Theme: {mode === 'dark' ? 'Dark' : 'Light'}
           </span>
-          <ChevronRight size={15} className="text-gray-600 dark:text-gray-600" />
+          <ChevronRight size={15} className="dark:text-gray-600 text-gray-400" />
         </button>
       </div>
 
@@ -116,7 +116,7 @@ export default function Profile() {
         <span className="text-sm font-semibold text-danger">Logout</span>
       </button>
 
-      <p className="text-center text-gray-700 text-xs mt-8">Smart Expense Tracker v1.0.0</p>
+      <p className="text-center dark:text-gray-700 text-gray-400 text-xs mt-8">Smart Expense Tracker v1.0.0</p>
 
       {/* Modals */}
       {modal === 'notifications' && <NotificationsModal onClose={() => setModal(null)} />}
@@ -134,8 +134,8 @@ function SettingRow({ icon, label, onClick }) {
       <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
         {icon}
       </div>
-      <span className="flex-1 text-sm font-medium text-gray-300 dark:text-gray-300 text-left">{label}</span>
-      <ChevronRight size={15} className="text-gray-600 dark:text-gray-600" />
+      <span className="flex-1 text-sm font-medium dark:text-gray-300 text-slate-700 text-left">{label}</span>
+      <ChevronRight size={15} className="dark:text-gray-600 text-gray-400" />
     </button>
   )
 }
@@ -174,8 +174,8 @@ function ToggleRow({ label, description, value, onChange }) {
   return (
     <div className="flex items-start justify-between py-3.5 border-b dark:border-dark-border border-light-border last:border-0">
       <div className="flex-1 pr-4">
-        <p className="text-sm font-semibold dark:text-gray-200">{label}</p>
-        {description && <p className="text-xs dark:text-gray-600 text-gray-600 mt-0.5">{description}</p>}
+        <p className="text-sm font-semibold dark:text-gray-200 text-slate-700">{label}</p>
+        {description && <p className="text-xs dark:text-gray-600 text-gray-500 mt-0.5">{description}</p>}
       </div>
       <button onClick={() => onChange(!value)}
         className={`w-11 h-6 rounded-full transition-all flex-shrink-0 relative mt-0.5

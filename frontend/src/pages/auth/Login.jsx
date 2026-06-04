@@ -25,7 +25,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-dark-bg flex flex-col px-6 py-12">
+    <div className="min-h-screen dark:bg-dark-bg bg-light-bg flex flex-col px-6 py-12">
 
       {/* Logo */}
       <div className="mb-10">
@@ -33,7 +33,7 @@ export default function Login() {
           <TrendingUp size={22} className="text-white" />
         </div>
         <p className="text-gray-500 text-sm font-medium uppercase tracking-widest mb-2">Welcome back</p>
-        <h1 className="text-3xl font-bold text-white">Sign In</h1>
+        <h1 className="text-3xl font-bold dark:text-white text-slate-800">Sign In</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4 flex-1">
@@ -73,20 +73,20 @@ export default function Login() {
 
         {/* Divider */}
         <div className="flex items-center gap-3 py-2">
-          <div className="flex-1 h-px bg-dark-border" />
-          <span className="text-gray-600 text-xs">or</span>
-          <div className="flex-1 h-px bg-dark-border" />
+          <div className="flex-1 h-px dark:bg-dark-border bg-light-border" />
+          <span className="text-gray-500 text-xs">or</span>
+          <div className="flex-1 h-px dark:bg-dark-border bg-light-border" />
         </div>
 
         <p className="text-center text-sm text-gray-500">
           Don't have an account?{' '}
-          <Link to="/register" className="text-primary font-semibold hover:text-blue-400">
+          <Link to="/register" className="text-primary font-semibold hover:text-indigo-400">
             Create Account
           </Link>
         </p>
       </form>
 
-      <p className="text-center text-xs text-gray-700 mt-8">
+      <p className="text-center text-xs dark:text-gray-700 text-gray-400 mt-8">
         Smart Expense Tracker © 2024
       </p>
     </div>

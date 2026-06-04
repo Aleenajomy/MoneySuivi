@@ -55,16 +55,17 @@ export default function AddExpense() {
   }
 
   return (
-    <div className="min-h-screen bg-dark-bg px-4 py-6">
+    <div className="min-h-screen dark:bg-dark-bg bg-light-bg px-4 py-6">
 
       {/* Header */}
       <div className="flex items-center gap-3 mb-7">
         <button onClick={() => navigate(-1)}
-          className="w-10 h-10 rounded-xl bg-dark-card border border-dark-border
+          className="w-10 h-10 rounded-xl dark:bg-dark-card bg-light-card
+                     dark:border-dark-border border-light-border border
                      flex items-center justify-center">
-          <ArrowLeft size={18} className="text-gray-400" />
+          <ArrowLeft size={18} className="dark:text-gray-400 text-gray-500" />
         </button>
-        <h1 className="text-lg font-bold text-white">
+        <h1 className="text-lg font-bold dark:text-white text-slate-800">
           {isEditing ? 'Edit Expense' : 'New Transaction'}
         </h1>
       </div>
@@ -82,7 +83,7 @@ export default function AddExpense() {
                           ? type === 'expense'
                             ? 'bg-red-500 text-white shadow-sm'
                             : 'bg-green-500 text-white shadow-sm'
-                          : 'text-gray-600 hover:text-gray-400'
+                          : 'dark:text-gray-600 text-gray-400 hover:text-gray-500'
                       }`}>
               {type === 'expense' ? '💸 Expense' : '💰 Income'}
             </button>
@@ -93,11 +94,11 @@ export default function AddExpense() {
         <div className="card p-5 text-center">
           <label className="label text-center block mb-3">Amount</label>
           <div className="flex items-center justify-center gap-2">
-            <span className="text-3xl font-bold text-gray-600">₹</span>
+            <span className="text-3xl font-bold dark:text-gray-400 text-gray-500">₹</span>
             <input
               type="number" step="0.01" min="0.01" required
-              className="text-4xl font-extrabold text-white bg-transparent outline-none
-                         text-center w-full placeholder-gray-700"
+              className="text-4xl font-extrabold dark:text-white text-slate-800 bg-transparent outline-none
+                         text-center w-full dark:placeholder-gray-700 placeholder-gray-300"
               placeholder="0.00"
               value={form.amount} onChange={set('amount')} />
           </div>
@@ -121,10 +122,10 @@ export default function AddExpense() {
                 <button key={cat} type="button"
                   onClick={() => setForm(p => ({ ...p, category: cat }))}
                   className={`p-2.5 rounded-xl text-center transition-all border
-                    ${isSelected ? 'border-primary bg-primary/10' : 'border-dark-border bg-dark-card'}`}>
+                    ${isSelected ? 'border-primary bg-primary/10' : 'dark:border-dark-border border-light-border dark:bg-dark-card bg-light-card'}`}>
                   <div className="text-2xl mb-1">{CATEGORY_ICONS[cat]}</div>
                   <div className={`text-[10px] font-semibold truncate
-                    ${isSelected ? 'text-primary' : 'text-gray-600'}`}>
+                    ${isSelected ? 'text-primary' : 'dark:text-gray-600 text-gray-500'}`}>
                     {cat}
                   </div>
                 </button>

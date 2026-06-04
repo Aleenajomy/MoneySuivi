@@ -29,10 +29,10 @@ export default function Register() {
   const set = key => e => setForm(p => ({ ...p, [key]: e.target.value }))
 
   return (
-    <div className="min-h-screen bg-dark-bg flex flex-col px-6 py-12">
+    <div className="min-h-screen dark:bg-dark-bg bg-light-bg flex flex-col px-6 py-12">
 
       <button onClick={() => navigate('/login')}
-        className="flex items-center gap-2 text-gray-500 hover:text-gray-300 mb-8 w-fit">
+        className="flex items-center gap-2 text-gray-500 hover:text-gray-400 mb-8 w-fit">
         <ArrowLeft size={18} /> Back
       </button>
 
@@ -41,7 +41,7 @@ export default function Register() {
           <TrendingUp size={22} className="text-white" />
         </div>
         <p className="text-gray-500 text-sm font-medium uppercase tracking-widest mb-2">Get started</p>
-        <h1 className="text-3xl font-bold text-white">Create Account</h1>
+        <h1 className="text-3xl font-bold dark:text-white text-slate-800">Create Account</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -89,7 +89,7 @@ export default function Register() {
 
         <p className="text-center text-sm text-gray-500 pt-2">
           Already have an account?{' '}
-          <Link to="/login" className="text-primary font-semibold hover:text-blue-400">Sign In</Link>
+          <Link to="/login" className="text-primary font-semibold hover:text-indigo-400">Sign In</Link>
         </p>
       </form>
     </div>
