@@ -41,10 +41,13 @@ export default function Layout() {
           if (isFab) {
             return (
               <button key={path} onClick={() => navigate(path)}
-                className="w-14 h-14 rounded-2xl gradient-blue -mt-6
-                           flex items-center justify-center
-                           active:scale-90 transition-transform shadow-lg">
-                <Icon size={24} className="text-white" strokeWidth={2.5} />
+                className="flex flex-col items-center gap-1 px-4 py-1 rounded-xl transition-all duration-200">
+                <div className="w-8 h-8 rounded-xl gradient-blue flex items-center justify-center">
+                  <Icon size={18} className="text-white" strokeWidth={2.5} />
+                </div>
+                <span className="text-[10px] font-semibold tracking-wide text-primary">
+                  {label}
+                </span>
               </button>
             )
           }
