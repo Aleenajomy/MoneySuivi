@@ -30,6 +30,17 @@ export function EMIProvider({ children }) {
     toast.success('Installment marked as paid')
   }
 
+  const updateEMI = async (id, data) => {
+    try {
+      const res = await api.put(`/emis/${id}`, data)
+      setEmis(prev => prev.map(e => e.id === id ? res.data.emi : e))
+      toast.success('EMI updated')
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Failed to update EMI')
+      throw e
+    }
+  }
+
   const deleteEMI = async (id) => {
     await api.delete(`/emis/${id}`)
     setEmis(prev => prev.filter(e => e.id !== id))
@@ -37,7 +48,7 @@ export function EMIProvider({ children }) {
   }
 
   return (
-    <EMIContext.Provider value={{ emis, loading, fetchEMIs, addEMI, payInstallment, deleteEMI }}>
+    <EMIContext.Provider value={{ emis, loading, fetchEMIs, addEMI, updateEMI, payInstallment, deleteEMI }}>
       {children}
     </EMIContext.Provider>
   )

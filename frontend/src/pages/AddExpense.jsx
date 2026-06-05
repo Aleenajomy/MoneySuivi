@@ -209,7 +209,7 @@ export default function AddExpense() {
                 </span>
                 <span>
                   <span className="block text-sm font-semibold dark:text-white text-slate-800">Recurring</span>
-                  <span className="block text-xs dark:text-gray-500 text-gray-500">Automatically create future expenses</span>
+                  <span className="block text-xs dark:text-gray-500 text-gray-500">Auto-create future expenses (rent, subscriptions). For loan EMIs, use the EMI Tracker tab.</span>
                 </span>
               </span>
               <input type="checkbox" className="w-5 h-5 accent-indigo-500" checked={form.recurring} onChange={setChecked('recurring')} />

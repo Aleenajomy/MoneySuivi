@@ -60,6 +60,32 @@ const payInstallment = async (req, res) => {
   }
 };
 
+const updateEMI = async (req, res) => {
+  try {
+    const existing = await prisma.eMI.findFirst({ where: { id: req.params.id, userId: req.user.id } });
+    if (!existing) return res.status(404).json({ success: false, message: 'EMI not found' });
+    const { title, totalAmount, emiAmount, totalInstallments, startDate, note } = req.body;
+    const start = new Date(startDate);
+    const total = Number(totalInstallments);
+    const active = existing.paidInstallments < total;
+    const emi = await prisma.eMI.update({
+      where: { id: existing.id },
+      data: {
+        title, note: note || null,
+        totalAmount: Number(totalAmount),
+        emiAmount: Number(emiAmount),
+        totalInstallments: total,
+        startDate: start,
+        active,
+        nextDueDate: active ? calcNextDue(start, existing.paidInstallments) : existing.nextDueDate,
+      },
+    });
+    res.json({ success: true, emi });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+};
+
 const deleteEMI = async (req, res) => {
   try {
     const existing = await prisma.eMI.findFirst({ where: { id: req.params.id, userId: req.user.id } });
@@ -71,4 +97,4 @@ const deleteEMI = async (req, res) => {
   }
 };
 
-module.exports = { getEMIs, createEMI, payInstallment, deleteEMI };
+module.exports = { getEMIs, createEMI, updateEMI, payInstallment, deleteEMI };

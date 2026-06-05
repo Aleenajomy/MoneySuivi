@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CheckCircle, Plus, Trash2, X } from 'lucide-react'
+import { CheckCircle, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useEMI } from '../context/EMIContext'
 import { formatCurrency, formatShortDate } from '../utils/constants'
 
@@ -7,20 +7,39 @@ const today = new Date().toISOString().split('T')[0]
 const empty = { title: '', totalAmount: '', emiAmount: '', totalInstallments: '', startDate: today, note: '' }
 
 export default function EMITracker() {
-  const { emis, loading, fetchEMIs, addEMI, payInstallment, deleteEMI } = useEMI()
+  const { emis, loading, fetchEMIs, addEMI, updateEMI, payInstallment, deleteEMI } = useEMI()
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(empty)
+  const [editId, setEditId] = useState(null)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => { fetchEMIs() }, [fetchEMIs])
 
   const set = k => e => setForm(prev => ({ ...prev, [k]: e.target.value }))
 
+  const openEdit = (emi) => {
+    setEditId(emi.id)
+    setForm({
+      title: emi.title,
+      totalAmount: String(emi.totalAmount),
+      emiAmount: String(emi.emiAmount),
+      totalInstallments: String(emi.totalInstallments),
+      startDate: emi.startDate.includes('T') ? emi.startDate.split('T')[0] : emi.startDate,
+      note: emi.note || ''
+    })
+    setShowForm(true)
+  }
+
+  const closeForm = () => { setShowForm(false); setEditId(null); setForm(empty) }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setSaving(true)
-    try { await addEMI(form); setForm(empty); setShowForm(false) }
-    finally { setSaving(false) }
+    try {
+      if (editId) { await updateEMI(editId, form) }
+      else { await addEMI(form) }
+      closeForm()
+    } finally { setSaving(false) }
   }
 
   const active = emis.filter(e => e.active)
@@ -28,9 +47,18 @@ export default function EMITracker() {
 
   return (
     <div className="page">
+      <div className="card p-3 mb-4 flex gap-2.5 items-start bg-primary/5 border border-primary/20">
+        <span className="text-primary mt-0.5">💡</span>
+        <div>
+          <p className="text-xs font-semibold text-primary mb-0.5">When to use EMI Tracker?</p>
+          <p className="text-[11px] dark:text-gray-400 text-gray-500">Use this for <span className="font-semibold">loan repayments</span> with a fixed tenure (e.g. phone, bike, home loan). Manually mark each month as paid to track progress.</p>
+          <p className="text-[11px] dark:text-gray-500 text-gray-400 mt-1">For bills that repeat automatically (rent, Netflix), use <span className="font-semibold">Recurring</span> in Add Transaction instead.</p>
+        </div>
+      </div>
+
       <div className="flex items-center justify-between mb-5 pr-12">
         <h1 className="text-xl font-bold dark:text-white text-slate-800">EMI Tracker</h1>
-        <button onClick={() => setShowForm(p => !p)}
+        <button onClick={() => { if (showForm && !editId) closeForm(); else if (!showForm) setShowForm(true); else closeForm() }}
           className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
           {showForm ? <X size={16} /> : <Plus size={16} />}
         </button>
@@ -38,7 +66,7 @@ export default function EMITracker() {
 
       {showForm && (
         <form onSubmit={handleSubmit} className="card p-4 mb-5 space-y-3 animate-slideDown">
-          <p className="text-sm font-bold dark:text-white text-slate-800">New EMI</p>
+          <p className="text-sm font-bold dark:text-white text-slate-800">{editId ? 'Edit EMI' : 'New EMI'}</p>
           <input className="input" placeholder="Title (e.g. Laptop EMI)" value={form.title} onChange={set('title')} required />
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -61,7 +89,8 @@ export default function EMITracker() {
             </div>
           </div>
           <textarea className="input resize-none" rows={2} placeholder="Note (optional)" value={form.note} onChange={set('note')} />
-          <button type="submit" disabled={saving} className="btn-primary w-full">{saving ? 'Saving...' : 'Add EMI'}</button>
+          <button type="submit" disabled={saving} className="btn-primary w-full">{saving ? 'Saving...' : editId ? 'Update EMI' : 'Add EMI'}</button>
+          {editId && <button type="button" onClick={closeForm} className="w-full text-center text-sm dark:text-gray-400 text-gray-500">Cancel</button>}
         </form>
       )}
 
@@ -80,7 +109,7 @@ export default function EMITracker() {
             <>
               <p className="text-xs font-semibold dark:text-gray-500 text-gray-400 uppercase tracking-widest mb-3">Active ({active.length})</p>
               <div className="space-y-3 mb-5">
-                {active.map(emi => <EMICard key={emi.id} emi={emi} onPay={payInstallment} onDelete={deleteEMI} />)}
+                {active.map(emi => <EMICard key={emi.id} emi={emi} onPay={payInstallment} onDelete={deleteEMI} onEdit={openEdit} />)}
               </div>
             </>
           )}
@@ -89,7 +118,7 @@ export default function EMITracker() {
             <>
               <p className="text-xs font-semibold dark:text-gray-500 text-gray-400 uppercase tracking-widest mb-3">Completed ({completed.length})</p>
               <div className="space-y-3">
-                {completed.map(emi => <EMICard key={emi.id} emi={emi} onPay={payInstallment} onDelete={deleteEMI} />)}
+                {completed.map(emi => <EMICard key={emi.id} emi={emi} onPay={payInstallment} onDelete={deleteEMI} onEdit={openEdit} />)}
               </div>
             </>
           )}
@@ -99,7 +128,7 @@ export default function EMITracker() {
   )
 }
 
-function EMICard({ emi, onPay, onDelete }) {
+function EMICard({ emi, onPay, onDelete, onEdit }) {
   const remaining = emi.totalInstallments - emi.paidInstallments
   const pct = Math.round((emi.paidInstallments / emi.totalInstallments) * 100)
 
@@ -121,6 +150,10 @@ function EMICard({ emi, onPay, onDelete }) {
               <CheckCircle size={15} />
             </button>
           )}
+          <button onClick={() => onEdit(emi)}
+            className="w-8 h-8 rounded-xl hover:bg-primary/10 text-gray-400 hover:text-primary flex items-center justify-center transition-colors">
+            <Pencil size={15} />
+          </button>
           <button onClick={() => { if (window.confirm('Delete EMI?')) onDelete(emi.id) }}
             className="w-8 h-8 rounded-xl hover:bg-danger/10 text-gray-400 hover:text-danger flex items-center justify-center transition-colors">
             <Trash2 size={15} />
