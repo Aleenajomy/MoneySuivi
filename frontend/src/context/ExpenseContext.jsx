@@ -22,7 +22,8 @@ export function ExpenseProvider({ children }) {
       if (query.category === 'All') delete query.category
       const res = await api.get('/expenses', { params: query })
       const data = res.data
-      setExpenses(prev => append ? [...prev, ...data.expenses] : data.expenses)
+      const sorted = (data.expenses || []).sort((a, b) => new Date(b.expenseDate) - new Date(a.expenseDate))
+      setExpenses(prev => append ? [...prev, ...sorted] : sorted)
       setPagination({ page: data.currentPage, totalPages: data.totalPages })
     } catch (err) {
       toast.error('Failed to load transactions')
