@@ -32,11 +32,14 @@ export function EMIProvider({ children }) {
 
   const updateEMI = async (id, data) => {
     try {
+      console.log('updateEMI called:', id, data)
       const res = await api.put(`/emis/${id}`, data)
+      console.log('updateEMI response:', res.data)
       setEmis(prev => prev.map(e => e.id === id ? res.data.emi : e))
       toast.success('EMI updated')
     } catch (e) {
-      toast.error(e.response?.data?.message || 'Failed to update EMI')
+      console.error('updateEMI error:', e.message, e)
+      toast.error(e.message || 'Failed to update EMI')
       throw e
     }
   }

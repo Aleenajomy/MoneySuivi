@@ -1,8 +1,9 @@
 const prisma = require('../lib/prisma');
 
-const calcNextDue = (start, paid) => {
-  const d = new Date(start);
-  d.setMonth(d.getMonth() + paid + 1);
+// nextDueDate = startDate + (paidInstallments + 1) months
+const calcNextDue = (startDate, paidInstallments) => {
+  const d = new Date(startDate);
+  d.setMonth(d.getMonth() + paidInstallments + 1);
   return d;
 };
 
@@ -10,7 +11,7 @@ const getEMIs = async (req, res) => {
   try {
     const emis = await prisma.eMI.findMany({
       where: { userId: req.user.id },
-      orderBy: { nextDueDate: 'asc' },
+      orderBy: { createdAt: 'desc' },
     });
     res.json({ success: true, emis });
   } catch (e) {
@@ -20,17 +21,22 @@ const getEMIs = async (req, res) => {
 
 const createEMI = async (req, res) => {
   try {
-    const { title, totalAmount, emiAmount, totalInstallments, startDate, note } = req.body;
+    const { title, totalAmount, emiAmount, totalInstallments, startDate, paidInstallments, note } = req.body;
     const start = new Date(startDate);
+    const total = Number(totalInstallments);
+    const paid = Math.min(Number(paidInstallments) || 0, total);
+    const active = paid < total;
     const emi = await prisma.eMI.create({
       data: {
-        title, note: note || null,
+        title,
+        note: note || null,
         totalAmount: Number(totalAmount),
         emiAmount: Number(emiAmount),
-        totalInstallments: Number(totalInstallments),
-        paidInstallments: 0,
+        totalInstallments: total,
+        paidInstallments: paid,
         startDate: start,
-        nextDueDate: calcNextDue(start, 0),
+        nextDueDate: calcNextDue(start, paid),
+        active,
         userId: req.user.id,
       },
     });
@@ -44,6 +50,8 @@ const payInstallment = async (req, res) => {
   try {
     const existing = await prisma.eMI.findFirst({ where: { id: req.params.id, userId: req.user.id } });
     if (!existing) return res.status(404).json({ success: false, message: 'EMI not found' });
+    if (!existing.active) return res.status(400).json({ success: false, message: 'EMI already completed' });
+
     const paid = existing.paidInstallments + 1;
     const done = paid >= existing.totalInstallments;
     const emi = await prisma.eMI.update({
@@ -51,7 +59,7 @@ const payInstallment = async (req, res) => {
       data: {
         paidInstallments: paid,
         active: !done,
-        nextDueDate: done ? existing.nextDueDate : calcNextDue(existing.startDate, paid),
+        nextDueDate: calcNextDue(existing.startDate, paid),
       },
     });
     res.json({ success: true, emi });
@@ -64,20 +72,24 @@ const updateEMI = async (req, res) => {
   try {
     const existing = await prisma.eMI.findFirst({ where: { id: req.params.id, userId: req.user.id } });
     if (!existing) return res.status(404).json({ success: false, message: 'EMI not found' });
-    const { title, totalAmount, emiAmount, totalInstallments, startDate, note } = req.body;
+
+    const { title, totalAmount, emiAmount, totalInstallments, startDate, paidInstallments, note } = req.body;
     const start = new Date(startDate);
     const total = Number(totalInstallments);
-    const active = existing.paidInstallments < total;
+    const paid = Math.min(Number(paidInstallments) || existing.paidInstallments, total);
+    const active = paid < total;
     const emi = await prisma.eMI.update({
       where: { id: existing.id },
       data: {
-        title, note: note || null,
+        title,
+        note: note || null,
         totalAmount: Number(totalAmount),
         emiAmount: Number(emiAmount),
         totalInstallments: total,
+        paidInstallments: paid,
         startDate: start,
         active,
-        nextDueDate: active ? calcNextDue(start, existing.paidInstallments) : existing.nextDueDate,
+        nextDueDate: calcNextDue(start, paid),
       },
     });
     res.json({ success: true, emi });
