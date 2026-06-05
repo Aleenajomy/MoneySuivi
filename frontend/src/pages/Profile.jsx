@@ -10,9 +10,13 @@ export default function Profile() {
   const { user, logout, updateProfile } = useAuth()
   const navigate = useNavigate()
   const [editing, setEditing] = useState(false)
-  const [modal, setModal] = useState(null) // 'notifications' | 'privacy' | 'help'
+  const [changingPw, setChangingPw] = useState(false)
+  const [modal, setModal] = useState(null)
   const [form, setForm] = useState({ name: user?.name || '', budgetLimit: user?.budgetLimit || 0 })
+  const [pwForm, setPwForm] = useState({ current: '', newPw: '', confirm: '' })
+  const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [pwLoading, setPwLoading] = useState(false)
 
   const handleSave = async (e) => {
     e.preventDefault()
@@ -24,6 +28,23 @@ export default function Profile() {
       toast.error('Update failed')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault()
+    if (pwForm.newPw !== pwForm.confirm) return toast.error('Passwords do not match')
+    if (pwForm.newPw.length < 6) return toast.error('Min. 6 characters')
+    setPwLoading(true)
+    try {
+      await api.put('/auth/profile', { currentPassword: pwForm.current, password: pwForm.newPw })
+      toast.success('Password changed!')
+      setPwForm({ current: '', newPw: '', confirm: '' })
+      setChangingPw(false)
+    } catch (err) {
+      toast.error(err.message || 'Failed to change password')
+    } finally {
+      setPwLoading(false)
     }
   }
 
@@ -101,10 +122,47 @@ export default function Profile() {
       {/* Settings */}
       <p className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-3 px-1 dark:text-gray-400">Settings</p>
       <div className="space-y-2 mb-4">
-        <SettingRow icon={<Bell size={17} />}        label="Notifications"      onClick={() => setModal('notifications')} />
-        <SettingRow icon={<Shield size={17} />}      label="Privacy & Security" onClick={() => setModal('privacy')} />
-        <SettingRow icon={<HelpCircle size={17} />}  label="Help & Support"     onClick={() => setModal('help')} />
+        <SettingRow icon={<Bell size={17} />}       label="Notifications" onClick={() => setModal('notifications')} />
+        <SettingRow icon={<Lock size={17} />}       label="Change Password" onClick={() => setChangingPw(p => !p)} />
+        <SettingRow icon={<HelpCircle size={17} />} label="Help & Support"  onClick={() => setModal('help')} />
       </div>
+
+      {/* Inline Password Change */}
+      {changingPw && (
+        <form onSubmit={handleChangePassword} className="card p-5 mb-4 space-y-3 animate-slideDown">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1">Change Password</p>
+          {[
+            { key: 'current', label: 'Current Password', placeholder: 'Enter current password' },
+            { key: 'newPw',   label: 'New Password',     placeholder: 'Min. 6 characters' },
+            { key: 'confirm', label: 'Confirm Password', placeholder: 'Re-enter new password' },
+          ].map(({ key, label, placeholder }) => (
+            <div key={key}>
+              <label className="label">{label}</label>
+              <div className="relative">
+                <input
+                  type={showPw ? 'text' : 'password'}
+                  className="input pr-11" placeholder={placeholder}
+                  value={pwForm[key]}
+                  onChange={e => setPwForm(p => ({ ...p, [key]: e.target.value }))}
+                  required
+                />
+                {key === 'newPw' && (
+                  <button type="button" onClick={() => setShowPw(s => !s)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
+                    {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={() => setChangingPw(false)} className="btn-secondary flex-1 py-2.5">Cancel</button>
+            <button type="submit" disabled={pwLoading} className="flex-1 py-2.5 rounded-xl gradient-blue text-white text-sm font-semibold disabled:opacity-50">
+              {pwLoading ? 'Saving...' : 'Update Password'}
+            </button>
+          </div>
+        </form>
+      )}
 
       <p className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-3 px-1 dark:text-gray-400">Account</p>
       <div className="space-y-2">
@@ -131,7 +189,6 @@ export default function Profile() {
 
       {/* Modals */}
       {modal === 'notifications' && <NotificationsModal onClose={() => setModal(null)} />}
-      {modal === 'privacy'        && <PrivacyModal       onClose={() => setModal(null)} user={user} />}
       {modal === 'help'           && <HelpModal          onClose={() => setModal(null)} />}
     </div>
   )
