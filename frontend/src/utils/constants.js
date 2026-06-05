@@ -1,9 +1,12 @@
 export const CATEGORIES = ['Food', 'Travel', 'Shopping', 'Bills', 'Entertainment', 'Salary', 'Healthcare', 'Other']
+export const INCOME_CATEGORIES = ['Salary', 'Freelance', 'Investment', 'Gift', 'Other']
+export const EXPENSE_CATEGORIES = ['Food', 'Travel', 'Shopping', 'Bills', 'Entertainment', 'Healthcare', 'Other']
 export const PAYMENT_METHODS = ['Cash', 'UPI', 'Credit Card', 'Debit Card', 'Net Banking']
 
 export const CATEGORY_ICONS = {
   Food: '🍔', Travel: '✈️', Shopping: '🛍️', Bills: '📄',
-  Entertainment: '🎬', Salary: '💰', Healthcare: '🏥', Other: '📦'
+  Entertainment: '🎬', Salary: '💰', Healthcare: '🏥', Other: '📦',
+  Freelance: '💻', Investment: '📈', Gift: '🎁'
 }
 
 export const CATEGORY_COLORS = {
@@ -14,7 +17,10 @@ export const CATEGORY_COLORS = {
   Entertainment: '#F472B6',
   Salary: '#00C896',
   Healthcare: '#38BDF8',
-  Other: '#94A3B8'
+  Other: '#94A3B8',
+  Freelance: '#34D399',
+  Investment: '#FBBF24',
+  Gift: '#F87171'
 }
 
 export const formatCurrency = (amount) =>

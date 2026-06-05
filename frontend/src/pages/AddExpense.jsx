@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useExpense } from '../context/ExpenseContext'
 import { ArrowLeft } from 'lucide-react'
-import { CATEGORIES, PAYMENT_METHODS, CATEGORY_ICONS, CATEGORY_COLORS } from '../utils/constants'
+import { CATEGORIES, INCOME_CATEGORIES, EXPENSE_CATEGORIES, PAYMENT_METHODS, CATEGORY_ICONS, CATEGORY_COLORS } from '../utils/constants'
 import toast from 'react-hot-toast'
 import api from '../services/api'
 
@@ -36,6 +36,13 @@ export default function AddExpense() {
   }, [id])
 
   const set = key => e => setForm(p => ({ ...p, [key]: e.target.value }))
+
+  const activeCategories = form.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
+
+  const handleTypeChange = (type) => {
+    const cats = type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
+    setForm(p => ({ ...p, type, category: cats[0] }))
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -76,7 +83,7 @@ export default function AddExpense() {
         <div className="card p-1.5 flex gap-1">
           {['expense', 'income'].map(type => (
             <button key={type} type="button"
-              onClick={() => setForm(p => ({ ...p, type }))}
+              onClick={() => handleTypeChange(type)}
               className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all
                       ${
                         form.type === type
@@ -115,7 +122,7 @@ export default function AddExpense() {
         <div>
           <label className="label">Category</label>
           <div className="grid grid-cols-4 gap-2">
-            {CATEGORIES.map(cat => {
+            {activeCategories.map(cat => {
               const isSelected = form.category === cat
               const color = CATEGORY_COLORS[cat] || '#0066FF'
               return (
