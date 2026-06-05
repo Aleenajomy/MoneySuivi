@@ -29,6 +29,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/expenses', require('./routes/expenses'));
 app.use('/api/transactions', require('./routes/expenses'));
 app.use('/api/budgets', require('./routes/budgets'));
+app.use('/budgets', require('./routes/budgets'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/export', require('./routes/export'));
 

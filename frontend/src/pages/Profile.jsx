@@ -1,15 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { useTheme } from '../context/ThemeContext'
-import { LogOut, ChevronRight, User, Bell, Shield, HelpCircle, X, Mail, Phone, Lock, Eye, EyeOff, Moon, Sun } from 'lucide-react'
+import { LogOut, ChevronRight, User, Bell, Shield, HelpCircle, X, Mail, Lock, Eye, EyeOff } from 'lucide-react'
 import { formatDate } from '../utils/constants'
 import toast from 'react-hot-toast'
 import api from '../services/api'
 
 export default function Profile() {
   const { user, logout, updateProfile } = useAuth()
-  const { mode, toggle } = useTheme()
   const navigate = useNavigate()
   const [editing, setEditing] = useState(false)
   const [modal, setModal] = useState(null) // 'notifications' | 'privacy' | 'help'
@@ -95,16 +93,6 @@ export default function Profile() {
         <SettingRow icon={<Bell size={17} />}        label="Notifications"      onClick={() => setModal('notifications')} />
         <SettingRow icon={<Shield size={17} />}      label="Privacy & Security" onClick={() => setModal('privacy')} />
         <SettingRow icon={<HelpCircle size={17} />}  label="Help & Support"     onClick={() => setModal('help')} />
-        <button onClick={toggle}
-          className="w-full card p-4 flex items-center gap-3 active:scale-[0.98] transition-transform animate-fadeIn">
-          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-            {mode === 'dark' ? <Moon size={17} /> : <Sun size={17} />}
-          </div>
-          <span className="flex-1 text-sm font-medium dark:text-gray-300 text-slate-700 text-left">
-            Theme: {mode === 'dark' ? 'Dark' : 'Light'}
-          </span>
-          <ChevronRight size={15} className="dark:text-gray-600 text-gray-400" />
-        </button>
       </div>
 
       <p className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-3 px-1 dark:text-gray-400">Account</p>
@@ -326,12 +314,38 @@ function HelpModal({ onClose }) {
   const [tab, setTab] = useState('faq') // 'faq' | 'contact'
 
   const faqs = [
-    { q: 'How do I add an expense?',           a: 'Tap the blue + button at the bottom center of the screen, fill in the details and tap "Add Transaction".' },
-    { q: 'How do I set a budget limit?',        a: 'Go to Profile → Edit Profile → enter your Monthly Budget Limit. You\'ll get a warning when you reach 80% of it.' },
-    { q: 'Can I edit or delete an expense?',    a: 'Yes! Tap any expense to edit it. On the History screen, tap the trash icon on the right side to delete.' },
-    { q: 'How does the Analytics chart work?',  a: 'It shows your current month\'s spending by category (pie chart) and your last 6 months trend (bar chart).' },
-    { q: 'Is my data secure?',                  a: 'Yes. Passwords are encrypted with bcrypt. All API calls use JWT tokens. Data is stored in MongoDB Atlas.' },
-    { q: 'Does this work offline?',             a: 'The app is a PWA — it caches the shell offline. However, adding/viewing expenses requires an internet connection.' },
+    {
+      q: 'How do I add income or expenses?',
+      a: 'Open the Add tab, choose Expense or Income, enter the amount, title, category, payment method, date, and optional note, then tap "Add Transaction".',
+    },
+    {
+      q: 'How do recurring expenses work?',
+      a: 'When adding an expense, turn on Recurring and choose Weekly or Monthly. Recurring is available only for expenses, not income.',
+    },
+    {
+      q: 'How do I set category budgets?',
+      a: 'Open Budgets, tap the plus button, choose an expense category, enter the monthly limit, and save. Existing budgets can be edited or deleted from the same screen.',
+    },
+    {
+      q: 'When will I get budget alerts?',
+      a: 'The app creates alerts when a category reaches 80% of its monthly budget and again when it reaches or exceeds 100%. Alerts appear in the Alerts tab.',
+    },
+    {
+      q: 'Can I edit, delete, search, or export transactions?',
+      a: 'Yes. Open History to search and filter transactions, download CSV or PDF reports for a date range, edit a transaction, or delete it.',
+    },
+    {
+      q: 'What does Analytics show?',
+      a: 'Analytics shows current spending by category, a category breakdown, and a 6-month spending trend. Use the refresh button to reload the latest data.',
+    },
+    {
+      q: 'How do I update my profile, theme, or password?',
+      a: 'Open Profile to edit your name and monthly budget limit, switch between light and dark theme, or change your password from Privacy & Security.',
+    },
+    {
+      q: 'Is my account data protected?',
+      a: 'Passwords are stored with bcrypt hashing, authenticated API requests use JWT tokens, and account data is stored in PostgreSQL through the backend API.',
+    },
   ]
 
   const handleSubmit = (e) => {
@@ -347,9 +361,9 @@ function HelpModal({ onClose }) {
       <div className="flex gap-2 mb-5 p-1 rounded-xl dark:bg-dark-bg bg-light-muted">
         {['faq', 'contact'].map(t => (
           <button key={t} onClick={() => setTab(t)}
-            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all
+            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5
               ${tab === t ? 'bg-primary text-white' : 'dark:text-gray-500 text-gray-600'}`}>
-            {t === 'faq' ? '❓ FAQs' : '✉️ Contact Us'}
+            {t === 'faq' ? <><HelpCircle size={14} /> FAQs</> : <><Mail size={14} /> Contact Us</>}
           </button>
         ))}
       </div>
@@ -377,16 +391,11 @@ function HelpModal({ onClose }) {
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Contact info tiles */}
-          <div className="grid grid-cols-2 gap-3 mb-2">
+          <div className="mb-2">
             <div className="p-3 rounded-xl dark:bg-dark-bg dark:border-dark-border border bg-light-bg border-light-border text-center">
               <Mail size={20} className="text-primary mx-auto mb-1" />
               <p className="text-[10px] dark:text-gray-500 text-gray-600 font-semibold uppercase">Email</p>
-              <p className="text-xs dark:text-gray-300 text-gray-700 mt-0.5">support@smartexpense.app</p>
-            </div>
-            <div className="p-3 rounded-xl dark:bg-dark-bg dark:border-dark-border border bg-light-bg border-light-border text-center">
-              <Phone size={20} className="text-secondary mx-auto mb-1" />
-              <p className="text-[10px] dark:text-gray-500 text-gray-600 font-semibold uppercase">Phone</p>
-              <p className="text-xs dark:text-gray-300 text-gray-700 mt-0.5">+91 98765 43210</p>
+              <p className="text-xs dark:text-gray-300 text-gray-700 mt-0.5">aleena.jomy.tech@gmail.com</p>
             </div>
           </div>
 

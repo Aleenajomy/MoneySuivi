@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, Download, FileText, Repeat, WalletCards } from 'lucide-react'
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, Download, FileText, Repeat, UserCircle, WalletCards } from 'lucide-react'
 import ExpenseCard from '../components/ExpenseCard'
 import { ExpenseCardSkeleton, StatCardSkeleton } from '../components/Skeleton'
 import { useAuth } from '../context/AuthContext'
@@ -40,10 +40,19 @@ export default function Dashboard() {
   return (
     <div className="page">
       <div className="flex items-center justify-between mb-6 animate-fadeIn pr-12">
-        <div>
-          <p className="text-gray-500 dark:text-gray-400 text-sm">Good day,</p>
-          <h1 className="text-xl font-bold dark:text-white text-slate-800">{user?.name?.split(' ')[0] || 'there'}</h1>
-        </div>
+        <button
+          type="button"
+          onClick={() => navigate('/profile')}
+          className="flex items-center gap-3 text-left rounded-xl active:scale-95 transition-transform"
+        >
+          <span className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+            <UserCircle size={22} />
+          </span>
+          <span>
+            <span className="block text-gray-500 dark:text-gray-400 text-sm">Good day,</span>
+            <span className="block text-xl font-bold dark:text-white text-slate-800">{user?.name?.split(' ')[0] || 'there'}</span>
+          </span>
+        </button>
       </div>
 
       <div
@@ -66,8 +75,8 @@ export default function Dashboard() {
           <><StatCardSkeleton /><StatCardSkeleton /></>
         ) : (
           <>
-            <StatCard label="Income" amount={totalIncome} icon={ArrowDownRight} tone="secondary" />
-            <StatCard label="Expenses" amount={totalExpense} icon={ArrowUpRight} tone="danger" />
+            <StatCard label="Income" amount={totalIncome} icon={ArrowDownRight} tone="secondary" onClick={() => navigate('/add?type=income')} />
+            <StatCard label="Expenses" amount={totalExpense} icon={ArrowUpRight} tone="danger" onClick={() => navigate('/add?type=expense')} />
           </>
         )}
       </div>
@@ -143,10 +152,15 @@ export default function Dashboard() {
   )
 }
 
-function StatCard({ label, amount, icon: Icon, tone }) {
+function StatCard({ label, amount, icon: Icon, tone, onClick }) {
   const color = tone === 'secondary' ? 'text-secondary bg-secondary/10' : 'text-danger bg-danger/10'
+  const Component = onClick ? 'button' : 'div'
   return (
-    <div className="card p-4">
+    <Component
+      type={onClick ? 'button' : undefined}
+      onClick={onClick}
+      className={`card p-4 text-left ${onClick ? 'active:scale-[0.98] transition-transform' : ''}`}
+    >
       <div className="flex items-center justify-between mb-3">
         <span className="text-xs font-semibold dark:text-gray-500 text-gray-600 uppercase tracking-wide">{label}</span>
         <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${color}`}>
@@ -154,7 +168,7 @@ function StatCard({ label, amount, icon: Icon, tone }) {
         </div>
       </div>
       <p className="dark:text-gray-100 text-slate-800 font-bold text-lg">{formatCurrency(amount)}</p>
-    </div>
+    </Component>
   )
 }
 

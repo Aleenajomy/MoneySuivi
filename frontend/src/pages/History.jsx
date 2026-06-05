@@ -63,7 +63,7 @@ export default function History() {
 
   return (
     <div className="page">
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between mb-5 pr-12">
         <h1 className="text-xl font-bold dark:text-white text-slate-800">History</h1>
         <div className="w-9 h-9 rounded-xl dark:bg-dark-card bg-light-card dark:border-dark-border border-light-border border flex items-center justify-center">
           <SlidersHorizontal size={16} className="dark:text-gray-400 text-gray-500" />
@@ -71,7 +71,7 @@ export default function History() {
       </div>
 
       <div className="card p-4 mb-4">
-        <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
           <div>
             <label className="label">Start Date</label>
             <input

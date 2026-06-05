@@ -16,6 +16,7 @@ export default function Budgets() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState('')
   const [form, setForm] = useState({ category: EXPENSE_CATEGORIES[0], monthlyLimit: '' })
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     fetchBudgets()
@@ -32,10 +33,18 @@ export default function Budgets() {
 
   const handleSave = async (e) => {
     e.preventDefault()
+    if (!form.category) return toast.error('Select a category')
     if (!form.monthlyLimit || Number(form.monthlyLimit) <= 0) return toast.error('Enter a valid limit')
-    if (editingId) await updateBudget(editingId, Number(form.monthlyLimit))
-    else await saveBudget(form.category, Number(form.monthlyLimit))
-    resetForm()
+    setSaving(true)
+    try {
+      if (editingId) await updateBudget(editingId, Number(form.monthlyLimit))
+      else await saveBudget(form.category, Number(form.monthlyLimit))
+      resetForm()
+    } catch (err) {
+      toast.error(err.message || 'Failed to save budget')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const startEdit = (budget) => {
@@ -91,9 +100,11 @@ export default function Budgets() {
                 required
               />
             </div>
-            <button type="submit" className="btn-primary flex items-center justify-center gap-2">
-              <Save size={15} />
-              Save Budget
+            <button type="submit" disabled={saving} className="btn-primary flex items-center justify-center gap-2 disabled:opacity-50">
+              {saving
+                ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                : <Save size={15} />}
+              {saving ? 'Saving...' : 'Save Budget'}
             </button>
           </form>
         </div>

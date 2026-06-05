@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Repeat } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useExpense } from '../context/ExpenseContext'
@@ -29,6 +29,7 @@ const defaultForm = {
 
 export default function AddExpense() {
   const { id } = useParams()
+  const [searchParams] = useSearchParams()
   const isEditing = Boolean(id)
   const navigate = useNavigate()
   const { addExpense, updateExpense } = useExpense()
@@ -52,6 +53,14 @@ export default function AddExpense() {
       })
     }).catch(() => toast.error('Failed to load transaction'))
   }, [id, isEditing])
+
+  useEffect(() => {
+    if (isEditing) return
+    const type = searchParams.get('type')
+    if (type === 'income' || type === 'expense') {
+      handleTypeChange(type)
+    }
+  }, [isEditing, searchParams])
 
   const set = key => e => setForm(prev => ({ ...prev, [key]: e.target.value }))
   const setChecked = key => e => setForm(prev => ({ ...prev, [key]: e.target.checked }))

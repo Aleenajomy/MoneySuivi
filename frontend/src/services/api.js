@@ -1,7 +1,19 @@
 import axios from 'axios'
 
+const getBaseURL = () => {
+  const configuredURL = import.meta.env.VITE_API_URL
+  const fallbackURL = import.meta.env.DEV ? '/api' : 'https://smartexpencetracker.onrender.com/api'
+  const baseURL = (configuredURL || fallbackURL).replace(/\/+$/, '')
+
+  if (baseURL.startsWith('http') && !baseURL.endsWith('/api')) {
+    return `${baseURL}/api`
+  }
+
+  return baseURL
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: getBaseURL(),
   headers: { 'Content-Type': 'application/json' }
 })
 
