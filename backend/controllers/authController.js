@@ -90,20 +90,42 @@ const getMe = async (req, res) => {
 // @access  Private
 const updateProfile = async (req, res) => {
   try {
-    const { name, budgetLimit, currency } = req.body;
+    const { name, budgetLimit, currency, currentPassword, password } = req.body;
     const data = {};
     if (name !== undefined) data.name = name;
     if (budgetLimit !== undefined) data.budgetLimit = Number(budgetLimit);
     if (currency !== undefined) data.currency = currency;
 
-    const user = await prisma.user.update({
-      where: { id: req.user.id },
-      data,
-    });
+    if (password) {
+      const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+      if (!currentPassword) return res.status(400).json({ success: false, message: 'Current password is required' });
+      const isMatch = await bcrypt.compare(currentPassword, user.password);
+      if (!isMatch) return res.status(400).json({ success: false, message: 'Current password is incorrect' });
+      data.password = await bcrypt.hash(password, 12);
+    }
+
+    const user = await prisma.user.update({ where: { id: req.user.id }, data });
     res.json({ success: true, message: 'Profile updated', user: toUserResponse(user) });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-module.exports = { register, login, getMe, updateProfile };
+const resetAllData = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    await Promise.all([
+      prisma.expense.deleteMany({ where: { userId } }),
+      prisma.budget.deleteMany({ where: { userId } }),
+      prisma.eMI.deleteMany({ where: { userId } }),
+      prisma.asset.deleteMany({ where: { userId } }),
+      prisma.liability.deleteMany({ where: { userId } }),
+      prisma.notification.deleteMany({ where: { userId } }),
+    ]);
+    res.json({ success: true, message: 'All data reset successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = { register, login, getMe, updateProfile, resetAllData };

@@ -34,6 +34,17 @@ export default function Profile() {
     }
   }
 
+  const handleResetAll = async () => {
+    if (!window.confirm('This will delete ALL your transactions, budgets, EMIs, assets and liabilities. This cannot be undone. Continue?')) return
+    if (!window.confirm('Are you absolutely sure? All data will be permanently deleted.')) return
+    try {
+      await api.delete('/auth/reset')
+      toast.success('All data has been reset')
+    } catch (e) {
+      toast.error(e.message || 'Reset failed')
+    }
+  }
+
   return (
     <div className="page">
 
@@ -96,13 +107,25 @@ export default function Profile() {
       </div>
 
       <p className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-3 px-1 dark:text-gray-400">Account</p>
-      <button onClick={handleLogout}
-        className="w-full card p-4 flex items-center gap-3 border-danger/20 active:scale-[0.98] transition-transform">
-        <div className="w-9 h-9 rounded-xl bg-danger/10 flex items-center justify-center">
-          <LogOut size={17} className="text-danger" />
-        </div>
-        <span className="text-sm font-semibold text-danger">Logout</span>
-      </button>
+      <div className="space-y-2">
+        <button onClick={handleResetAll}
+          className="w-full card p-4 flex items-center gap-3 border-orange-500/20 active:scale-[0.98] transition-transform">
+          <div className="w-9 h-9 rounded-xl bg-orange-500/10 flex items-center justify-center">
+            <Shield size={17} className="text-orange-500" />
+          </div>
+          <div className="flex-1 text-left">
+            <span className="text-sm font-semibold text-orange-500 block">Reset All Data</span>
+            <span className="text-xs dark:text-gray-500 text-gray-400">Delete all transactions, budgets, EMIs & more</span>
+          </div>
+        </button>
+        <button onClick={handleLogout}
+          className="w-full card p-4 flex items-center gap-3 border-danger/20 active:scale-[0.98] transition-transform">
+          <div className="w-9 h-9 rounded-xl bg-danger/10 flex items-center justify-center">
+            <LogOut size={17} className="text-danger" />
+          </div>
+          <span className="text-sm font-semibold text-danger">Logout</span>
+        </button>
+      </div>
 
       <p className="text-center dark:text-gray-700 text-gray-400 text-xs mt-8">Smart Expense Tracker v1.0.0</p>
 
@@ -293,7 +316,7 @@ function PrivacyModal({ onClose, user }) {
               </div>
             </div>
           ))}
-          <button type="submit" disabled={loading} className="btn-primary">
+          <button type="submit" disabled={loading} className="btn-primary w-full">
             {loading
               ? <span className="flex items-center justify-center gap-2">
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
