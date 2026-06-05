@@ -159,7 +159,7 @@ function Modal({ title, onClose, children }) {
       <div className="w-full max-w-md rounded-t-3xl border-t animate-slideUp
                       dark:bg-dark-card dark:border-dark-border
                       bg-light-card border-light-border shadow-lg"
-        style={{ maxHeight: '80vh', overflowY: 'auto', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        style={{ maxHeight: 'calc(100vh - 140px)', overflowY: 'auto' }}>
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 rounded-full bg-dark-border dark:bg-dark-border bg-light-border" />
