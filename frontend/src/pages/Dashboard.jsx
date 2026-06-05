@@ -1,13 +1,16 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, Download, FileText, Repeat, UserCircle, WalletCards } from 'lucide-react'
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, BarChart3, Download, FileText, Repeat, UserCircle, WalletCards } from 'lucide-react'
+import { Bar, BarChart as ReBarChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import ExpenseCard from '../components/ExpenseCard'
 import { ExpenseCardSkeleton, StatCardSkeleton } from '../components/Skeleton'
 import { useAuth } from '../context/AuthContext'
 import { useBudget } from '../context/BudgetContext'
 import { useExpense } from '../context/ExpenseContext'
 import { useNotification } from '../context/NotificationContext'
-import { formatCurrency, formatShortDate } from '../utils/constants'
+import { CATEGORY_COLORS, CATEGORY_ICONS, formatCurrency, formatShortDate } from '../utils/constants'
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 const budgetColor = (pct) => {
   if (pct >= 100) return 'bg-red-500'
@@ -92,6 +95,12 @@ export default function Dashboard() {
         </button>
       </div>
 
+      <AnalysisWidget
+        analytics={analytics}
+        loading={loadingAnalytics}
+        onAction={() => navigate('/analytics')}
+      />
+
       <Widget title="Category Budgets" action="Manage" onAction={() => navigate('/budgets')} icon={WalletCards}>
         {topBudgets.length === 0 ? (
           <p className="text-xs dark:text-gray-500 text-gray-500">No category budgets set yet.</p>
@@ -148,6 +157,89 @@ export default function Dashboard() {
         : expenses.length === 0
           ? <EmptyState />
           : expenses.slice(0, 5).map(e => <ExpenseCard key={e._id} expense={e} />)}
+    </div>
+  )
+}
+
+function AnalysisWidget({ analytics, loading, onAction }) {
+  const categoryData = (analytics.categorySpending || []).slice(0, 4).map(item => ({
+    name: item._id,
+    value: item.total,
+    color: CATEGORY_COLORS[item._id] || '#6366F1',
+  }))
+  const trendData = (analytics.monthlyTrend || []).map(item => ({
+    month: MONTHS[item._id.month - 1],
+    amount: item.total,
+  }))
+  const totalSpent = categoryData.reduce((sum, item) => sum + item.value, 0)
+
+  return (
+    <div className="card p-4 mb-5">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <span className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+            <BarChart3 size={16} />
+          </span>
+          <h2 className="font-bold dark:text-white text-slate-800 text-sm">Spending Analysis</h2>
+        </div>
+        <button type="button" onClick={onAction} className="text-primary text-xs font-semibold px-2 py-1 rounded-lg bg-primary/10">
+          Details
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="h-[170px] rounded-xl dark:bg-dark-bg bg-light-muted animate-pulse" />
+      ) : trendData.length > 0 ? (
+        <>
+          <div className="h-[170px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <ReBarChart data={trendData} barSize={22} margin={{ top: 8, right: 4, left: -18, bottom: 0 }}>
+                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--tick-color)' }} />
+                <Tooltip content={<AnalysisTooltip />} cursor={{ fill: 'rgba(99, 102, 241, 0.08)' }} />
+                <Bar dataKey="amount" fill="#6366F1" radius={[7, 7, 2, 2]} />
+              </ReBarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {categoryData.length > 0 && (
+            <div className="mt-4 space-y-2.5">
+              {categoryData.map(item => (
+                <div key={item.name}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs dark:text-gray-400 text-gray-600 font-semibold">
+                      {CATEGORY_ICONS[item.name]} {item.name}
+                    </span>
+                    <span className="text-xs dark:text-gray-300 text-slate-700 font-bold">{formatCurrency(item.value)}</span>
+                  </div>
+                  <div className="h-1.5 dark:bg-dark-border bg-slate-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${totalSpent ? (item.value / totalSpent) * 100 : 0}%`,
+                        backgroundColor: item.color,
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="text-center py-8">
+          <p className="dark:text-gray-400 text-gray-500 text-sm font-medium">No analytics yet</p>
+          <p className="dark:text-gray-600 text-gray-400 text-xs mt-1">Add expenses to build your graph.</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AnalysisTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="dark:bg-dark-card bg-white dark:border-dark-border border-light-border border rounded-xl px-3 py-2 text-xs shadow-lg">
+      <p className="dark:text-white text-slate-800 font-semibold">{formatCurrency(payload[0].value)}</p>
     </div>
   )
 }
