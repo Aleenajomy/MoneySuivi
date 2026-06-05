@@ -4,9 +4,17 @@ export const EXPENSE_CATEGORIES = ['Food', 'Travel', 'Shopping', 'Bills', 'Enter
 export const PAYMENT_METHODS = ['Cash', 'UPI', 'Credit Card', 'Debit Card', 'Net Banking']
 
 export const CATEGORY_ICONS = {
-  Food: '🍔', Travel: '✈️', Shopping: '🛍️', Bills: '📄',
-  Entertainment: '🎬', Salary: '💰', Healthcare: '🏥', Other: '📦',
-  Freelance: '💻', Investment: '📈', Gift: '🎁'
+  Food: 'FD',
+  Travel: 'TR',
+  Shopping: 'SH',
+  Bills: 'BL',
+  Entertainment: 'EN',
+  Salary: 'SA',
+  Healthcare: 'HC',
+  Other: 'OT',
+  Freelance: 'FR',
+  Investment: 'IN',
+  Gift: 'GF',
 }
 
 export const CATEGORY_COLORS = {
@@ -20,13 +28,15 @@ export const CATEGORY_COLORS = {
   Other: '#94A3B8',
   Freelance: '#34D399',
   Investment: '#FBBF24',
-  Gift: '#F87171'
+  Gift: '#F87171',
 }
 
 export const formatCurrency = (amount) =>
   new Intl.NumberFormat('en-IN', {
-    style: 'currency', currency: 'INR', maximumFractionDigits: 0
-  }).format(amount)
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format(amount || 0)
 
 export const formatDate = (date) =>
   new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })

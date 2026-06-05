@@ -8,31 +8,64 @@ datasource db {
 }
 
 model User {
-  id          String    @id @default(uuid())
-  name        String    @db.VarChar(50)
-  email       String    @unique
-  password    String
-  budgetLimit Float     @default(0)
-  currency    String    @default("INR")
-  expenses    Expense[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id            String         @id @default(uuid())
+  name          String         @db.VarChar(50)
+  email         String         @unique
+  password      String
+  budgetLimit   Float          @default(0)
+  currency      String         @default("INR")
+  expenses      Expense[]
+  budgets       Budget[]
+  notifications Notification[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
 model Expense {
-  id            String   @id @default(uuid())
-  userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title         String   @db.VarChar(100)
-  amount        Float
-  category      String
-  type          String   @default("expense")
-  paymentMethod String   @default("Cash")
-  note          String?  @db.VarChar(500)
-  expenseDate   DateTime @default(now())
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title          String    @db.VarChar(100)
+  amount         Float
+  category       String
+  type           String    @default("expense")
+  paymentMethod  String    @default("Cash")
+  note           String?   @db.VarChar(500)
+  expenseDate    DateTime  @default(now())
+  recurring      Boolean   @default(false)
+  recurringType  String?
+  nextRunDate    DateTime?
+  isAutoCreated  Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@index([userId, expenseDate])
   @@index([userId, category])
+  @@index([recurring, nextRunDate])
+}
+
+model Budget {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category     String
+  monthlyLimit Float
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, category])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category  String
+  percentage Float    @default(0)
+  message   String
+  type      String   @default("warning")
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
 }

@@ -1,11 +1,13 @@
-import { createContext, useContext, useState, useCallback } from 'react'
-import api from '../services/api'
+import { createContext, useCallback, useContext, useState } from 'react'
 import toast from 'react-hot-toast'
+import api from '../services/api'
+import { useNotification } from './NotificationContext'
 
 const ExpenseContext = createContext(null)
 export const useExpense = () => useContext(ExpenseContext)
 
 export function ExpenseProvider({ children }) {
+  const notificationContext = useNotification()
   const [expenses, setExpenses] = useState([])
   const [analytics, setAnalytics] = useState({})
   const [loading, setLoading] = useState(false)
@@ -23,7 +25,7 @@ export function ExpenseProvider({ children }) {
       setExpenses(prev => append ? [...prev, ...data.expenses] : data.expenses)
       setPagination({ page: data.currentPage, totalPages: data.totalPages })
     } catch (err) {
-      toast.error('Failed to load expenses')
+      toast.error('Failed to load transactions')
     } finally {
       setLoading(false)
     }
@@ -42,15 +44,21 @@ export function ExpenseProvider({ children }) {
   }, [])
 
   const addExpense = async (data) => {
-    await api.post('/expenses', data)
-    toast.success('Expense added! ✅')
+    const res = await api.post('/expenses', data)
+    toast.success('Transaction added')
+    if (res.data.notification) {
+      toast(res.data.notification.message, {
+        icon: res.data.notification.type === 'critical' ? '!' : 'i',
+      })
+      notificationContext?.fetchNotifications?.()
+    }
     fetchExpenses({ page: 1 })
     fetchAnalytics()
   }
 
   const updateExpense = async (id, data) => {
     await api.put(`/expenses/${id}`, data)
-    toast.success('Expense updated! ✅')
+    toast.success('Transaction updated')
     fetchExpenses({ page: 1 })
     fetchAnalytics()
   }
@@ -58,7 +66,7 @@ export function ExpenseProvider({ children }) {
   const deleteExpense = async (id) => {
     await api.delete(`/expenses/${id}`)
     setExpenses(prev => prev.filter(e => e._id !== id))
-    toast.success('Expense deleted')
+    toast.success('Transaction deleted')
     fetchAnalytics()
   }
 
@@ -68,8 +76,18 @@ export function ExpenseProvider({ children }) {
 
   return (
     <ExpenseContext.Provider value={{
-      expenses, analytics, loading, loadingAnalytics, pagination, filters,
-      fetchExpenses, fetchAnalytics, addExpense, updateExpense, deleteExpense, applyFilter
+      expenses,
+      analytics,
+      loading,
+      loadingAnalytics,
+      pagination,
+      filters,
+      fetchExpenses,
+      fetchAnalytics,
+      addExpense,
+      updateExpense,
+      deleteExpense,
+      applyFilter,
     }}>
       {children}
     </ExpenseContext.Provider>

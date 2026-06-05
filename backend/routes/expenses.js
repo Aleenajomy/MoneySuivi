@@ -17,6 +17,14 @@ const expenseRules = [
   body('amount').isFloat({ min: 0.01 }).withMessage('Amount must be greater than 0'),
   body('category').notEmpty().withMessage('Category is required'),
   body('expenseDate').notEmpty().withMessage('Date is required'),
+  body('type').optional().isIn(['expense', 'income']).withMessage('Type must be expense or income'),
+  body('recurring').optional().isBoolean().withMessage('Recurring must be true or false'),
+  body('recurringType').custom((value, { req }) => {
+    if (req.body.recurring === true || req.body.recurring === 'true') {
+      return ['weekly', 'monthly'].includes(value);
+    }
+    return true;
+  }).withMessage('Recurring type must be weekly or monthly'),
 ];
 
 router.use(protect); // All expense routes are protected
