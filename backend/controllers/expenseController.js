@@ -30,7 +30,7 @@ const getExpenses = async (req, res) => {
     const where = buildFilter(req.user.id, req.query);
     const [total, expenses] = await Promise.all([
       prisma.expense.count({ where }),
-      prisma.expense.findMany({ where, orderBy: { expenseDate: 'asc' }, skip: (page - 1) * limit, take: limit }),
+      prisma.expense.findMany({ where, orderBy: { expenseDate: 'desc' }, skip: (page - 1) * limit, take: limit }),
     ]);
     res.json({ success: true, count: expenses.length, total, totalPages: Math.ceil(total / limit), currentPage: page, expenses: expenses.map(toExpenseResponse) });
   } catch (error) {
