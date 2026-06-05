@@ -4,16 +4,16 @@ export const EXPENSE_CATEGORIES = ['Food', 'Travel', 'Shopping', 'Bills', 'Enter
 export const PAYMENT_METHODS = ['Cash', 'UPI', 'Credit Card', 'Debit Card', 'Net Banking']
 
 export const CATEGORY_ICONS = {
-  Food: 'Food',
-  Travel: 'Travel',
-  Shopping: 'Shopping',
-  Bills: 'Bills',
-  Entertainment: 'Entertainment',
-  Salary: 'Salary',
-  Healthcare: 'Healthcare',
-  Other: 'Other',
-  Freelance: 'Freelance',
-  Investment: 'Investment',
+  Food: 'Utensils',
+  Travel: 'Bus',
+  Shopping: 'ShoppingBag',
+  Bills: 'Receipt',
+  Entertainment: 'Tv',
+  Salary: 'Banknote',
+  Healthcare: 'HeartPulse',
+  Other: 'CircleDot',
+  Freelance: 'Briefcase',
+  Investment: 'TrendingUp',
   Gift: 'Gift',
 }
 

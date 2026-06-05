@@ -1,8 +1,14 @@
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Edit2, Plus, Save, Trash2, X } from 'lucide-react'
+import { Edit2, Plus, Save, Trash2, X, Utensils, Bus, ShoppingBag, Receipt, Tv, Banknote, HeartPulse, Briefcase, TrendingUp, Gift, CircleDot } from 'lucide-react'
 import { useBudget } from '../context/BudgetContext'
-import { CATEGORY_ICONS, EXPENSE_CATEGORIES, formatCurrency } from '../utils/constants'
+import { CATEGORY_COLORS, EXPENSE_CATEGORIES, formatCurrency } from '../utils/constants'
+
+const ICONS = {
+  Food: Utensils, Travel: Bus, Shopping: ShoppingBag, Bills: Receipt,
+  Entertainment: Tv, Salary: Banknote, Healthcare: HeartPulse,
+  Freelance: Briefcase, Investment: TrendingUp, Gift, Other: CircleDot,
+}
 
 const barColor = (pct) => {
   if (pct >= 100) return 'bg-red-500'
@@ -128,8 +134,8 @@ export default function Budgets() {
               <div key={b.id} className="card p-4 animate-fadeIn">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <span className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">
-                      {CATEGORY_ICONS[b.category] || 'OT'}
+                    <span className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center" style={{ color: CATEGORY_COLORS[b.category] || '#0066FF' }}>
+                      {(() => { const I = ICONS[b.category] || CircleDot; return <I size={18} /> })()}
                     </span>
                     <div>
                       <p className="font-semibold text-sm dark:text-white text-slate-800">{b.category}</p>
