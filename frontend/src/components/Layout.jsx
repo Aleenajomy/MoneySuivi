@@ -1,27 +1,20 @@
-import { useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Home, Clock, WalletCards, Bell, Plus } from 'lucide-react'
+import { Home, Clock, WalletCards, CreditCard, Plus } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
-import { useNotification } from '../context/NotificationContext'
 import { Sun, Moon } from 'lucide-react'
 
 const navItems = [
   { path: '/', icon: Home, label: 'Home' },
   { path: '/history', icon: Clock, label: 'History' },
   { path: '/add', icon: Plus, label: 'Add', isFab: true },
-  { path: '/budgets', icon: WalletCards, label: 'Budgets' },
-  { path: '/notifications', icon: Bell, label: 'Alerts' },
+  { path: '/emis', icon: CreditCard, label: 'EMI' },
+  { path: '/networth', icon: WalletCards, label: 'Net Worth' },
 ]
 
 export default function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
   const { mode, toggle } = useTheme()
-  const { unreadCount, fetchNotifications } = useNotification()
-
-  useEffect(() => {
-    fetchNotifications()
-  }, [fetchNotifications])
 
   return (
     <div className="relative max-w-md mx-auto min-h-screen transition-colors duration-300 dark:bg-dark-bg bg-light-bg">
@@ -66,11 +59,6 @@ export default function Layout() {
                 <Icon size={20}
                   className={isActive ? 'text-primary' : 'dark:text-gray-500 text-gray-400'}
                   strokeWidth={isActive ? 2.5 : 1.8} />
-                {path === '/notifications' && unreadCount > 0 && (
-                  <span className="absolute -mt-7 ml-7 min-w-[16px] h-4 px-1 rounded-full bg-danger text-white text-[9px] font-bold leading-4">
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </span>
-                )}
               </div>
               <span className={`text-[10px] font-semibold tracking-wide
                 ${isActive ? 'text-primary' : 'dark:text-gray-500 text-gray-400'}`}>

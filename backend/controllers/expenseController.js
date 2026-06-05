@@ -11,7 +11,7 @@ const buildFilter = (userId, query) => {
   if (startDate || endDate) {
     where.expenseDate = {};
     if (startDate) where.expenseDate.gte = new Date(startDate);
-    if (endDate) where.expenseDate.lte = new Date(endDate);
+    if (endDate) { const d = new Date(endDate); d.setHours(23, 59, 59, 999); where.expenseDate.lte = d; }
   }
   return where;
 };
@@ -30,7 +30,7 @@ const getExpenses = async (req, res) => {
     const where = buildFilter(req.user.id, req.query);
     const [total, expenses] = await Promise.all([
       prisma.expense.count({ where }),
-      prisma.expense.findMany({ where, orderBy: { expenseDate: 'desc' }, skip: (page - 1) * limit, take: limit }),
+      prisma.expense.findMany({ where, orderBy: { expenseDate: 'asc' }, skip: (page - 1) * limit, take: limit }),
     ]);
     res.json({ success: true, count: expenses.length, total, totalPages: Math.ceil(total / limit), currentPage: page, expenses: expenses.map(toExpenseResponse) });
   } catch (error) {

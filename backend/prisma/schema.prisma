@@ -17,6 +17,9 @@ model User {
   expenses      Expense[]
   budgets       Budget[]
   notifications Notification[]
+  emis          EMI[]
+  assets        Asset[]
+  liabilities   Liability[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
@@ -54,6 +57,53 @@ model Budget {
   updatedAt    DateTime @updatedAt
 
   @@unique([userId, category])
+}
+
+model EMI {
+  id                   String   @id @default(uuid())
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title                String   @db.VarChar(100)
+  totalAmount          Float
+  emiAmount            Float
+  totalInstallments    Int
+  paidInstallments     Int      @default(0)
+  startDate            DateTime
+  nextDueDate          DateTime
+  note                 String?  @db.VarChar(500)
+  active               Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([userId, active])
+}
+
+model Asset {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String   @db.VarChar(100)
+  type      String
+  value     Float
+  note      String?  @db.VarChar(500)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Liability {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String   @db.VarChar(100)
+  type      String
+  value     Float
+  note      String?  @db.VarChar(500)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model Notification {

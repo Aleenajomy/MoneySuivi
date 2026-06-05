@@ -1,4 +1,4 @@
-import { Repeat, Trash2 } from 'lucide-react'
+import { Repeat, Trash2, Utensils, Bus, ShoppingBag, Receipt, Tv, Banknote, HeartPulse, Briefcase, TrendingUp, Gift, CircleDot } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useExpense } from '../context/ExpenseContext'
 import { CATEGORY_COLORS, CATEGORY_ICONS, formatCurrency, formatShortDate } from '../utils/constants'
@@ -9,6 +9,13 @@ export default function ExpenseCard({ expense, showActions = false }) {
   const isIncome = expense.type === 'income'
   const color = CATEGORY_COLORS[expense.category] || '#0066FF'
 
+  const ICONS = {
+    Food: Utensils, Travel: Bus, Shopping: ShoppingBag, Bills: Receipt,
+    Entertainment: Tv, Salary: Banknote, Healthcare: HeartPulse,
+    Freelance: Briefcase, Investment: TrendingUp, Gift, Other: CircleDot,
+  }
+  const Icon = ICONS[expense.category] || CircleDot
+
   const handleDelete = (e) => {
     e.stopPropagation()
     if (window.confirm('Delete this transaction?')) deleteExpense(expense._id)
@@ -17,13 +24,13 @@ export default function ExpenseCard({ expense, showActions = false }) {
   return (
     <div
       onClick={() => navigate(`/edit/${expense._id}`)}
-      className="card p-4 flex items-center gap-3 mb-2.5 cursor-pointer active:scale-[0.98] transition-transform hover:dark:border-dark-muted hover:bg-opacity-75 animate-fadeIn"
+      className="flex items-center gap-3 py-3 px-1 border-b dark:border-dark-border border-light-border cursor-pointer hover:dark:bg-white/5 hover:bg-black/5 transition-colors animate-fadeIn"
     >
       <div
-        className="w-11 h-11 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0"
+        className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
         style={{ backgroundColor: `${color}18`, color }}
       >
-        {CATEGORY_ICONS[expense.category] || 'OT'}
+        <Icon size={20} />
       </div>
 
       <div className="flex-1 min-w-0">

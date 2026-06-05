@@ -1,16 +1,16 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, BarChart3, Repeat, UserCircle, WalletCards } from 'lucide-react'
-import { Bar, BarChart as ReBarChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, BarChart3, CreditCard, Repeat, TrendingUp, UserCircle, WalletCards } from 'lucide-react'
+import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import ExpenseCard from '../components/ExpenseCard'
 import { ExpenseCardSkeleton, StatCardSkeleton } from '../components/Skeleton'
 import { useAuth } from '../context/AuthContext'
 import { useBudget } from '../context/BudgetContext'
 import { useExpense } from '../context/ExpenseContext'
 import { useNotification } from '../context/NotificationContext'
-import { CATEGORY_COLORS, CATEGORY_ICONS, formatCurrency, formatShortDate } from '../utils/constants'
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+import { useEMI } from '../context/EMIContext'
+import { useNetWorth } from '../context/NetWorthContext'
+import { CATEGORY_COLORS, formatCurrency, formatShortDate } from '../utils/constants'
 
 const budgetColor = (pct) => {
   if (pct >= 100) return 'bg-red-500'
@@ -24,6 +24,8 @@ export default function Dashboard() {
   const { analytics, expenses, loading, loadingAnalytics, fetchExpenses, fetchAnalytics } = useExpense()
   const { budgets, fetchBudgets } = useBudget()
   const { notifications, unreadCount, fetchNotifications } = useNotification()
+  const { emis, fetchEMIs } = useEMI()
+  const { summary, fetchNetWorth } = useNetWorth()
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -31,7 +33,9 @@ export default function Dashboard() {
     fetchExpenses({ page: 1 })
     fetchBudgets()
     fetchNotifications()
-  }, [fetchAnalytics, fetchExpenses, fetchBudgets, fetchNotifications])
+    fetchEMIs()
+    fetchNetWorth()
+  }, [fetchAnalytics, fetchExpenses, fetchBudgets, fetchNotifications, fetchEMIs, fetchNetWorth])
 
   const balance = analytics.balance ?? 0
   const totalIncome = analytics.totalIncome ?? 0
@@ -39,6 +43,9 @@ export default function Dashboard() {
   const upcomingRecurring = analytics.upcomingRecurring || []
   const topBudgets = budgets.slice().sort((a, b) => b.percentage - a.percentage).slice(0, 3)
   const latestAlerts = notifications.slice(0, 2)
+  const upcomingEMIs = emis.filter(e => e.active).slice(0, 3)
+  const netWorth = summary.netWorth ?? 0
+  const isPositiveNW = netWorth >= 0
 
   return (
     <div className="page">
@@ -84,11 +91,50 @@ export default function Dashboard() {
         )}
       </div>
 
+      {/* Net Worth Mini Card */}
+      <button
+        type="button"
+        onClick={() => navigate('/networth')}
+        className="w-full card p-4 mb-5 flex items-center justify-between active:scale-[0.98] transition-transform"
+      >
+        <div className="flex items-center gap-3">
+          <span className={`w-10 h-10 rounded-xl flex items-center justify-center ${isPositiveNW ? 'bg-secondary/10' : 'bg-danger/10'}`}>
+            <TrendingUp size={18} className={isPositiveNW ? 'text-secondary' : 'text-danger'} />
+          </span>
+          <div className="text-left">
+            <p className="text-xs dark:text-gray-500 text-gray-400 font-medium">Net Worth</p>
+            <p className={`text-lg font-extrabold ${isPositiveNW ? 'text-secondary' : 'text-danger'}`}>{formatCurrency(netWorth)}</p>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] dark:text-gray-600 text-gray-400">Assets</p>
+          <p className="text-xs font-semibold dark:text-gray-300 text-slate-700">{formatCurrency(summary.totalAssets)}</p>
+          <p className="text-[10px] dark:text-gray-600 text-gray-400 mt-1">Liabilities</p>
+          <p className="text-xs font-semibold dark:text-gray-300 text-slate-700">{formatCurrency(summary.totalLiabilities)}</p>
+        </div>
+      </button>
+
       <AnalysisWidget
         analytics={analytics}
         loading={loadingAnalytics}
         onAction={() => navigate('/analytics')}
       />
+
+      <Widget title="Upcoming EMIs" action="View All" onAction={() => navigate('/emis')} icon={CreditCard}>
+        {upcomingEMIs.length === 0 ? (
+          <p className="text-xs dark:text-gray-500 text-gray-500">No active EMIs.</p>
+        ) : upcomingEMIs.map(emi => (
+          <div key={emi.id} className="flex items-center justify-between py-1.5 border-b dark:border-dark-border border-light-border last:border-0">
+            <div>
+              <p className="text-xs font-semibold dark:text-gray-300 text-slate-700">{emi.title}</p>
+              <p className="text-[10px] dark:text-gray-600 text-gray-400">
+                {emi.paidInstallments}/{emi.totalInstallments} paid · Due {formatShortDate(emi.nextDueDate)}
+              </p>
+            </div>
+            <span className="text-xs font-bold text-danger">{formatCurrency(emi.emiAmount)}/mo</span>
+          </div>
+        ))}
+      </Widget>
 
       <Widget title="Category Budgets" action="Manage" onAction={() => navigate('/budgets')} icon={WalletCards}>
         {topBudgets.length === 0 ? (
@@ -151,14 +197,10 @@ export default function Dashboard() {
 }
 
 function AnalysisWidget({ analytics, loading, onAction }) {
-  const categoryData = (analytics.categorySpending || []).slice(0, 4).map(item => ({
+  const categoryData = (analytics.categorySpending || []).map(item => ({
     name: item._id,
     value: item.total,
     color: CATEGORY_COLORS[item._id] || '#6366F1',
-  }))
-  const trendData = (analytics.monthlyTrend || []).map(item => ({
-    month: MONTHS[item._id.month - 1],
-    amount: item.total,
   }))
   const totalSpent = categoryData.reduce((sum, item) => sum + item.value, 0)
 
@@ -178,57 +220,45 @@ function AnalysisWidget({ analytics, loading, onAction }) {
 
       {loading ? (
         <div className="h-[170px] rounded-xl dark:bg-dark-bg bg-light-muted animate-pulse" />
-      ) : trendData.length > 0 ? (
-        <>
-          <div className="h-[170px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <ReBarChart data={trendData} barSize={22} margin={{ top: 8, right: 4, left: -18, bottom: 0 }}>
-                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--tick-color)' }} />
-                <Tooltip content={<AnalysisTooltip />} cursor={{ fill: 'rgba(99, 102, 241, 0.08)' }} />
-                <Bar dataKey="amount" fill="#6366F1" radius={[7, 7, 2, 2]} />
-              </ReBarChart>
+      ) : categoryData.length > 0 ? (
+        <div className="flex items-center gap-4">
+          <div className="relative flex-shrink-0">
+            <ResponsiveContainer width={150} height={150}>
+              <PieChart>
+                <Pie data={categoryData} cx="50%" cy="50%"
+                  innerRadius={48} outerRadius={70}
+                  dataKey="value" paddingAngle={3} startAngle={90} endAngle={-270}>
+                  {categoryData.map((entry, i) => (
+                    <Cell key={i} fill={entry.color} stroke="transparent" />
+                  ))}
+                </Pie>
+              </PieChart>
             </ResponsiveContainer>
-          </div>
-
-          {categoryData.length > 0 && (
-            <div className="mt-4 space-y-2.5">
-              {categoryData.map(item => (
-                <div key={item.name}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs dark:text-gray-400 text-gray-600 font-semibold">
-                      {CATEGORY_ICONS[item.name]} {item.name}
-                    </span>
-                    <span className="text-xs dark:text-gray-300 text-slate-700 font-bold">{formatCurrency(item.value)}</span>
-                  </div>
-                  <div className="h-1.5 dark:bg-dark-border bg-slate-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${totalSpent ? (item.value / totalSpent) * 100 : 0}%`,
-                        backgroundColor: item.color,
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <p className="text-[10px] dark:text-gray-500 text-gray-400">Total</p>
+              <p className="text-sm font-bold dark:text-white text-slate-800">{formatCurrency(totalSpent)}</p>
             </div>
-          )}
-        </>
+          </div>
+          <div className="flex-1 space-y-2.5">
+            {categoryData.map(item => (
+              <div key={item.name} className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+                  <span className="text-xs dark:text-gray-400 text-gray-500">{item.name}</span>
+                </div>
+                <span className="text-xs font-semibold dark:text-white text-slate-700">
+                  {Math.round((item.value / totalSpent) * 100)}%
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
       ) : (
         <div className="text-center py-8">
           <p className="dark:text-gray-400 text-gray-500 text-sm font-medium">No analytics yet</p>
           <p className="dark:text-gray-600 text-gray-400 text-xs mt-1">Add expenses to build your graph.</p>
         </div>
       )}
-    </div>
-  )
-}
-
-function AnalysisTooltip({ active, payload }) {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="dark:bg-dark-card bg-white dark:border-dark-border border-light-border border rounded-xl px-3 py-2 text-xs shadow-lg">
-      <p className="dark:text-white text-slate-800 font-semibold">{formatCurrency(payload[0].value)}</p>
     </div>
   )
 }

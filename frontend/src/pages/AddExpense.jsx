@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Repeat } from 'lucide-react'
+import { ArrowLeft, Repeat, Utensils, Bus, ShoppingBag, Receipt, Tv, Banknote, HeartPulse, Briefcase, TrendingUp, Gift, CircleDot } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useExpense } from '../context/ExpenseContext'
 import api from '../services/api'
@@ -61,6 +61,12 @@ export default function AddExpense() {
       handleTypeChange(type)
     }
   }, [isEditing, searchParams])
+
+  const ICONS = {
+    Food: Utensils, Travel: Bus, Shopping: ShoppingBag, Bills: Receipt,
+    Entertainment: Tv, Salary: Banknote, Healthcare: HeartPulse,
+    Freelance: Briefcase, Investment: TrendingUp, Gift, Other: CircleDot,
+  }
 
   const set = key => e => setForm(prev => ({ ...prev, [key]: e.target.value }))
   const setChecked = key => e => setForm(prev => ({ ...prev, [key]: e.target.checked }))
@@ -171,7 +177,7 @@ export default function AddExpense() {
                     isSelected ? 'border-primary bg-primary/10' : 'dark:border-dark-border border-light-border dark:bg-dark-card bg-light-card'
                   }`}
                 >
-                  <div className="text-xs font-bold mb-1" style={{ color }}>{CATEGORY_ICONS[cat]}</div>
+                  <div className="flex justify-center mb-1" style={{ color }}>{(() => { const I = ICONS[cat] || CircleDot; return <I size={18} /> })()}</div>
                   <div className={`text-[10px] font-semibold truncate ${isSelected ? 'text-primary' : 'dark:text-gray-600 text-gray-500'}`}>
                     {cat}
                   </div>

@@ -87,7 +87,7 @@ export default function Login() {
       </form>
 
       <p className="text-center text-xs dark:text-gray-700 text-gray-400 mt-8">
-        Smart Expense Tracker © 2024
+        Smart Expense Tracker © 2026
       </p>
     </div>
   )

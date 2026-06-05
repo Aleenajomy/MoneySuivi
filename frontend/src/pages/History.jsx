@@ -27,13 +27,16 @@ export default function History() {
   const [exporting, setExporting] = useState('')
 
   useEffect(() => {
-    const params = { page: 1 }
-    if (filters.category && filters.category !== 'All') params.category = filters.category
-    if (filters.search) params.search = filters.search
-    if (appliedRange.startDate) params.startDate = appliedRange.startDate
-    if (appliedRange.endDate) params.endDate = appliedRange.endDate
-    fetchExpenses(params)
-  }, [filters, appliedRange, fetchExpenses])
+    const timer = setTimeout(() => {
+      const params = { page: 1 }
+      if (filters.category && filters.category !== 'All') params.category = filters.category
+      if (search.trim()) params.search = search.trim()
+      if (appliedRange.startDate) params.startDate = appliedRange.startDate
+      if (appliedRange.endDate) params.endDate = appliedRange.endDate
+      fetchExpenses(params)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [filters.category, search, appliedRange, fetchExpenses])
 
   const activeFilterCount = [
     filters.category && filters.category !== 'All',
@@ -41,10 +44,7 @@ export default function History() {
     appliedRange.startDate || appliedRange.endDate,
   ].filter(Boolean).length
 
-  const handleSearch = (val) => {
-    setSearch(val)
-    applyFilter('search', val)
-  }
+  const handleSearch = (val) => setSearch(val)
 
   const applyDateFilter = () => {
     if (range.startDate && range.endDate && range.startDate > range.endDate) {
@@ -58,7 +58,6 @@ export default function History() {
     setSearch('')
     setRange({ startDate: '', endDate: '' })
     setAppliedRange({ startDate: '', endDate: '' })
-    applyFilter('search', '')
     applyFilter('category', 'All')
   }
 
@@ -66,7 +65,7 @@ export default function History() {
     if (pagination.page < pagination.totalPages) {
       const params = { page: pagination.page + 1 }
       if (filters.category && filters.category !== 'All') params.category = filters.category
-      if (filters.search) params.search = filters.search
+      if (search.trim()) params.search = search.trim()
       if (appliedRange.startDate) params.startDate = appliedRange.startDate
       if (appliedRange.endDate) params.endDate = appliedRange.endDate
       fetchExpenses(params, true)
@@ -207,7 +206,9 @@ export default function History() {
               <p className="dark:text-gray-600 text-gray-400 text-sm mt-1">Try adjusting your filters</p>
             </div>
           : <>
-              {expenses.map(e => <ExpenseCard key={e._id} expense={e} showActions />)}
+              <div className="card overflow-hidden">
+                {expenses.map(e => <ExpenseCard key={e._id} expense={e} showActions />)}
+              </div>
               {pagination.page < pagination.totalPages && (
                 <button onClick={loadMore} disabled={loading} className="w-full py-3 text-primary text-sm font-semibold bg-primary/10 rounded-xl mt-2">
                   {loading ? 'Loading...' : 'Load more'}
