@@ -159,7 +159,7 @@ function Modal({ title, onClose, children }) {
       <div className="w-full max-w-md rounded-t-3xl border-t animate-slideUp
                       dark:bg-dark-card dark:border-dark-border
                       bg-light-card border-light-border shadow-lg"
-        style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+        style={{ maxHeight: '80vh', overflowY: 'auto', paddingBottom: 'env(safe-area-inset-bottom)' }}>
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 rounded-full bg-dark-border dark:bg-dark-border bg-light-border" />
@@ -291,7 +291,7 @@ function PrivacyModal({ onClose, user }) {
           </button>
         </>
       ) : (
-        <form onSubmit={handleChangePassword} className="space-y-4">
+        <form onSubmit={handleChangePassword} className="space-y-4 pb-6">
           {[
             { key: 'current', label: 'Current Password',  placeholder: 'Enter current password' },
             { key: 'newPw',   label: 'New Password',      placeholder: 'Min. 6 characters' },
