@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, BarChart3, Download, FileText, Repeat, UserCircle, WalletCards } from 'lucide-react'
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, BarChart3, Repeat, UserCircle, WalletCards } from 'lucide-react'
 import { Bar, BarChart as ReBarChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import ExpenseCard from '../components/ExpenseCard'
 import { ExpenseCardSkeleton, StatCardSkeleton } from '../components/Skeleton'
@@ -82,17 +82,6 @@ export default function Dashboard() {
             <StatCard label="Expenses" amount={totalExpense} icon={ArrowUpRight} tone="danger" onClick={() => navigate('/add?type=expense')} />
           </>
         )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 mb-5">
-        <button type="button" onClick={() => navigate('/history')} className="btn-secondary flex items-center justify-center gap-2">
-          <Download size={15} />
-          Export CSV
-        </button>
-        <button type="button" onClick={() => navigate('/history')} className="btn-primary flex items-center justify-center gap-2">
-          <FileText size={15} />
-          Export PDF
-        </button>
       </div>
 
       <AnalysisWidget
