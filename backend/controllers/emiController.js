@@ -73,10 +73,13 @@ const updateEMI = async (req, res) => {
     const existing = await prisma.eMI.findFirst({ where: { id: req.params.id, userId: req.user.id } });
     if (!existing) return res.status(404).json({ success: false, message: 'EMI not found' });
 
-    const { title, totalAmount, emiAmount, totalInstallments, startDate, paidInstallments, note } = req.body;
+    const { title, totalAmount, emiAmount, totalInstallments, startDate, note } = req.body;
+    const paidInstallments = req.body.paidInstallments;
     const start = new Date(startDate);
     const total = Number(totalInstallments);
-    const paid = Math.min(Number(paidInstallments) || existing.paidInstallments, total);
+    const paid = paidInstallments !== undefined && paidInstallments !== '' 
+      ? Math.min(Number(paidInstallments), total) 
+      : existing.paidInstallments;
     const active = paid < total;
     const emi = await prisma.eMI.update({
       where: { id: existing.id },
