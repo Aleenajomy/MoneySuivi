@@ -19,8 +19,8 @@ export const CATEGORY_ICONS = {
 
 export const CATEGORY_COLORS = {
   Food: '#FF6B6B',
-  Travel: '#0066FF',
-  Shopping: '#A78BFA',
+  Travel: '#0EA5E9',
+  Shopping: '#06B6D4',
   Bills: '#FB923C',
   Entertainment: '#F472B6',
   Salary: '#00C896',

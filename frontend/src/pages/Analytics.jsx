@@ -25,7 +25,7 @@ export default function Analytics() {
   const categoryData = (analytics.categorySpending || []).map(item => ({
     name: item._id,
     value: item.total,
-    color: CATEGORY_COLORS[item._id] || '#0066FF'
+    color: CATEGORY_COLORS[item._id] || '#0EA5E9'
   }))
 
   const trendData = (analytics.monthlyTrend || []).map(item => ({
@@ -147,7 +147,7 @@ export default function Analytics() {
               <XAxis dataKey="month" axisLine={false} tickLine={false}
                 tick={{ fontSize: 11, fill: 'var(--tick-color)' }} />
               <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-              <Bar dataKey="amount" fill="#0066FF" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="amount" fill="#0EA5E9" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         ) : (

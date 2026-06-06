@@ -62,10 +62,10 @@ export default function EMITracker() {
 
   return (
     <div className="page">
-      <div className="card p-3 mb-4 flex gap-2.5 items-start bg-primary/5 border border-primary/20">
-        <span className="text-primary mt-0.5">💡</span>
+      <div className="card p-3 mb-4 flex gap-2.5 items-start bg-sky-500/5 border border-sky-500/20">
+        <span className="text-sky-500 mt-0.5">💡</span>
         <div>
-          <p className="text-xs font-semibold text-primary mb-0.5">When to use EMI Tracker?</p>
+          <p className="text-xs font-semibold text-sky-500 mb-0.5">When to use EMI Tracker?</p>
           <p className="text-[11px] dark:text-gray-400 text-gray-500">Use for <span className="font-semibold">loan repayments</span> with a fixed tenure (phone, bike, home loan). Mark each installment paid manually.</p>
           <p className="text-[11px] dark:text-gray-500 text-gray-400 mt-1">For auto-repeating bills (rent, Netflix), use <span className="font-semibold">Recurring</span> in Add Transaction.</p>
         </div>
@@ -75,7 +75,7 @@ export default function EMITracker() {
         <h1 className="text-xl font-bold dark:text-white text-slate-800">EMI Tracker</h1>
         <button
           onClick={() => showForm ? closeForm() : setShowForm(true)}
-          className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+          className="w-9 h-9 rounded-xl bg-sky-500/10 text-sky-500 flex items-center justify-center">
           {showForm ? <X size={16} /> : <Plus size={16} />}
         </button>
       </div>
@@ -196,7 +196,7 @@ function EMICard({ emi, onPay, onDelete, onEdit }) {
             </button>
           )}
           <button onClick={() => onEdit(emi)}
-            className="w-8 h-8 rounded-xl hover:bg-primary/10 text-gray-400 hover:text-primary flex items-center justify-center transition-colors">
+            className="w-8 h-8 rounded-xl hover:bg-sky-500/10 text-gray-400 hover:text-sky-500 flex items-center justify-center transition-colors">
             <Pencil size={15} />
           </button>
           <button onClick={() => { if (window.confirm('Delete this EMI?')) onDelete(emi.id) }}
@@ -208,7 +208,7 @@ function EMICard({ emi, onPay, onDelete, onEdit }) {
 
       {/* Progress bar */}
       <div className="h-1.5 dark:bg-dark-border bg-slate-200 rounded-full overflow-hidden mb-2">
-        <div className="h-full rounded-full transition-all bg-primary" style={{ width: `${pct}%` }} />
+        <div className="h-full rounded-full transition-all bg-sky-500" style={{ width: `${pct}%` }} />
       </div>
 
       {/* Amount summary */}
@@ -220,7 +220,7 @@ function EMICard({ emi, onPay, onDelete, onEdit }) {
           {pct}%
         </span>
         {emi.active
-          ? <span className="dark:text-gray-500 text-gray-400">Left: <span className="text-primary font-semibold">{formatCurrency(amountRemaining)}</span></span>
+          ? <span className="dark:text-gray-500 text-gray-400">Left: <span className="text-sky-500 font-semibold">{formatCurrency(amountRemaining)}</span></span>
           : <span className="text-secondary font-semibold">✓ Complete</span>
         }
       </div>

@@ -37,7 +37,7 @@ export default function ExpenseCard({ expense, showActions = false }) {
         <div className="flex items-center gap-2 min-w-0">
           <p className="font-semibold dark:text-white text-slate-800 text-sm truncate">{expense.title}</p>
           {expense.recurring && (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-primary/10 text-primary text-[10px] font-bold uppercase">
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-sky-500/10 text-sky-500 text-[10px] font-bold uppercase">
               <Repeat size={10} />
               {expense.recurringType}
             </span>
@@ -49,7 +49,7 @@ export default function ExpenseCard({ expense, showActions = false }) {
           <span className="text-xs dark:text-gray-500 text-gray-400">{formatShortDate(expense.expenseDate)}</span>
         </div>
         {expense.recurring && expense.nextRunDate && (
-          <p className="text-[10px] text-primary mt-1">Next: {formatShortDate(expense.nextRunDate)}</p>
+          <p className="text-[10px] text-sky-500 mt-1">Next: {formatShortDate(expense.nextRunDate)}</p>
         )}
       </div>
 

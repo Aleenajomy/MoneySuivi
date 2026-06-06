@@ -45,8 +45,8 @@ function createPNG(size) {
         Math.sqrt((ax - cornerX) ** 2 + (ay - cornerY) ** 2) <= cornerR);
 
       if (inRoundedRect) {
-        // indigo background #6366F1
-        row.push(99, 102, 241);
+        // primary background #0EA5E9 (replaced indigo)
+        row.push(14, 165, 233);
       } else {
         // transparent white background
         row.push(255, 255, 255);

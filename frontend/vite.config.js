@@ -12,7 +12,7 @@ export default defineConfig({
         name: 'Smart Expense Tracker',
         short_name: 'Expenses',
         description: 'Track your expenses smartly with offline support',
-        theme_color: '#6366F1',
+        theme_color: '#0EA5E9',
         background_color: '#0f172a',
         display: 'standalone',
         orientation: 'portrait',

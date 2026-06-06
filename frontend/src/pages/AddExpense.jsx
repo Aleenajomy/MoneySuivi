@@ -174,7 +174,7 @@ export default function AddExpense() {
                   type="button"
                   onClick={() => setForm(prev => ({ ...prev, category: cat }))}
                   className={`p-2.5 rounded-xl text-center transition-all border ${
-                    isSelected ? 'border-primary bg-primary/10' : 'dark:border-dark-border border-light-border dark:bg-dark-card bg-light-card'
+                      isSelected ? 'border-sky-500 bg-sky-500/10' : 'dark:border-dark-border border-light-border dark:bg-dark-card bg-light-card'
                   }`}
                 >
                   <div className="flex justify-center mb-1" style={{ color }}>{(() => { const I = ICONS[cat] || CircleDot; return <I size={18} /> })()}</div>
@@ -204,15 +204,15 @@ export default function AddExpense() {
           <div className="card p-4">
             <label className="flex items-center justify-between gap-3">
               <span className="flex items-center gap-2">
-                <span className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <Repeat size={16} className="text-primary" />
+                <span className="w-8 h-8 rounded-xl bg-sky-500/10 flex items-center justify-center">
+                  <Repeat size={16} className="text-sky-500" />
                 </span>
                 <span>
                   <span className="block text-sm font-semibold dark:text-white text-slate-800">Recurring</span>
                   <span className="block text-xs dark:text-gray-500 text-gray-500">Auto-create future expenses (rent, subscriptions). For loan EMIs, use the EMI Tracker tab.</span>
                 </span>
               </span>
-              <input type="checkbox" className="w-5 h-5 accent-indigo-500" checked={form.recurring} onChange={setChecked('recurring')} />
+              <input type="checkbox" className="w-5 h-5 accent-sky-500" checked={form.recurring} onChange={setChecked('recurring')} />
             </label>
 
             {form.recurring && (

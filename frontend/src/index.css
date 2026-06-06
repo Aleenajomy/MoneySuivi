@@ -13,7 +13,7 @@
   }
 
   html {
-    --primary: #6366F1;
+    --primary: #0EA5E9;
     --secondary: #10B981;
     --danger: #F87171;
     --warning: #FBBF24;
@@ -49,7 +49,7 @@
   }
 
   .gradient-blue {
-    @apply bg-gradient-to-br from-indigo-400 to-indigo-600 dark:from-indigo-500 dark:to-indigo-700;
+    background: linear-gradient(135deg, #38BDF8 0%, #0EA5E9 100%);
   }
 
   .gradient-green {
@@ -61,7 +61,7 @@
   }
 
   .gradient-purple {
-    @apply bg-gradient-to-br from-violet-400 to-indigo-600 dark:from-violet-500 dark:to-indigo-700;
+    background: linear-gradient(135deg, #38BDF8 0%, #0284C7 100%);
   }
 
   .btn-primary {
@@ -72,13 +72,15 @@
   }
 
   .dark .btn-primary {
-    @apply bg-indigo-600 hover:bg-indigo-700;
-    box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+    background-color: #0EA5E9;
+    box-shadow: 0 0 20px rgba(14, 165, 233, 0.3);
   }
+  .dark .btn-primary:hover { background-color: #0284C7; }
 
   html:not(.dark) .btn-primary {
-    @apply bg-indigo-500 hover:bg-indigo-600;
+    background-color: #0EA5E9;
   }
+  html:not(.dark) .btn-primary:hover { background-color: #0284C7; }
 
   .btn-secondary {
     @apply w-full py-3.5 rounded-xl border font-semibold text-sm
@@ -100,14 +102,15 @@
   }
 
   .dark .input {
-    @apply border-dark-border bg-dark-bg text-gray-100 placeholder-gray-600
-           focus:border-indigo-500 focus:ring-indigo-500/20;
+    @apply border-dark-border bg-dark-bg text-gray-100 placeholder-gray-600;
+    --tw-ring-color: rgba(14, 165, 233, 0.2);
   }
+  .dark .input:focus { border-color: #0EA5E9; box-shadow: 0 0 0 2px rgba(14,165,233,0.15); }
 
   html:not(.dark) .input {
-    @apply border-light-border bg-white text-slate-700 placeholder-slate-400
-           focus:border-indigo-400 focus:ring-indigo-400/20;
+    @apply border-light-border bg-white text-slate-700 placeholder-slate-400;
   }
+  html:not(.dark) .input:focus { border-color: #0EA5E9; box-shadow: 0 0 0 2px rgba(14,165,233,0.15); }
 
   .label {
     @apply block text-xs font-semibold mb-1.5 uppercase tracking-wide;

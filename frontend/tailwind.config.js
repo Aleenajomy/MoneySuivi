@@ -5,7 +5,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: '#6366F1',
+        primary: '#0EA5E9',
         secondary: '#10B981',
         danger: '#F87171',
         warning: '#FBBF24',
@@ -16,18 +16,18 @@ export default {
           muted: '#475569'
         },
         light: {
-          bg: '#FAF5FF',
-          card: '#FDF2F8',
-          border: '#F3E8FF',
-          muted: '#E9D5FF'
+          bg: '#F8FAFC',
+          card: '#FFFFFF',
+          border: '#E2E8F0',
+          muted: '#F1F5F9'
         },
         pastel: {
-          purple: '#D8B4FE',
-          pink: '#F9A8D4',
-          blue: '#BFDBFE',
+          blue: '#BAE6FD',
           green: '#BBEDDA',
           yellow: '#FEE2A4',
-          rose: '#FBCFE8'
+          rose: '#FBCFE8',
+          pink: '#F9A8D4',
+          red: '#FECACA'
         }
       },
       fontFamily: {

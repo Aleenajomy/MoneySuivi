@@ -55,7 +55,7 @@ export default function Dashboard() {
           onClick={() => navigate('/profile')}
           className="flex items-center gap-3 text-left rounded-xl active:scale-95 transition-transform"
         >
-          <span className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+          <span className="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-500 flex items-center justify-center">
             <UserCircle size={22} />
           </span>
           <span>
@@ -67,7 +67,7 @@ export default function Dashboard() {
 
       <div
         className="rounded-2xl p-6 mb-4 relative overflow-hidden animate-slideUp shadow-lg hover:shadow-xl transition-shadow"
-        style={{ background: 'linear-gradient(135deg, #5B4CB8 0%, #6B5FDB 50%, #9B93DB 100%)' }}
+        style={{ background: 'linear-gradient(135deg, #0284C7 0%, #0EA5E9 50%, #38BDF8 100%)' }}
       >
         <div className="absolute -top-6 -right-6 w-32 h-32 rounded-full bg-white/5" />
         <div className="absolute -bottom-8 -left-4 w-24 h-24 rounded-full bg-white/5" />
@@ -182,7 +182,7 @@ export default function Dashboard() {
 
       <div className="flex items-center justify-between mb-4 animate-slideLeft">
         <h2 className="font-bold dark:text-white">Recent Transactions</h2>
-        <button onClick={() => navigate('/history')} className="text-primary text-xs font-semibold px-3 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 transition-all">
+        <button onClick={() => navigate('/history')} className="text-sky-500 text-xs font-semibold px-3 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 transition-all">
           See all
         </button>
       </div>
@@ -200,7 +200,7 @@ function AnalysisWidget({ analytics, loading, onAction }) {
   const categoryData = (analytics.categorySpending || []).map(item => ({
     name: item._id,
     value: item.total,
-    color: CATEGORY_COLORS[item._id] || '#6366F1',
+    color: CATEGORY_COLORS[item._id] || '#0EA5E9',
   }))
   const totalSpent = categoryData.reduce((sum, item) => sum + item.value, 0)
 
@@ -208,12 +208,12 @@ function AnalysisWidget({ analytics, loading, onAction }) {
     <div className="card p-4 mb-5">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <span className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+          <span className="w-8 h-8 rounded-xl bg-sky-500/10 text-sky-500 flex items-center justify-center">
             <BarChart3 size={16} />
           </span>
           <h2 className="font-bold dark:text-white text-slate-800 text-sm">Spending Analysis</h2>
         </div>
-        <button type="button" onClick={onAction} className="text-primary text-xs font-semibold px-2 py-1 rounded-lg bg-primary/10">
+        <button type="button" onClick={onAction} className="text-sky-500 text-xs font-semibold px-2 py-1 rounded-lg bg-sky-500/10">
           Details
         </button>
       </div>
@@ -287,13 +287,13 @@ function Widget({ title, action, onAction, icon: Icon, children }) {
   return (
     <div className="card p-4 mb-5">
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+          <div className="flex items-center gap-2">
+            <span className="w-8 h-8 rounded-xl bg-sky-500/10 text-sky-500 flex items-center justify-center">
             <Icon size={16} />
           </span>
           <h2 className="font-bold dark:text-white text-slate-800 text-sm">{title}</h2>
         </div>
-        <button type="button" onClick={onAction} className="text-primary text-xs font-semibold px-2 py-1 rounded-lg bg-primary/10">
+        <button type="button" onClick={onAction} className="text-sky-500 text-xs font-semibold px-2 py-1 rounded-lg bg-sky-500/10">
           {action}
         </button>
       </div>
@@ -308,7 +308,7 @@ function EmptyState() {
     <div className="text-center py-14 animate-scaleIn">
       <p className="dark:text-gray-400 text-gray-600 font-medium">No transactions yet</p>
       <p className="dark:text-gray-600 text-gray-500 text-sm mt-1">Start by adding your first expense</p>
-      <button onClick={() => navigate('/add')} className="mt-4 px-5 py-2.5 rounded-xl bg-primary/10 text-primary text-sm font-semibold hover:bg-primary/20 transition-all active:scale-95">
+      <button onClick={() => navigate('/add')} className="mt-4 px-5 py-2.5 rounded-xl bg-sky-500/10 text-sky-500 text-sm font-semibold hover:bg-sky-500/20 transition-all active:scale-95">
         Add Expense
       </button>
     </div>

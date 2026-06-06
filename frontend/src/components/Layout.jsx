@@ -29,7 +29,7 @@ export default function Layout() {
       >
         {mode === 'dark'
           ? <Sun size={16} className="text-yellow-400" />
-          : <Moon size={16} className="text-indigo-500" />}
+          : <Moon size={16} className="text-sky-500" />}
       </button>
 
       <Outlet />
@@ -45,7 +45,7 @@ export default function Layout() {
                 <div className="w-8 h-8 rounded-xl gradient-blue flex items-center justify-center">
                   <Icon size={18} className="text-white" strokeWidth={2.5} />
                 </div>
-                <span className="text-[10px] font-semibold tracking-wide text-primary">
+                <span className="text-[10px] font-semibold tracking-wide text-sky-500">
                   {label}
                 </span>
               </button>
@@ -54,14 +54,14 @@ export default function Layout() {
           return (
             <button key={path} onClick={() => navigate(path)}
               className="flex flex-col items-center gap-1 px-4 py-1 rounded-xl transition-all duration-200">
-              <div className={`relative w-8 h-8 rounded-xl flex items-center justify-center transition-all
-                ${isActive ? 'bg-primary/20' : ''}`}>
+                <div className={`relative w-8 h-8 rounded-xl flex items-center justify-center transition-all
+                ${isActive ? 'bg-sky-500/20' : ''}`}>
                 <Icon size={20}
-                  className={isActive ? 'text-primary' : 'dark:text-gray-500 text-gray-400'}
+                  className={isActive ? 'text-sky-500' : 'dark:text-gray-500 text-gray-400'}
                   strokeWidth={isActive ? 2.5 : 1.8} />
               </div>
               <span className={`text-[10px] font-semibold tracking-wide
-                ${isActive ? 'text-primary' : 'dark:text-gray-500 text-gray-400'}`}>
+                ${isActive ? 'text-sky-500' : 'dark:text-gray-500 text-gray-400'}`}>
                 {label}
               </span>
             </button>

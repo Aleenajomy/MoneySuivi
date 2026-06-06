@@ -63,7 +63,7 @@ export default function NetWorth() {
       <div className="card p-1.5 flex gap-1 mb-5">
         {['assets', 'liabilities'].map(t => (
           <button key={t} onClick={() => setTab(t)}
-            className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all capitalize ${tab === t ? 'bg-primary text-white' : 'dark:text-gray-500 text-gray-400'}`}>
+            className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all capitalize ${tab === t ? 'bg-sky-500 text-white' : 'dark:text-gray-500 text-gray-400'}`}>
             {t} ({t === 'assets' ? summary.assets.length : summary.liabilities.length})
           </button>
         ))}
@@ -71,7 +71,7 @@ export default function NetWorth() {
 
       {/* Add button */}
       <button onClick={() => openAdd(tab === 'assets' ? 'asset' : 'liability')}
-        className="w-full py-3 rounded-xl border-2 border-dashed dark:border-dark-border border-light-border dark:text-gray-500 text-gray-400 text-sm font-semibold flex items-center justify-center gap-2 mb-4 hover:border-primary hover:text-primary transition-colors">
+        className="w-full py-3 rounded-xl border-2 border-dashed dark:border-dark-border border-light-border dark:text-gray-500 text-gray-400 text-sm font-semibold flex items-center justify-center gap-2 mb-4 hover:border-sky-500 hover:text-sky-500 transition-colors">
         <Plus size={16} /> Add {tab === 'assets' ? 'Asset' : 'Liability'}
       </button>
 
@@ -113,7 +113,7 @@ export default function NetWorth() {
               <div className="flex items-center gap-1">
                 <p className={`text-sm font-bold mr-1 ${tab === 'assets' ? 'text-secondary' : 'text-danger'}`}>{formatCurrency(item.value)}</p>
                 <button onClick={() => openEdit(tab === 'assets' ? 'asset' : 'liability', item)}
-                  className="w-7 h-7 rounded-lg flex items-center justify-center dark:text-gray-600 text-gray-400 hover:text-primary transition-colors">
+                  className="w-7 h-7 rounded-lg flex items-center justify-center dark:text-gray-600 text-gray-400 hover:text-sky-500 transition-colors">
                   <Pencil size={13} />
                 </button>
                 <button onClick={() => { if (window.confirm('Delete?')) tab === 'assets' ? deleteAsset(item.id) : deleteLiability(item.id) }}
