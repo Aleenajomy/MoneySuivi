@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, ArrowDownRight, ArrowUpRight, BarChart3, CreditCard, Repeat, TrendingUp, UserCircle, WalletCards } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
@@ -19,6 +19,17 @@ const budgetColor = (pct) => {
   return 'bg-emerald-500'
 }
 
+const getDisplayBalances = (analytics) => {
+  const cash = Number(analytics.cashBalance || 0)
+  const upi = Number(analytics.upiBalance || 0)
+  const creditCard = Number(analytics.creditCardBalance || 0)
+  const debitCard = Number(analytics.debitCardBalance || 0)
+  const netBanking = Number(analytics.netBankingBalance || 0)
+  const breakdown = cash + upi + creditCard + debitCard + netBanking
+  const total = breakdown !== 0 ? breakdown : Number(analytics.totalBalance ?? analytics.balance ?? 0)
+  return { cash, upi, creditCard, debitCard, netBanking, total }
+}
+
 export default function Dashboard() {
   const { user } = useAuth()
   const { analytics, expenses, loading, loadingAnalytics, fetchExpenses, fetchAnalytics } = useExpense()
@@ -26,6 +37,7 @@ export default function Dashboard() {
   const { notifications, unreadCount, fetchNotifications } = useNotification()
   const { emis, fetchEMIs } = useEMI()
   const { summary, fetchNetWorth } = useNetWorth()
+  const [showBalanceBreakdown, setShowBalanceBreakdown] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -37,7 +49,6 @@ export default function Dashboard() {
     fetchNetWorth()
   }, [fetchAnalytics, fetchExpenses, fetchBudgets, fetchNotifications, fetchEMIs, fetchNetWorth])
 
-  const balance = analytics.balance ?? 0
   const totalIncome = analytics.totalIncome ?? 0
   const totalExpense = analytics.totalExpense ?? 0
   const upcomingRecurring = analytics.upcomingRecurring || []
@@ -46,6 +57,9 @@ export default function Dashboard() {
   const upcomingEMIs = emis.filter(e => e.active).slice(0, 3)
   const netWorth = summary.netWorth ?? 0
   const isPositiveNW = netWorth >= 0
+
+  const { cash: cashAmount, upi: upiAmount, creditCard: creditCardAmount, debitCard: debitCardAmount, netBanking: netBankingAmount, total: displayBalance } = getDisplayBalances(analytics)
+  const balanceAlerts = analytics.balanceAlerts || []
 
   return (
     <div className="page">
@@ -65,8 +79,10 @@ export default function Dashboard() {
         </button>
       </div>
 
-      <div
-        className="rounded-2xl p-6 mb-4 relative overflow-hidden animate-slideUp shadow-lg hover:shadow-xl transition-shadow"
+      <button
+        type="button"
+        onClick={() => setShowBalanceBreakdown(true)}
+        className="w-full text-left rounded-2xl p-6 mb-4 relative overflow-hidden animate-slideUp shadow-lg hover:shadow-xl active:scale-[0.98] transition-shadow"
         style={{ background: 'linear-gradient(135deg, #0284C7 0%, #0EA5E9 50%, #38BDF8 100%)' }}
       >
         <div className="absolute -top-6 -right-6 w-32 h-32 rounded-full bg-white/5" />
@@ -74,11 +90,34 @@ export default function Dashboard() {
         <p className="text-blue-200 text-xs font-semibold uppercase tracking-widest mb-2">Total Balance</p>
         {loadingAnalytics
           ? <div className="h-10 w-44 bg-white/20 rounded-xl animate-pulse mb-3" />
-          : <p className="text-4xl font-extrabold text-white mb-3 tracking-tight">{formatCurrency(balance)}</p>}
+          : <p className="text-4xl font-extrabold text-white mb-3 tracking-tight">{formatCurrency(displayBalance)}</p>}
         <p className="text-blue-200 text-xs">
-          {new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
+          Cash, bank and wallet balances
         </p>
-      </div>
+      </button>
+
+      {balanceAlerts.length > 0 && (
+        <div className="card p-4 mb-5 border-yellow-400/30">
+          {balanceAlerts.map(alert => (
+            <div key={alert.message} className="flex items-start gap-2 text-xs dark:text-yellow-200 text-yellow-700 mb-2 last:mb-0">
+              <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
+              <span>{alert.message}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showBalanceBreakdown && !loadingAnalytics && (
+        <BalanceModal
+          cashAmount={cashAmount}
+          upiAmount={upiAmount}
+          creditCardAmount={creditCardAmount}
+          debitCardAmount={debitCardAmount}
+          netBankingAmount={netBankingAmount}
+          total={displayBalance}
+          onClose={() => setShowBalanceBreakdown(false)}
+        />
+      )}
 
       <div className="grid grid-cols-2 gap-3 mb-5">
         {loadingAnalytics ? (
@@ -148,9 +187,14 @@ export default function Dashboard() {
             <div className="h-1.5 dark:bg-dark-border bg-slate-200 rounded-full overflow-hidden">
               <div className={`h-full ${budgetColor(budget.percentage)}`} style={{ width: `${Math.min(budget.percentage, 100)}%` }} />
             </div>
-            <p className="text-[10px] dark:text-gray-600 text-gray-400 mt-1">
-              {formatCurrency(budget.spent)} / {formatCurrency(budget.monthlyLimit)}
-            </p>
+            <div className="flex items-center justify-between mt-1">
+              <p className="text-[10px] dark:text-gray-600 text-gray-400">
+                {formatCurrency(budget.spent)} / {formatCurrency(budget.monthlyLimit)}
+              </p>
+              <p className="text-[10px] font-semibold dark:text-gray-300 text-slate-700">
+                Left: {formatCurrency(budget.remaining)}
+              </p>
+            </div>
           </div>
         ))}
       </Widget>
@@ -280,6 +324,38 @@ function StatCard({ label, amount, icon: Icon, tone, onClick }) {
       </div>
       <p className="dark:text-gray-100 text-slate-800 font-bold text-lg">{formatCurrency(amount)}</p>
     </Component>
+  )
+}
+
+function BalanceModal({ cashAmount, upiAmount, creditCardAmount, debitCardAmount, netBankingAmount, total, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 px-4 flex items-center justify-center" onClick={onClose}>
+      <div className="card p-5 w-full max-w-sm shadow-2xl animate-scaleIn" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-lg font-bold dark:text-white text-slate-800">Account Summary</h2>
+          <button type="button" onClick={onClose} className="text-xs font-semibold text-sky-500 px-3 py-1.5 rounded-lg bg-sky-500/10">
+            Close
+          </button>
+        </div>
+        <SummaryRow label="Cash" amount={cashAmount} />
+        <SummaryRow label="UPI" amount={upiAmount} />
+        <SummaryRow label="Credit Card" amount={creditCardAmount} />
+        <SummaryRow label="Debit Card" amount={debitCardAmount} />
+        <SummaryRow label="Net Banking" amount={netBankingAmount} />
+        <div className="border-t dark:border-dark-border border-light-border mt-4 pt-4">
+          <SummaryRow label="Total Balance" amount={total} strong />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SummaryRow({ label, amount, strong = false }) {
+  return (
+    <div className="flex items-center justify-between py-2">
+      <span className={`${strong ? 'font-bold dark:text-white text-slate-800' : 'dark:text-gray-400 text-gray-600'} text-sm`}>{label}</span>
+      <span className={`${strong ? 'text-lg' : 'text-sm'} font-bold dark:text-white text-slate-800`}>{formatCurrency(amount)}</span>
+    </div>
   )
 }
 

@@ -1,4 +1,4 @@
-import { Repeat, Trash2, Utensils, Bus, ShoppingBag, Receipt, Tv, Banknote, HeartPulse, Briefcase, TrendingUp, Gift, CircleDot } from 'lucide-react'
+import { Repeat, Trash2, Utensils, Bus, ShoppingBag, Receipt, Tv, Banknote, HeartPulse, Briefcase, TrendingUp, Gift, CircleDot, ArrowRightLeft } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useExpense } from '../context/ExpenseContext'
 import { CATEGORY_COLORS, CATEGORY_ICONS, formatCurrency, formatShortDate } from '../utils/constants'
@@ -7,6 +7,7 @@ export default function ExpenseCard({ expense, showActions = false }) {
   const navigate = useNavigate()
   const { deleteExpense } = useExpense()
   const isIncome = expense.type === 'income'
+  const isTransfer = expense.type === 'transfer'
   const color = CATEGORY_COLORS[expense.category] || '#0066FF'
 
   const ICONS = {
@@ -14,7 +15,7 @@ export default function ExpenseCard({ expense, showActions = false }) {
     Entertainment: Tv, Salary: Banknote, Healthcare: HeartPulse,
     Freelance: Briefcase, Investment: TrendingUp, Gift, Other: CircleDot,
   }
-  const Icon = ICONS[expense.category] || CircleDot
+  const Icon = isTransfer ? ArrowRightLeft : ICONS[expense.category] || CircleDot
 
   const handleDelete = (e) => {
     e.stopPropagation()
@@ -44,7 +45,9 @@ export default function ExpenseCard({ expense, showActions = false }) {
           )}
         </div>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-xs dark:text-gray-500 text-gray-400">{expense.category}</span>
+          <span className="text-xs dark:text-gray-500 text-gray-400">
+            {isTransfer ? `${expense.fromAccountType} to ${expense.toAccountType}` : expense.category}
+          </span>
           <span className="w-1 h-1 rounded-full dark:bg-gray-700 bg-gray-300" />
           <span className="text-xs dark:text-gray-500 text-gray-400">{formatShortDate(expense.expenseDate)}</span>
         </div>
@@ -55,10 +58,10 @@ export default function ExpenseCard({ expense, showActions = false }) {
 
       <div className="flex items-center gap-2">
         <div className="text-right">
-          <p className={`font-bold text-sm ${isIncome ? 'text-secondary' : 'text-danger'}`}>
-            {isIncome ? '+' : '-'}{formatCurrency(expense.amount)}
+          <p className={`font-bold text-sm ${isTransfer ? 'text-sky-500' : isIncome ? 'text-secondary' : 'text-danger'}`}>
+            {isTransfer ? '' : isIncome ? '+' : '-'}{formatCurrency(expense.amount)}
           </p>
-          <p className="text-[10px] dark:text-gray-600 text-gray-600 mt-0.5">{expense.paymentMethod}</p>
+          <p className="text-[10px] dark:text-gray-600 text-gray-600 mt-0.5">{isTransfer ? 'Transfer' : expense.accountType || expense.paymentMethod}</p>
         </div>
         {showActions && (
           <button

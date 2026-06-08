@@ -26,7 +26,7 @@ const exportCSV = async (req, res) => {
     const expenses = await getExportData(req.user.id, startDate, endDate);
 
     const parser = new Parser({
-      fields: ['date', 'title', 'category', 'type', 'amount', 'paymentMethod', 'note', 'recurring', 'nextRunDate'],
+      fields: ['date', 'title', 'category', 'type', 'amount', 'accountType', 'fromAccountType', 'toAccountType', 'paymentMethod', 'note', 'recurring', 'nextRunDate'],
     });
     const csv = parser.parse(expenses.map(e => ({
       date: formatDate(e.expenseDate),
@@ -34,6 +34,9 @@ const exportCSV = async (req, res) => {
       category: e.category,
       type: e.type,
       amount: e.amount,
+      accountType: e.accountType || '',
+      fromAccountType: e.fromAccountType || '',
+      toAccountType: e.toAccountType || '',
       paymentMethod: e.paymentMethod,
       note: e.note || '',
       recurring: e.recurring ? e.recurringType : '',

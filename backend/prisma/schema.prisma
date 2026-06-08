@@ -32,6 +32,9 @@ model Expense {
   amount         Float
   category       String
   type           String    @default("expense")
+  accountType    String    @default("Cash")
+  fromAccountType String?
+  toAccountType   String?
   paymentMethod  String    @default("Cash")
   note           String?   @db.VarChar(500)
   expenseDate    DateTime  @default(now())
@@ -44,6 +47,7 @@ model Expense {
 
   @@index([userId, expenseDate])
   @@index([userId, category])
+  @@index([userId, accountType])
   @@index([recurring, nextRunDate])
 }
 

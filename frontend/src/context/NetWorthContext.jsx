@@ -6,7 +6,16 @@ const NetWorthContext = createContext(null)
 export const useNetWorth = () => useContext(NetWorthContext)
 
 export function NetWorthProvider({ children }) {
-  const [summary, setSummary] = useState({ totalAssets: 0, totalLiabilities: 0, netWorth: 0, assets: [], liabilities: [] })
+  const [summary, setSummary] = useState({
+    totalAssets: 0,
+    totalLiabilities: 0,
+    netWorth: 0,
+    cashInHand: 0,
+    bankBalance: 0,
+    investmentBalance: 0,
+    assets: [],
+    liabilities: [],
+  })
   const [loading, setLoading] = useState(false)
 
   const fetchNetWorth = useCallback(async () => {

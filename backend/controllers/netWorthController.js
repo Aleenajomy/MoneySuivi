@@ -1,4 +1,5 @@
 const prisma = require('../lib/prisma');
+const { calculateBalances } = require('../utils/accountBalances');
 
 // ── Assets ──────────────────────────────────────────────
 const getAssets = async (req, res) => {
@@ -71,13 +72,44 @@ const deleteLiability = async (req, res) => {
 // ── Net Worth ────────────────────────────────────────────
 const getNetWorth = async (req, res) => {
   try {
-    const [assets, liabilities] = await Promise.all([
+    const [assets, liabilities, transactions] = await Promise.all([
       prisma.asset.findMany({ where: { userId: req.user.id } }),
       prisma.liability.findMany({ where: { userId: req.user.id } }),
+      prisma.expense.findMany({
+        where: { userId: req.user.id },
+        select: { amount: true, type: true, accountType: true, paymentMethod: true, fromAccountType: true, toAccountType: true },
+      }),
     ]);
     const totalAssets = assets.reduce((s, a) => s + a.value, 0);
     const totalLiabilities = liabilities.reduce((s, l) => s + l.value, 0);
-    res.json({ success: true, totalAssets, totalLiabilities, netWorth: totalAssets - totalLiabilities, assets, liabilities });
+
+    const breakdown = assets.reduce((totals, asset) => {
+      const value = asset.value || 0;
+      if (['Savings', 'Other'].includes(asset.type)) {
+        totals.inHand += value;
+      } else if (asset.type === 'Fixed Deposit') {
+        totals.bank += value;
+      } else {
+        totals.investment += value;
+      }
+      return totals;
+    }, { inHand: 0, bank: 0, investment: 0 });
+    const accountBalances = calculateBalances(transactions);
+
+    res.json({
+      success: true,
+      totalAssets,
+      totalLiabilities,
+      netWorth: totalAssets - totalLiabilities,
+      cashInHand: accountBalances.cashBalance || breakdown.inHand,
+      bankBalance: accountBalances.bankBalance || breakdown.bank,
+      walletBalance: accountBalances.walletBalance,
+      totalBalance: accountBalances.totalBalance,
+      creditCardDue: accountBalances.creditCardDue,
+      investmentBalance: breakdown.investment,
+      assets,
+      liabilities,
+    });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 

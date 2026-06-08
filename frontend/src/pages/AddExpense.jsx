@@ -3,23 +3,33 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Repeat, Utensils, Bus, ShoppingBag, Receipt, Tv, Banknote, HeartPulse, Briefcase, TrendingUp, Gift, CircleDot } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useExpense } from '../context/ExpenseContext'
+import { useBudget } from '../context/BudgetContext'
 import api from '../services/api'
 import {
   CATEGORIES,
   CATEGORY_COLORS,
-  CATEGORY_ICONS,
   EXPENSE_CATEGORIES,
   INCOME_CATEGORIES,
   PAYMENT_METHODS,
+  ACCOUNT_TYPES,
+  formatCurrency,
 } from '../utils/constants'
 
 const today = new Date().toISOString().split('T')[0]
+const INCOME_ACCOUNT_TYPES = ACCOUNT_TYPES.filter(type => type !== 'Credit Card')
+
+const accountTypeForPayment = (paymentMethod) => {
+  if (paymentMethod === 'UPI' || paymentMethod === 'Debit Card' || paymentMethod === 'Net Banking') return 'Bank'
+  if (paymentMethod === 'Credit Card') return 'Credit Card'
+  return 'Cash'
+}
 
 const defaultForm = {
   title: '',
   amount: '',
   category: CATEGORIES[0],
   type: 'expense',
+  accountType: ACCOUNT_TYPES[0],
   paymentMethod: PAYMENT_METHODS[0],
   note: '',
   expenseDate: today,
@@ -33,8 +43,13 @@ export default function AddExpense() {
   const isEditing = Boolean(id)
   const navigate = useNavigate()
   const { addExpense, updateExpense } = useExpense()
+  const { budgets, fetchBudgets } = useBudget()
   const [form, setForm] = useState(defaultForm)
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    fetchBudgets()
+  }, [fetchBudgets])
 
   useEffect(() => {
     if (!isEditing) return
@@ -44,7 +59,8 @@ export default function AddExpense() {
         title: e.title,
         amount: e.amount,
         category: e.category,
-        type: e.type,
+        type: e.type === 'income' ? 'income' : 'expense',
+        accountType: e.accountType || e.paymentMethod || ACCOUNT_TYPES[0],
         paymentMethod: e.paymentMethod,
         note: e.note || '',
         expenseDate: e.expenseDate.split('T')[0],
@@ -71,6 +87,7 @@ export default function AddExpense() {
   const set = key => e => setForm(prev => ({ ...prev, [key]: e.target.value }))
   const setChecked = key => e => setForm(prev => ({ ...prev, [key]: e.target.checked }))
   const activeCategories = form.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
+  const selectedBudget = form.type === 'expense' ? budgets.find(b => b.category === form.category) : null
 
   const handleTypeChange = (type) => {
     const cats = type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
@@ -78,7 +95,17 @@ export default function AddExpense() {
       ...prev,
       type,
       category: cats[0],
+      accountType: type === 'expense' ? accountTypeForPayment(prev.paymentMethod) : prev.accountType,
       recurring: type === 'expense' ? prev.recurring : false,
+    }))
+  }
+
+  const handlePaymentChange = (e) => {
+    const paymentMethod = e.target.value
+    setForm(prev => ({
+      ...prev,
+      paymentMethod,
+      accountType: accountTypeForPayment(paymentMethod),
     }))
   }
 
@@ -89,14 +116,18 @@ export default function AddExpense() {
 
     setLoading(true)
     try {
+      const isExpense = form.type === 'expense'
       const data = {
         ...form,
         amount: Number(form.amount),
-        recurring: form.type === 'expense' && form.recurring,
-        recurringType: form.type === 'expense' && form.recurring ? form.recurringType : undefined,
+        paymentMethod: form.paymentMethod,
+        accountType: accountTypeForPayment(form.paymentMethod),
+        recurring: isExpense && form.recurring,
+        recurringType: isExpense && form.recurring ? form.recurringType : undefined,
       }
       if (isEditing) await updateExpense(id, data)
       else await addExpense(data)
+      await fetchBudgets()
       navigate(-1)
     } catch (err) {
       toast.error(err.message || 'Something went wrong')
@@ -187,13 +218,42 @@ export default function AddExpense() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="label">Payment</label>
-            <select className="input" value={form.paymentMethod} onChange={set('paymentMethod')}>
-              {PAYMENT_METHODS.map(m => <option key={m}>{m}</option>)}
-            </select>
+        {selectedBudget && (
+          <div className="card p-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold dark:text-gray-500 text-gray-500 uppercase tracking-widest">Category Balance</p>
+              <p className="text-xs font-bold dark:text-gray-300 text-slate-700">{selectedBudget.percentage}% used</p>
+            </div>
+            <div className="h-1.5 dark:bg-dark-border bg-slate-200 rounded-full overflow-hidden mb-2">
+              <div className="h-full bg-emerald-500" style={{ width: `${Math.min(selectedBudget.percentage, 100)}%` }} />
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="dark:text-gray-500 text-gray-500">
+                {formatCurrency(selectedBudget.spent)} spent
+              </span>
+              <span className="font-semibold dark:text-white text-slate-800">
+                {formatCurrency(selectedBudget.remaining)} left
+              </span>
+            </div>
           </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {form.type === 'income' ? (
+            <div>
+              <label className="label">Payment Method</label>
+              <select className="input" value={form.paymentMethod} onChange={set('paymentMethod')}>
+                {PAYMENT_METHODS.map(m => <option key={m}>{m}</option>)}
+              </select>
+            </div>
+          ) : (
+            <div>
+              <label className="label">Payment</label>
+              <select className="input" value={form.paymentMethod} onChange={handlePaymentChange}>
+                {PAYMENT_METHODS.map(m => <option key={m}>{m}</option>)}
+              </select>
+            </div>
+          )}
           <div>
             <label className="label">Date</label>
             <input type="date" className="input" max={today} value={form.expenseDate} onChange={set('expenseDate')} />

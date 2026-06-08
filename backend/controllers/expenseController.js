@@ -1,5 +1,10 @@
 const prisma = require('../lib/prisma');
 const { checkBudgetAlert } = require('../services/budgetAlertService');
+const {
+  calculateBalances,
+  buildBalanceAlerts,
+  normalizeAccountType,
+} = require('../utils/accountBalances');
 
 const toExpenseResponse = (e) => ({ ...e, _id: e.id });
 
@@ -50,14 +55,17 @@ const getExpense = async (req, res) => {
 
 const createExpense = async (req, res) => {
   try {
-    const { title, amount, category, type, paymentMethod, note, expenseDate, recurring, recurringType } = req.body;
+    const { title, amount, category, type, accountType, paymentMethod, note, expenseDate, recurring, recurringType } = req.body;
     const date = expenseDate ? new Date(expenseDate) : new Date();
     const isRecurring = Boolean(recurring);
+    const normalizedType = type === 'income' ? 'income' : 'expense';
+    const normalizedAccountType = normalizeAccountType(accountType || paymentMethod);
     const expense = await prisma.expense.create({
       data: {
         title, category,
         amount: Number(amount),
-        type: type || 'expense',
+        type: normalizedType,
+        accountType: normalizedAccountType,
         paymentMethod: paymentMethod || 'Cash',
         note: note || null,
         expenseDate: date,
@@ -67,7 +75,7 @@ const createExpense = async (req, res) => {
         nextRunDate: isRecurring ? calcNextRunDate(date, recurringType) : null,
       },
     });
-    const notification = (type || 'expense') === 'expense' ? await checkBudgetAlert(req.user.id, category) : null;
+    const notification = normalizedType === 'expense' ? await checkBudgetAlert(req.user.id, category) : null;
     res.status(201).json({ success: true, message: 'Expense added successfully', expense: toExpenseResponse(expense), notification });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -79,8 +87,10 @@ const updateExpense = async (req, res) => {
     const existing = await prisma.expense.findFirst({ where: { id: req.params.id, userId: req.user.id } });
     if (!existing) return res.status(404).json({ success: false, message: 'Expense not found' });
     const data = {};
-    const fields = ['title', 'category', 'type', 'paymentMethod', 'note'];
+    const fields = ['title', 'category', 'paymentMethod', 'note'];
     fields.forEach(f => { if (req.body[f] !== undefined) data[f] = req.body[f]; });
+    if (req.body.type !== undefined) data.type = req.body.type === 'income' ? 'income' : 'expense';
+    if (req.body.accountType !== undefined) data.accountType = normalizeAccountType(req.body.accountType);
     if (req.body.amount !== undefined) data.amount = Number(req.body.amount);
     if (req.body.expenseDate !== undefined) data.expenseDate = new Date(req.body.expenseDate);
     if (req.body.recurring !== undefined) {
@@ -121,27 +131,76 @@ const getAnalytics = async (req, res) => {
     const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
     const next30Days = new Date(now); next30Days.setDate(now.getDate() + 30);
 
-    const [monthlyTotals, categoryTotals, monthlyTrendRows, upcomingRecurring] = await Promise.all([
-      prisma.expense.groupBy({ by: ['type'], where: { userId: req.user.id, expenseDate: { gte: startOfMonth, lte: endOfMonth } }, _sum: { amount: true } }),
+    const [monthlyTotals, categoryTotals, monthlyTrendRows, balanceGrowthRows, upcomingRecurring, accountTotals, investmentTotals, categoryAllTime, allTransactions] = await Promise.all([
+      prisma.expense.groupBy({ by: ['type'], where: { userId: req.user.id, type: { in: ['expense', 'income'] }, expenseDate: { gte: startOfMonth, lte: endOfMonth } }, _sum: { amount: true } }),
       prisma.expense.groupBy({ by: ['category'], where: { userId: req.user.id, type: 'expense', expenseDate: { gte: startOfMonth, lte: endOfMonth } }, _sum: { amount: true }, orderBy: { _sum: { amount: 'desc' } } }),
       prisma.$queryRaw`
         SELECT EXTRACT(YEAR FROM "expenseDate")::int AS year, EXTRACT(MONTH FROM "expenseDate")::int AS month, SUM(amount)::float AS total
         FROM "Expense" WHERE "userId" = ${req.user.id} AND type = 'expense' AND "expenseDate" >= ${sixMonthsAgo}
         GROUP BY year, month ORDER BY year ASC, month ASC`,
+      prisma.$queryRaw`
+        SELECT EXTRACT(YEAR FROM "expenseDate")::int AS year, EXTRACT(MONTH FROM "expenseDate")::int AS month,
+          SUM(CASE
+            WHEN type = 'income' AND "accountType" <> 'Credit Card' THEN amount
+            WHEN type = 'expense' AND "accountType" <> 'Credit Card' THEN -amount
+            ELSE 0
+          END)::float AS total
+        FROM "Expense" WHERE "userId" = ${req.user.id} AND type IN ('income', 'expense') AND "expenseDate" >= ${sixMonthsAgo}
+        GROUP BY year, month ORDER BY year ASC, month ASC`,
       prisma.expense.findMany({ where: { userId: req.user.id, recurring: true, nextRunDate: { gte: now, lte: next30Days } }, orderBy: { nextRunDate: 'asc' }, take: 5 }),
+      prisma.expense.groupBy({ by: ['accountType', 'type'], where: { userId: req.user.id, type: { in: ['expense', 'income'] } }, _sum: { amount: true } }),
+      prisma.expense.groupBy({ by: ['type'], where: { userId: req.user.id, category: 'Investment' }, _sum: { amount: true } }),
+      prisma.expense.groupBy({ by: ['category', 'type'], where: { userId: req.user.id, type: { in: ['expense', 'income'] } }, _sum: { amount: true } }),
+      prisma.expense.findMany({ where: { userId: req.user.id }, select: { amount: true, type: true, accountType: true, paymentMethod: true, fromAccountType: true, toAccountType: true } }),
     ]);
 
     const totalIncome = monthlyTotals.find(i => i.type === 'income')?._sum.amount || 0;
     const totalExpense = monthlyTotals.find(i => i.type === 'expense')?._sum.amount || 0;
+    const accountBreakdownMap = {};
+    accountTotals.forEach(item => {
+      const key = normalizeAccountType(item.accountType);
+      const amount = item._sum.amount || 0;
+      if (!accountBreakdownMap[key]) accountBreakdownMap[key] = { income: 0, expense: 0 };
+      accountBreakdownMap[key][item.type] += amount;
+    });
+    const expensesByAccountType = Object.entries(accountBreakdownMap).map(([accountType, totals]) => ({ accountType, total: totals.expense }));
+    const incomeByAccountType = Object.entries(accountBreakdownMap).map(([accountType, totals]) => ({ accountType, total: totals.income }));
+
+    // Calculate absolute all-time net balance
+    const balances = calculateBalances(allTransactions);
+    console.log('[Analytics] allTransactions count:', allTransactions.length);
+    console.log('[Analytics] sample paymentMethods:', allTransactions.slice(0, 5).map(t => ({ type: t.type, amount: t.amount, pm: t.paymentMethod, at: t.accountType })));
+    console.log('[Analytics] balances:', balances);
+    const balanceAlerts = buildBalanceAlerts(balances);
+
+    const investmentBalance = (investmentTotals.find(i => i.type === 'income')?._sum.amount || 0) - (investmentTotals.find(i => i.type === 'expense')?._sum.amount || 0)
+
+    const categoryBalancesMap = {}
+    if (categoryAllTime) {
+      categoryAllTime.forEach(item => {
+        const cat = item.category || 'Other'
+        const delta = (item.type === 'income' ? 1 : -1) * (item._sum.amount || 0)
+        categoryBalancesMap[cat] = (categoryBalancesMap[cat] || 0) + delta
+      })
+    }
+    const categoryBalances = Object.entries(categoryBalancesMap).map(([category, balance]) => ({ category, balance }))
 
     res.json({
       success: true,
       analytics: {
         totalIncome, totalExpense,
-        balance: totalIncome - totalExpense,
+        balance: balances.totalBalance,
+        ...balances,
+        balanceAlerts,
         categorySpending: categoryTotals.map(i => ({ _id: i.category, total: i._sum.amount || 0 })),
         monthlyTrend: monthlyTrendRows.map(i => ({ _id: { year: i.year, month: i.month }, total: i.total || 0 })),
+        monthlyBalanceGrowth: balanceGrowthRows.map(i => ({ _id: { year: i.year, month: i.month }, total: i.total || 0 })),
         upcomingRecurring: upcomingRecurring.map(toExpenseResponse),
+        accountBreakdown: Object.entries(accountBreakdownMap).map(([accountType, totals]) => ({ accountType, ...totals, net: totals.income - totals.expense })),
+        expensesByAccountType,
+        incomeByAccountType,
+        investmentBalance,
+        categoryBalances,
       },
     });
   } catch (error) {
@@ -149,4 +208,49 @@ const getAnalytics = async (req, res) => {
   }
 };
 
-module.exports = { getExpenses, getExpense, createExpense, updateExpense, deleteExpense, getAnalytics };
+const getBalances = async (req, res) => {
+  try {
+    const transactions = await prisma.expense.findMany({
+      where: { userId: req.user.id },
+      select: { amount: true, type: true, accountType: true, paymentMethod: true, fromAccountType: true, toAccountType: true },
+    });
+    const balances = calculateBalances(transactions);
+    res.json({ success: true, balances, alerts: buildBalanceAlerts(balances) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = { getExpenses, getExpense, createExpense, updateExpense, deleteExpense, getAnalytics, getBalances };
+// Non-destructive debug endpoint to inspect analytics internals
+const getAnalyticsDebug = async (req, res) => {
+  try {
+    const paymentTotals = await prisma.expense.groupBy({ by: ['accountType', 'paymentMethod', 'type'], where: { userId: req.user.id }, _sum: { amount: true } })
+    const recent = await prisma.expense.findMany({ where: { userId: req.user.id }, orderBy: { expenseDate: 'desc' }, take: 20 })
+
+    const paymentBreakdownMap = {}
+    paymentTotals.forEach(item => {
+      const key = item.paymentMethod || 'Other'
+      const delta = (item.type === 'income' ? 1 : -1) * (item._sum.amount || 0)
+      paymentBreakdownMap[key] = (paymentBreakdownMap[key] || 0) + delta
+    })
+
+    const normalizedPaymentMap = {}
+    Object.entries(paymentBreakdownMap).forEach(([k, v]) => {
+      const key = (k || 'other').toString().toLowerCase()
+      normalizedPaymentMap[key] = (normalizedPaymentMap[key] || 0) + v
+    })
+
+    const cashKeys = ['cash']
+    const bankKeys = ['upi', 'credit card', 'debit card', 'net banking', 'bank', 'bank transfer']
+
+    const cashBalance = cashKeys.reduce((s, k) => s + (normalizedPaymentMap[k] || 0), 0)
+    const bankBalance = bankKeys.reduce((s, k) => s + (normalizedPaymentMap[k] || 0), 0)
+
+    res.json({ success: true, paymentTotals, paymentBreakdownMap, normalizedPaymentMap, cashBalance, bankBalance, recent })
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message })
+  }
+}
+
+module.exports.getAnalyticsDebug = getAnalyticsDebug
