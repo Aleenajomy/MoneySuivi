@@ -185,7 +185,7 @@ export default function Profile() {
         </button>
       </div>
 
-      <p className="text-center dark:text-gray-700 text-gray-400 text-xs mt-8">Smart Expense Tracker v1.0.0</p>
+      <p className="text-center dark:text-gray-700 text-gray-400 text-xs mt-8">MoneySuivi v1.0.0</p>
 
       {/* Modals */}
       {modal === 'notifications' && <NotificationsModal onClose={() => setModal(null)} />}

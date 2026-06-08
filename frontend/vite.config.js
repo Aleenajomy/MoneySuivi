@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon-192x192.png', 'icon-512x512.png'],
       manifest: {
-        name: 'Smart Expense Tracker',
-        short_name: 'Expenses',
-        description: 'Track your expenses smartly with offline support',
+        name: 'MoneySuivi',
+        short_name: 'MoneySuivi',
+        description: 'One finance ecosystem for budgets, expenses, EMIs, net worth and notifications',
         theme_color: '#0EA5E9',
         background_color: '#0f172a',
         display: 'standalone',

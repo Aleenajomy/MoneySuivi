@@ -35,7 +35,7 @@ app.use('/api/export', require('./routes/export'));
 app.use('/api/emis', require('./routes/emis'));
 app.use('/api/networth', require('./routes/networth'));
 
-app.get('/api/health', (req, res) => res.json({ success: true, message: 'Smart Expense Tracker API is running' }));
+app.get('/api/health', (req, res) => res.json({ success: true, message: 'MoneySuivi API is running' }));
 
 app.use((req, res) => res.status(404).json({ success: false, message: 'Route not found' }));
 app.use((err, req, res, next) => {

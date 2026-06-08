@@ -51,7 +51,7 @@ const exportCSV = async (req, res) => {
 const drawFooter = (doc) => {
   const bottom = doc.page.height - 36;
   doc.fontSize(8).fillColor('#94a3b8')
-    .text(`Generated on ${formatDate(new Date())} | Smart Expense Tracker`, 40, bottom, {
+    .text(`Generated on ${formatDate(new Date())} | MoneySuivi`, 40, bottom, {
       width: doc.page.width - 80,
       align: 'center',
     });

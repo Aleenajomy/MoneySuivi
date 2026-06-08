@@ -53,4 +53,38 @@ const processRecurring = async () => {
 // Run every day at midnight
 cron.schedule('0 0 * * *', processRecurring);
 
+// Daily spend summary notification at 9 PM
+cron.schedule('0 21 * * *', async () => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+
+    const users = await prisma.user.findMany({ select: { id: true } });
+
+    for (const user of users) {
+      const result = await prisma.expense.aggregate({
+        where: { userId: user.id, type: 'expense', expenseDate: { gte: today, lt: tomorrow } },
+        _sum: { amount: true },
+      });
+      const total = result._sum.amount || 0;
+      if (total > 0) {
+        await prisma.notification.create({
+          data: {
+            userId: user.id,
+            category: 'Daily Summary',
+            message: `You spent ₹${total.toFixed(0)} today across all categories.`,
+            type: 'info',
+            percentage: 0,
+          },
+        });
+      }
+    }
+    console.log('[Cron] Daily spend notifications sent');
+  } catch (error) {
+    console.error('[Cron] Daily notification error:', error.message);
+  }
+});
+
 console.log('[Cron] Recurring expense scheduler started');

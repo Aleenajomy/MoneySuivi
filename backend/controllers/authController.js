@@ -128,4 +128,19 @@ const resetAllData = async (req, res) => {
   }
 };
 
-module.exports = { register, login, getMe, updateProfile, resetAllData };
+const forgotPassword = async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+    if (!email || !newPassword) return res.status(400).json({ success: false, message: 'Email and new password are required' });
+    if (newPassword.length < 6) return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return res.status(404).json({ success: false, message: 'No account found with this email' });
+    const hashed = await bcrypt.hash(newPassword, 12);
+    await prisma.user.update({ where: { email }, data: { password: hashed } });
+    res.json({ success: true, message: 'Password reset successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = { register, login, getMe, updateProfile, resetAllData, forgotPassword };

@@ -55,36 +55,42 @@ function createPNG(size) {
     rows.push(Buffer.from(row));
   }
 
-  // Draw ₹ symbol area (white bar in center)
-  const barW = Math.floor(size * 0.08);
-  const barH = Math.floor(size * 0.5);
-  const bx = Math.floor(cx - barW / 2);
-  const by = Math.floor(cy - barH / 2);
+  // Draw a bold "M" for MoneySuivi
+  const leftX = Math.floor(size * 0.24);
+  const rightX = Math.floor(size * 0.76);
+  const midX = Math.floor(size * 0.5);
+  const topY = Math.floor(size * 0.26);
+  const bottomY = Math.floor(size * 0.74);
+  const thickness = Math.max(1, Math.floor(size * 0.11));
 
-  for (let y = by; y < by + barH; y++) {
-    for (let x = bx; x < bx + barW; x++) {
-      const offset = 1 + x * 3;
-      rows[y][offset] = 255;
-      rows[y][offset + 1] = 255;
-      rows[y][offset + 2] = 255;
+  const inMShape = (x, y) => {
+    if (y < topY || y > bottomY) return false;
+    if ((x >= leftX && x < leftX + thickness) || (x >= rightX - thickness && x < rightX)) {
+      return true;
     }
-  }
 
-  // Horizontal bars for ₹
-  const hbarY1 = by + Math.floor(barH * 0.2);
-  const hbarY2 = by + Math.floor(barH * 0.4);
-  const hbarX = Math.floor(cx - size * 0.15);
-  const hbarW = Math.floor(size * 0.3);
-  for (let b = 0; b < 2; b++) {
-    const hy = b === 0 ? hbarY1 : hbarY2;
-    for (let hbw = 0; hbw < Math.floor(size * 0.08); hbw++) {
-      for (let x = hbarX; x < hbarX + hbarW; x++) {
+    if (x >= leftX && x <= midX) {
+      const t = (x - leftX) / Math.max(1, midX - leftX);
+      const lineY = topY + t * (bottomY - topY);
+      return Math.abs(y - lineY) < thickness;
+    }
+
+    if (x >= midX && x <= rightX) {
+      const t = (rightX - x) / Math.max(1, rightX - midX);
+      const lineY = topY + t * (bottomY - topY);
+      return Math.abs(y - lineY) < thickness;
+    }
+
+    return false;
+  };
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      if (inMShape(x, y)) {
         const offset = 1 + x * 3;
-        if (rows[hy + hbw]) {
-          rows[hy + hbw][offset] = 255;
-          rows[hy + hbw][offset + 1] = 255;
-          rows[hy + hbw][offset + 2] = 255;
-        }
+        rows[y][offset] = 255;
+        rows[y][offset + 1] = 255;
+        rows[y][offset + 2] = 255;
       }
     }
   }

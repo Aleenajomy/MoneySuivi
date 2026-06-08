@@ -1,6 +1,6 @@
-# Smart Expense Tracker (PWA)
+# MoneySuivi(All-in-One Finance Ecosystem)
 
-A full-stack expense tracker PWA built with React + Vite, Node.js + Express, PostgreSQL, and Prisma.
+A full-stack finance ecosystem PWA built with React + Vite, Node.js + Express, PostgreSQL, and Prisma.
 
 Live: [smartexpencetracker-frontend.onrender.com](https://smartexpencetracker-frontend.onrender.com)
 

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
-const { register, login, getMe, updateProfile, resetAllData } = require('../controllers/authController');
+const { register, login, getMe, updateProfile, resetAllData, forgotPassword } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 
@@ -20,6 +20,7 @@ router.post('/register', registerRules, validate, register);
 router.post('/login', loginRules, validate, login);
 router.get('/me', protect, getMe);
 router.put('/profile', protect, updateProfile);
+router.post('/forgot-password', forgotPassword);
 router.delete('/reset', protect, resetAllData);
 
 module.exports = router;
