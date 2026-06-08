@@ -59,7 +59,7 @@ export default function Dashboard() {
   const isPositiveNW = netWorth >= 0
 
   const { cash: cashAmount, upi: upiAmount, creditCard: creditCardAmount, debitCard: debitCardAmount, netBanking: netBankingAmount, total: displayBalance } = getDisplayBalances(analytics)
-  const balanceAlerts = analytics.balanceAlerts || []
+
 
   return (
     <div className="page">
@@ -96,16 +96,7 @@ export default function Dashboard() {
         </p>
       </button>
 
-      {balanceAlerts.length > 0 && (
-        <div className="card p-4 mb-5 border-yellow-400/30">
-          {balanceAlerts.map(alert => (
-            <div key={alert.message} className="flex items-start gap-2 text-xs dark:text-yellow-200 text-yellow-700 mb-2 last:mb-0">
-              <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
-              <span>{alert.message}</span>
-            </div>
-          ))}
-        </div>
-      )}
+
 
       {showBalanceBreakdown && !loadingAnalytics && (
         <BalanceModal

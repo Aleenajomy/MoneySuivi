@@ -83,16 +83,10 @@ const calculateBalances = (transactions = []) => {
 };
 
 const buildBalanceAlerts = (balances, thresholds = {}) => {
-  const cashMinimum = Number(thresholds.cashMinimum ?? 1000);
   const alerts = [];
-
-  if (balances.cashBalance !== 0 && balances.cashBalance < cashMinimum) {
-    alerts.push({ type: 'warning', accountType: 'Cash', message: 'Cash in Hand is running low.' });
-  }
   if (balances.creditCardBalance < 0) {
     alerts.push({ type: 'warning', accountType: 'Credit Card', message: 'Credit Card balance is negative.' });
   }
-
   return alerts;
 };
 
