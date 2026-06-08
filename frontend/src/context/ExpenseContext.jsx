@@ -36,7 +36,6 @@ export function ExpenseProvider({ children }) {
     setLoadingAnalytics(true)
     try {
       const res = await api.get('/expenses/analytics')
-      console.log('[Analytics Response]', res.data.analytics)
       setAnalytics(res.data.analytics)
     } catch (err) {
       console.error(err)

@@ -168,9 +168,6 @@ const getAnalytics = async (req, res) => {
 
     // Calculate absolute all-time net balance
     const balances = calculateBalances(allTransactions);
-    console.log('[Analytics] allTransactions count:', allTransactions.length);
-    console.log('[Analytics] sample paymentMethods:', allTransactions.slice(0, 5).map(t => ({ type: t.type, amount: t.amount, pm: t.paymentMethod, at: t.accountType })));
-    console.log('[Analytics] balances:', balances);
     const balanceAlerts = buildBalanceAlerts(balances);
 
     const investmentBalance = (investmentTotals.find(i => i.type === 'income')?._sum.amount || 0) - (investmentTotals.find(i => i.type === 'expense')?._sum.amount || 0)
