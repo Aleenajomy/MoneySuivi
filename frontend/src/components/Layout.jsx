@@ -19,18 +19,20 @@ export default function Layout() {
   return (
     <div className="relative max-w-md mx-auto min-h-screen transition-colors duration-300 dark:bg-dark-bg bg-light-bg">
       {/* Theme toggle — fixed top right */}
-      <button
-        onClick={toggle}
-        className="fixed top-4 right-4 z-50 w-9 h-9 rounded-xl
-                   dark:bg-dark-card bg-light-card
-                   dark:border-dark-border border-light-border border
-                   flex items-center justify-center
-                   transition-all active:scale-90 shadow-sm"
-      >
-        {mode === 'dark'
-          ? <Sun size={16} className="text-yellow-400" />
-          : <Moon size={16} className="text-sky-500" />}
-      </button>
+      {location.pathname !== '/analytics' && (
+        <button
+          onClick={toggle}
+          className="fixed top-4 right-4 z-50 w-9 h-9 rounded-xl
+                     dark:bg-dark-card bg-light-card
+                     dark:border-dark-border border-light-border border
+                     flex items-center justify-center
+                     transition-all active:scale-90 shadow-sm"
+        >
+          {mode === 'dark'
+            ? <Sun size={16} className="text-yellow-400" />
+            : <Moon size={16} className="text-sky-500" />}
+        </button>
+      )}
 
       <Outlet />
 
