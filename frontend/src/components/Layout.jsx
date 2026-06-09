@@ -1,7 +1,5 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Home, Clock, WalletCards, CreditCard, Plus } from 'lucide-react'
-import { useTheme } from '../context/ThemeContext'
-import { Sun, Moon } from 'lucide-react'
 
 const navItems = [
   { path: '/', icon: Home, label: 'Home' },
@@ -14,29 +12,12 @@ const navItems = [
 export default function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { mode, toggle } = useTheme()
 
   return (
     <div className="relative max-w-md mx-auto min-h-screen transition-colors duration-300 dark:bg-dark-bg bg-light-bg">
-      {/* Theme toggle — fixed top right */}
-      {location.pathname !== '/analytics' && (
-        <button
-          onClick={toggle}
-          className="fixed top-4 right-4 z-50 w-9 h-9 rounded-xl
-                     dark:bg-dark-card bg-light-card
-                     dark:border-dark-border border-light-border border
-                     flex items-center justify-center
-                     transition-all active:scale-90 shadow-sm"
-        >
-          {mode === 'dark'
-            ? <Sun size={16} className="text-yellow-400" />
-            : <Moon size={16} className="text-sky-500" />}
-        </button>
-      )}
-
       <Outlet />
 
-      {/* Bottom Navigation with embedded FAB */}
+      {/* Bottom Navigation */}
       <nav className="bottom-nav">
         {navItems.map(({ path, icon: Icon, label, isFab }) => {
           const isActive = location.pathname === path
@@ -56,7 +37,7 @@ export default function Layout() {
           return (
             <button key={path} onClick={() => navigate(path)}
               className="flex flex-col items-center gap-1 px-4 py-1 rounded-xl transition-all duration-200">
-                <div className={`relative w-8 h-8 rounded-xl flex items-center justify-center transition-all
+              <div className={`relative w-8 h-8 rounded-xl flex items-center justify-center transition-all
                 ${isActive ? 'bg-sky-500/20' : ''}`}>
                 <Icon size={20}
                   className={isActive ? 'text-sky-500' : 'dark:text-gray-500 text-gray-400'}
@@ -69,6 +50,7 @@ export default function Layout() {
             </button>
           )
         })}
+
       </nav>
     </div>
   )

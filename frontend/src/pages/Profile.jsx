@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { LogOut, ChevronRight, User, Bell, Shield, HelpCircle, X, Mail, Lock, Eye, EyeOff } from 'lucide-react'
+import { useTheme } from '../context/ThemeContext'
+import { LogOut, ChevronRight, User, Bell, Shield, HelpCircle, X, Mail, Lock, Eye, EyeOff, Sun, Moon } from 'lucide-react'
 import { formatDate } from '../utils/constants'
 import toast from 'react-hot-toast'
 import api from '../services/api'
@@ -9,6 +10,7 @@ import api from '../services/api'
 export default function Profile() {
   const { user, logout, updateProfile } = useAuth()
   const navigate = useNavigate()
+  const { mode, toggle } = useTheme()
   const [editing, setEditing] = useState(false)
   const [changingPw, setChangingPw] = useState(false)
   const [modal, setModal] = useState(null)
@@ -122,6 +124,26 @@ export default function Profile() {
       {/* Settings */}
       <p className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-3 px-1 dark:text-gray-400">Settings</p>
       <div className="space-y-2 mb-4">
+        {/* Theme toggle row */}
+        <button
+          onClick={toggle}
+          className="w-full card p-4 flex items-center gap-3 active:scale-[0.98] transition-transform animate-fadeIn"
+        >
+          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+            {mode === 'dark' ? <Sun size={17} className="text-yellow-400" /> : <Moon size={17} className="text-sky-500" />}
+          </div>
+          <span className="flex-1 text-sm font-medium dark:text-gray-300 text-slate-700 text-left">
+            {mode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          </span>
+          <div className={`w-11 h-6 rounded-full transition-colors duration-200 flex items-center px-0.5 ${
+            mode === 'dark' ? 'bg-primary' : 'bg-slate-300 dark:bg-dark-border'
+          }`}>
+            <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
+              mode === 'dark' ? 'translate-x-5' : 'translate-x-0'
+            }`} />
+          </div>
+        </button>
+
         <SettingRow icon={<Bell size={17} />}       label="Notifications" onClick={() => setModal('notifications')} />
         <SettingRow icon={<Lock size={17} />}       label="Change Password" onClick={() => setChangingPw(p => !p)} />
         <SettingRow icon={<HelpCircle size={17} />} label="Help & Support"  onClick={() => setModal('help')} />
