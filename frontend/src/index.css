@@ -30,8 +30,9 @@
     @apply bg-light-bg text-slate-700;
   }
 
+  /* Remove mobile-only max-width constraint — layout is now handled by Layout.jsx */
   #root {
-    @apply max-w-md mx-auto min-h-screen relative overflow-x-hidden transition-colors duration-300;
+    @apply w-full min-h-screen relative overflow-x-hidden transition-colors duration-300;
   }
 }
 
@@ -124,10 +125,12 @@
     @apply text-slate-600;
   }
 
+  /* Bottom nav — mobile & tablet only, hidden on desktop */
   .bottom-nav {
-    @apply fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md
-           flex items-center justify-around px-2 py-3 z-50
-           border-t transition-all duration-300;
+    @apply fixed bottom-0 left-0 right-0 w-full
+           flex items-center justify-around px-2 py-3 z-40
+           border-t transition-all duration-300
+           lg:hidden;
   }
 
   .dark .bottom-nav {
@@ -138,40 +141,40 @@
     @apply bg-light-card border-light-border shadow-lg;
   }
 
+  /* Page content — mobile: full pad + bottom space for nav; desktop: no bottom pad */
   .page {
-    @apply pb-28 pt-5 px-4 min-h-screen transition-colors duration-300;
+    @apply pb-28 pt-5 px-4 min-h-screen transition-colors duration-300
+           lg:pb-8 lg:pt-8 lg:px-8;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    @apply hidden lg:flex flex-col fixed left-0 top-0 h-screen z-50
+           w-60 border-r transition-all duration-300;
+  }
+
+  .dark .sidebar {
+    @apply bg-dark-card border-dark-border;
+  }
+
+  html:not(.dark) .sidebar {
+    @apply bg-light-card border-light-border shadow-lg;
+  }
+
+  /* Main content shifts right when sidebar is visible */
+  .with-sidebar {
+    @apply lg:ml-60;
   }
 
   /* Animation utilities */
-  .animate-in {
-    @apply animate-fadeIn;
-  }
-
-  .animate-slide-up {
-    @apply animate-slideUp;
-  }
-
-  .animate-slide-down {
-    @apply animate-slideDown;
-  }
-
-  .animate-slide-left {
-    @apply animate-slideLeft;
-  }
-
-  .animate-slide-right {
-    @apply animate-slideRight;
-  }
-
-  .animate-scale-in {
-    @apply animate-scaleIn;
-  }
-
-  .transition-theme {
-    @apply transition-all duration-300;
-  }
+  .animate-in { @apply animate-fadeIn; }
+  .animate-slide-up { @apply animate-slideUp; }
+  .animate-slide-down { @apply animate-slideDown; }
+  .animate-slide-left { @apply animate-slideLeft; }
+  .animate-slide-right { @apply animate-slideRight; }
+  .animate-scale-in { @apply animate-scaleIn; }
+  .transition-theme { @apply transition-all duration-300; }
 }
 
 ::-webkit-scrollbar { display: none; }
 * { scrollbar-width: none; }
-
