@@ -13,6 +13,9 @@ export function NetWorthProvider({ children }) {
     cashInHand: 0,
     bankBalance: 0,
     investmentBalance: 0,
+    cashBalance: 0,
+    outstandingLoans: 0,
+    outstandingEMIs: 0,
     assets: [],
     liabilities: [],
   })
@@ -37,7 +40,7 @@ export function NetWorthProvider({ children }) {
     setSummary(prev => {
       const assets = [res.data.asset, ...prev.assets]
       const totalAssets = assets.reduce((s, a) => s + a.value, 0)
-      return { ...prev, assets, totalAssets, netWorth: totalAssets - prev.totalLiabilities }
+      return { ...prev, assets, totalAssets, netWorth: totalAssets + (prev.cashBalance || 0) - prev.totalLiabilities }
     })
     toast.success('Asset added')
   }
@@ -47,7 +50,7 @@ export function NetWorthProvider({ children }) {
     setSummary(prev => {
       const assets = prev.assets.map(a => a.id === id ? res.data.asset : a)
       const totalAssets = assets.reduce((s, a) => s + a.value, 0)
-      return { ...prev, assets, totalAssets, netWorth: totalAssets - prev.totalLiabilities }
+      return { ...prev, assets, totalAssets, netWorth: totalAssets + (prev.cashBalance || 0) - prev.totalLiabilities }
     })
     toast.success('Asset updated')
   }
@@ -57,7 +60,7 @@ export function NetWorthProvider({ children }) {
     setSummary(prev => {
       const assets = prev.assets.filter(a => a.id !== id)
       const totalAssets = assets.reduce((s, a) => s + a.value, 0)
-      return { ...prev, assets, totalAssets, netWorth: totalAssets - prev.totalLiabilities }
+      return { ...prev, assets, totalAssets, netWorth: totalAssets + (prev.cashBalance || 0) - prev.totalLiabilities }
     })
     toast.success('Asset deleted')
   }
@@ -67,7 +70,7 @@ export function NetWorthProvider({ children }) {
     setSummary(prev => {
       const liabilities = [res.data.liability, ...prev.liabilities]
       const totalLiabilities = liabilities.reduce((s, l) => s + l.value, 0)
-      return { ...prev, liabilities, totalLiabilities, netWorth: prev.totalAssets - totalLiabilities }
+      return { ...prev, liabilities, totalLiabilities, netWorth: prev.totalAssets + (prev.cashBalance || 0) - totalLiabilities }
     })
     toast.success('Liability added')
   }
@@ -77,7 +80,7 @@ export function NetWorthProvider({ children }) {
     setSummary(prev => {
       const liabilities = prev.liabilities.map(l => l.id === id ? res.data.liability : l)
       const totalLiabilities = liabilities.reduce((s, l) => s + l.value, 0)
-      return { ...prev, liabilities, totalLiabilities, netWorth: prev.totalAssets - totalLiabilities }
+      return { ...prev, liabilities, totalLiabilities, netWorth: prev.totalAssets + (prev.cashBalance || 0) - totalLiabilities }
     })
     toast.success('Liability updated')
   }
@@ -87,7 +90,7 @@ export function NetWorthProvider({ children }) {
     setSummary(prev => {
       const liabilities = prev.liabilities.filter(l => l.id !== id)
       const totalLiabilities = liabilities.reduce((s, l) => s + l.value, 0)
-      return { ...prev, liabilities, totalLiabilities, netWorth: prev.totalAssets - totalLiabilities }
+      return { ...prev, liabilities, totalLiabilities, netWorth: prev.totalAssets + (prev.cashBalance || 0) - totalLiabilities }
     })
     toast.success('Liability deleted')
   }

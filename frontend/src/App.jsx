@@ -37,8 +37,8 @@ export default function App() {
         <NotificationProvider>
           <ExpenseProvider>
             <BudgetProvider>
-              <EMIProvider>
-                <NetWorthProvider>
+              <NetWorthProvider>
+                <EMIProvider>
                   <BrowserRouter>
                 <Toaster
                   position="top-center"
@@ -64,8 +64,8 @@ export default function App() {
                   <Route path="/edit/:id" element={<PrivateRoute><AddExpense /></PrivateRoute>} />
                 </Routes>
                   </BrowserRouter>
-                </NetWorthProvider>
-              </EMIProvider>
+                </EMIProvider>
+              </NetWorthProvider>
             </BudgetProvider>
           </ExpenseProvider>
         </NotificationProvider>

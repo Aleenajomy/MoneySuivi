@@ -7,13 +7,19 @@ const app = express();
 
 const allowedOrigins = [
   'https://smartexpencetracker-frontend.onrender.com',
-  'http://localhost:3000'
+  'https://smartexpencetracker.onrender.com',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:4173',
 ];
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) callback(null, true);
-    else callback(new Error('Not allowed by CORS'));
+    // Allow requests with no origin (mobile apps, curl, Postman, same-origin proxy)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    // Return 403-style rejection without throwing — avoids 500 from error handler
+    return callback(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -50,7 +56,18 @@ const startServer = async () => {
     await prisma.$connect();
     console.log('PostgreSQL connected via Prisma');
     require('./services/cronJob');
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+    const server = app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+    server.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(`❌  Port ${PORT} is already in use. Kill the process using it and restart.`);
+        process.exit(1);
+      } else {
+        console.error('Server error:', err.message);
+        process.exit(1);
+      }
+    });
   } catch (error) {
     console.error(`Database Connection Error: ${error.message}`);
     process.exit(1);
