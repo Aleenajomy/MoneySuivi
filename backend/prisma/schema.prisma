@@ -69,17 +69,34 @@ model EMI {
   user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   title                String   @db.VarChar(100)
   totalAmount          Float
-  emiAmount            Float
-  totalInstallments    Int
+  emiAmount            Float?
+  totalInstallments    Int?
   paidInstallments     Int      @default(0)
+  paidAmount           Float    @default(0)
   startDate            DateTime
-  nextDueDate          DateTime
+  nextDueDate          DateTime?
   note                 String?  @db.VarChar(500)
   active               Boolean  @default(true)
+  type                 String   @default("FIXED")
+  interestRate         Float?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+  payments             EMIPayment[]
 
   @@index([userId, active])
+}
+
+model EMIPayment {
+  id          String   @id @default(uuid())
+  emiId       String
+  emi         EMI      @relation(fields: [emiId], references: [id], onDelete: Cascade)
+  amount      Float
+  paidAt      DateTime @default(now())
+  note        String?  @db.VarChar(500)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([emiId])
 }
 
 model Asset {

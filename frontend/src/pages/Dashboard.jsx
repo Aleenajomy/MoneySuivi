@@ -10,7 +10,7 @@ import { useExpense } from '../context/ExpenseContext'
 import { useNotification } from '../context/NotificationContext'
 import { useEMI } from '../context/EMIContext'
 import { useNetWorth } from '../context/NetWorthContext'
-import { CATEGORY_COLORS, formatCurrency, formatShortDate } from '../utils/constants'
+import { CATEGORY_COLORS, formatCurrency, formatShortDate, getLoanDetails } from '../utils/constants'
 
 const budgetColor = (pct) => {
   if (pct >= 100) return 'bg-red-500'
@@ -153,17 +153,31 @@ export default function Dashboard() {
       <Widget title="Upcoming EMIs" action="View All" onAction={() => navigate('/emis')} icon={CreditCard}>
         {upcomingEMIs.length === 0 ? (
           <p className="text-xs dark:text-gray-500 text-gray-500">No active EMIs.</p>
-        ) : upcomingEMIs.map(emi => (
-          <div key={emi.id} className="flex items-center justify-between py-1.5 border-b dark:border-dark-border border-light-border last:border-0">
-            <div>
-              <p className="text-xs font-semibold dark:text-gray-300 text-slate-700">{emi.title}</p>
-              <p className="text-[10px] dark:text-gray-600 text-gray-400">
-                {emi.paidInstallments}/{emi.totalInstallments} paid · Due {formatShortDate(emi.nextDueDate)}
-              </p>
+        ) : upcomingEMIs.map(emi => {
+          const details = getLoanDetails(emi)
+          const isFixed = emi.type !== 'FLEXIBLE'
+          const detailText = isFixed 
+            ? `${emi.paidInstallments}/${emi.totalInstallments} paid · Due ${formatShortDate(emi.nextDueDate)}`
+            : `Paid: ${formatCurrency(details.amountPaid)} / ${formatCurrency(details.totalPayableAmount)}${emi.nextDueDate ? ` · Due ${formatShortDate(emi.nextDueDate)}` : ''}`
+          
+          const rightText = isFixed
+            ? `${formatCurrency(emi.emiAmount)}/mo`
+            : emi.emiAmount 
+              ? `${formatCurrency(emi.emiAmount)}/mo`
+              : `Left: ${formatCurrency(details.remainingBalance)}`
+
+          return (
+            <div key={emi.id} className="flex items-center justify-between py-1.5 border-b dark:border-dark-border border-light-border last:border-0">
+              <div>
+                <p className="text-xs font-semibold dark:text-gray-300 text-slate-700">{emi.title}</p>
+                <p className="text-[10px] dark:text-gray-600 text-gray-400">
+                  {detailText}
+                </p>
+              </div>
+              <span className="text-xs font-bold text-danger">{rightText}</span>
             </div>
-            <span className="text-xs font-bold text-danger">{formatCurrency(emi.emiAmount)}/mo</span>
-          </div>
-        ))}
+          )
+        })}
       </Widget>
 
       <Widget title="Category Budgets" action="Manage" onAction={() => navigate('/budgets')} icon={WalletCards}>

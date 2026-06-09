@@ -7,7 +7,7 @@ const navItems = [
   { path: '/', icon: Home, label: 'Home' },
   { path: '/history', icon: Clock, label: 'History' },
   { path: '/add', icon: Plus, label: 'Add', isFab: true },
-  { path: '/emis', icon: CreditCard, label: 'EMI' },
+  { path: '/emis', icon: CreditCard, label: 'Loans' },
   { path: '/networth', icon: WalletCards, label: 'Net Worth' },
 ]
 

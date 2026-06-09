@@ -19,18 +19,26 @@ export function EMIProvider({ children }) {
   }, [])
 
   const addEMI = async (data) => {
-    const res = await api.post('/emis', data)
-    setEmis(prev => [res.data.emi, ...prev])
-    toast.success('EMI added')
+    try {
+      const res = await api.post('/emis', data)
+      setEmis(prev => [res.data.emi, ...prev])
+      toast.success('Loan added successfully')
+    } catch (e) {
+      const errorMsg = e.response?.data?.message || e.message || 'Failed to add loan'
+      toast.error(errorMsg)
+      throw e
+    }
   }
 
-  const payInstallment = async (id) => {
+  const payInstallment = async (id, paymentData = null) => {
     try {
-      await api.patch(`/emis/${id}/pay`)
+      await api.patch(`/emis/${id}/pay`, paymentData || {})
       await fetchEMIs()
-      toast.success('Installment marked as paid')
+      toast.success('Repayment recorded successfully')
     } catch (e) {
-      toast.error(e.message || 'Failed to mark paid')
+      const errorMsg = e.response?.data?.message || e.message || 'Failed to record repayment'
+      toast.error(errorMsg)
+      throw e
     }
   }
 
@@ -38,9 +46,10 @@ export function EMIProvider({ children }) {
     try {
       await api.put(`/emis/${id}`, data)
       await fetchEMIs()
-      toast.success('EMI updated')
+      toast.success('Loan updated successfully')
     } catch (e) {
-      toast.error(e.message || 'Failed to update EMI')
+      const errorMsg = e.response?.data?.message || e.message || 'Failed to update loan'
+      toast.error(errorMsg)
       throw e
     }
   }
@@ -49,14 +58,26 @@ export function EMIProvider({ children }) {
     try {
       await api.delete(`/emis/${id}`)
       await fetchEMIs()
-      toast.success('EMI deleted')
+      toast.success('Loan deleted')
     } catch (e) {
-      toast.error(e.message || 'Failed to delete EMI')
+      const errorMsg = e.response?.data?.message || e.message || 'Failed to delete loan'
+      toast.error(errorMsg)
+    }
+  }
+
+  const deletePayment = async (paymentId) => {
+    try {
+      await api.delete(`/emis/payments/${paymentId}`)
+      await fetchEMIs()
+      toast.success('Repayment log deleted')
+    } catch (e) {
+      const errorMsg = e.response?.data?.message || e.message || 'Failed to delete repayment log'
+      toast.error(errorMsg)
     }
   }
 
   return (
-    <EMIContext.Provider value={{ emis, loading, fetchEMIs, addEMI, updateEMI, payInstallment, deleteEMI }}>
+    <EMIContext.Provider value={{ emis, loading, fetchEMIs, addEMI, updateEMI, payInstallment, deleteEMI, deletePayment }}>
       {children}
     </EMIContext.Provider>
   )
