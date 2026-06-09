@@ -32,7 +32,11 @@ api.interceptors.response.use(
       localStorage.removeItem('token')
       window.location.href = '/login'
     }
-    return Promise.reject(new Error(err.response?.data?.message || err.message || 'Something went wrong'))
+    const rejectError = new Error(err.response?.data?.message || err.message || 'Something went wrong')
+    if (err.response) {
+      rejectError.status = err.response.status
+    }
+    return Promise.reject(rejectError)
   }
 )
 

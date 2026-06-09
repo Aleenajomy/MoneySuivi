@@ -56,7 +56,9 @@ export function BudgetProvider({ children }) {
         loadLocalBudgets()
         toast.error('Budget API is not deployed yet. Using local budgets on this device.')
       } else {
-        toast.error(err.message || 'Failed to load budgets')
+        if (err.status !== 401) {
+          toast.error(err.message || 'Failed to load budgets')
+        }
       }
     } finally {
       setLoading(false)

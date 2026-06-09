@@ -23,8 +23,13 @@ export function NetWorthProvider({ children }) {
     try {
       const res = await api.get('/networth/summary')
       setSummary(res.data)
-    } catch { toast.error('Failed to load net worth') }
-    finally { setLoading(false) }
+    } catch (err) {
+      if (err.status !== 401) {
+        toast.error('Failed to load net worth')
+      }
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   const addAsset = async (data) => {

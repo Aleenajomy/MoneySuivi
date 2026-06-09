@@ -14,8 +14,13 @@ export function EMIProvider({ children }) {
     try {
       const res = await api.get('/emis')
       setEmis(res.data.emis)
-    } catch { toast.error('Failed to load EMIs') }
-    finally { setLoading(false) }
+    } catch (err) {
+      if (err.status !== 401) {
+        toast.error('Failed to load EMIs')
+      }
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   const addEMI = async (data) => {

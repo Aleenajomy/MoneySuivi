@@ -26,7 +26,9 @@ export function ExpenseProvider({ children }) {
       setExpenses(prev => append ? [...prev, ...sorted] : sorted)
       setPagination({ page: data.currentPage, totalPages: data.totalPages })
     } catch (err) {
-      toast.error('Failed to load transactions')
+      if (err.status !== 401) {
+        toast.error('Failed to load transactions')
+      }
     } finally {
       setLoading(false)
     }
