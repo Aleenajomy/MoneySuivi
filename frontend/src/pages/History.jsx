@@ -30,16 +30,18 @@ export default function History() {
     const timer = setTimeout(() => {
       const params = { page: 1 }
       if (filters.category && filters.category !== 'All') params.category = filters.category
+      if (filters.type && filters.type !== 'All') params.type = filters.type
       if (search.trim()) params.search = search.trim()
       if (appliedRange.startDate) params.startDate = appliedRange.startDate
       if (appliedRange.endDate) params.endDate = appliedRange.endDate
       fetchExpenses(params)
     }, 300)
     return () => clearTimeout(timer)
-  }, [filters.category, search, appliedRange, fetchExpenses])
+  }, [filters.category, filters.type, search, appliedRange, fetchExpenses])
 
   const activeFilterCount = [
     filters.category && filters.category !== 'All',
+    filters.type && filters.type !== 'All',
     filters.search,
     appliedRange.startDate || appliedRange.endDate,
   ].filter(Boolean).length
@@ -59,12 +61,14 @@ export default function History() {
     setRange({ startDate: '', endDate: '' })
     setAppliedRange({ startDate: '', endDate: '' })
     applyFilter('category', 'All')
+    applyFilter('type', 'All')
   }
 
   const loadMore = () => {
     if (pagination.page < pagination.totalPages) {
       const params = { page: pagination.page + 1 }
       if (filters.category && filters.category !== 'All') params.category = filters.category
+      if (filters.type && filters.type !== 'All') params.type = filters.type
       if (search.trim()) params.search = search.trim()
       if (appliedRange.startDate) params.startDate = appliedRange.startDate
       if (appliedRange.endDate) params.endDate = appliedRange.endDate
@@ -75,8 +79,13 @@ export default function History() {
   const exportFile = async (type) => {
     setExporting(type)
     try {
+      const params = { ...appliedRange }
+      if (filters.category && filters.category !== 'All') params.category = filters.category
+      if (filters.type && filters.type !== 'All') params.type = filters.type
+      if (search.trim()) params.search = search.trim()
+
       const res = await api.get(`/export/${type}`, {
-        params: appliedRange,
+        params,
         responseType: 'blob',
       })
       downloadBlob(res.data, type === 'csv' ? 'transactions.csv' : 'expense-report.pdf')
@@ -122,6 +131,33 @@ export default function History() {
                 <X size={15} />
               </button>
             )}
+          </div>
+
+          {/* Transaction Type Filters */}
+          <div className="mb-4">
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: 'All', value: 'All' },
+                { label: 'Income', value: 'income' },
+                { label: 'Expenses', value: 'expense' }
+              ].map(t => {
+                const isActive = (filters.type || 'All') === t.value
+                return (
+                  <button
+                    key={t.value}
+                    type="button"
+                    onClick={() => applyFilter('type', t.value)}
+                    className={`py-2.5 text-xs font-bold rounded-xl transition-all border text-center ${
+                      isActive
+                        ? 'bg-primary/15 border-primary/30 text-primary'
+                        : 'dark:bg-dark-bg bg-white dark:border-dark-border border-light-border dark:text-gray-400 text-gray-500'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
           <div className="flex gap-2 overflow-x-auto pb-3 mb-4 -mx-4 px-4">

@@ -10,10 +10,14 @@ const buildDateFilter = (startDate, endDate) => {
   return filter;
 };
 
-const getExportData = async (userId, startDate, endDate) => {
+const getExportData = async (userId, query = {}) => {
+  const { startDate, endDate, type, category, search } = query;
   const where = { userId };
   const expenseDate = buildDateFilter(startDate, endDate);
   if (expenseDate) where.expenseDate = expenseDate;
+  if (type && type !== 'All') where.type = type;
+  if (category && category !== 'All') where.category = category;
+  if (search) where.title = { contains: search, mode: 'insensitive' };
   return prisma.expense.findMany({ where, orderBy: { expenseDate: 'desc' } });
 };
 
@@ -22,8 +26,7 @@ const formatAmount = (amount) => `Rs. ${Number(amount).toLocaleString('en-IN')}`
 
 const exportCSV = async (req, res) => {
   try {
-    const { startDate, endDate } = req.query;
-    const expenses = await getExportData(req.user.id, startDate, endDate);
+    const expenses = await getExportData(req.user.id, req.query);
 
     const parser = new Parser({
       fields: ['date', 'title', 'category', 'type', 'amount', 'accountType', 'fromAccountType', 'toAccountType', 'paymentMethod', 'note', 'recurring', 'nextRunDate'],
@@ -62,8 +65,7 @@ const drawFooter = (doc) => {
 
 const exportPDF = async (req, res) => {
   try {
-    const { startDate, endDate } = req.query;
-    const expenses = await getExportData(req.user.id, startDate, endDate);
+    const expenses = await getExportData(req.user.id, req.query);
     const totalIncome = expenses.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
     const totalExpense = expenses.filter(e => e.type === 'expense').reduce((sum, e) => sum + e.amount, 0);
 

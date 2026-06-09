@@ -9,9 +9,10 @@ const {
 const toExpenseResponse = (e) => ({ ...e, _id: e.id });
 
 const buildFilter = (userId, query) => {
-  const { category, startDate, endDate, search } = query;
+  const { category, startDate, endDate, search, type } = query;
   const where = { userId };
   if (category && category !== 'All') where.category = category;
+  if (type && type !== 'All') where.type = type;
   if (search) where.title = { contains: search, mode: 'insensitive' };
   if (startDate || endDate) {
     where.expenseDate = {};

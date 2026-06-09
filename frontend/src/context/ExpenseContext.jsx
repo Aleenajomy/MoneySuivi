@@ -13,13 +13,14 @@ export function ExpenseProvider({ children }) {
   const [loading, setLoading] = useState(false)
   const [loadingAnalytics, setLoadingAnalytics] = useState(false)
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1 })
-  const [filters, setFilters] = useState({ category: 'All', search: '' })
+  const [filters, setFilters] = useState({ category: 'All', type: 'All', search: '' })
 
   const fetchExpenses = useCallback(async (params = {}, append = false) => {
     setLoading(true)
     try {
       const query = { ...params }
       if (query.category === 'All') delete query.category
+      if (query.type === 'All') delete query.type
       const res = await api.get('/expenses', { params: query })
       const data = res.data
       const sorted = (data.expenses || []).sort((a, b) => new Date(b.expenseDate) - new Date(a.expenseDate))
