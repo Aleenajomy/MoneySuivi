@@ -9,7 +9,7 @@
     "fresh": "powershell -Command \"$p = (netstat -ano | Select-String ':5000 .+LISTENING').Line.Split(' ')[-1]; if ($p) { taskkill /F /PID $p 2>$null }\" ; nodemon server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "build": "prisma generate && prisma migrate deploy"
+    "build": "prisma generate && prisma db push"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
