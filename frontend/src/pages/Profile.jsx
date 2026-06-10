@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
-import { LogOut, ChevronRight, User, Bell, Shield, HelpCircle, X, Mail, Lock, Eye, EyeOff, Sun, Moon } from 'lucide-react'
+import { LogOut, ChevronRight, User, Bell, Shield, HelpCircle, X, Mail, Lock, Eye, EyeOff, Sun, Moon, HandCoins } from 'lucide-react'
 import { formatDate } from '../utils/constants'
 import toast from 'react-hot-toast'
 import api from '../services/api'
@@ -141,6 +141,7 @@ export default function Profile() {
               </div>
             </button>
 
+            <SettingRow icon={<HandCoins size={17} />} label="Borrow & Lend Ledger" onClick={() => navigate('/ledger')} />
             <SettingRow icon={<Bell size={17} />} label="Notifications" onClick={() => setModal('notifications')} />
             <SettingRow icon={<Lock size={17} />} label="Change Password" onClick={() => setChangingPw(p => !p)} />
             <SettingRow icon={<HelpCircle size={17} />} label="Help & Support" onClick={() => setModal('help')} />
