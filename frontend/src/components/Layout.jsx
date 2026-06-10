@@ -1,17 +1,15 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   Home, Clock, WalletCards, CreditCard, Plus,
   BarChart3, WalletIcon, BellIcon, UserCircle, LogOut, Settings,
-  Menu, Search, Sun, Moon, ChevronLeft, ChevronRight, X, FileText
+  Menu, Sun, Moon, ChevronLeft, ChevronRight, X
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useNotification } from '../context/NotificationContext'
 import { useTheme } from '../context/ThemeContext'
 import { motion, AnimatePresence } from 'framer-motion'
 import { subscribeUserToPush } from '../utils/pushManager'
-import api from '../services/api'
-import toast from 'react-hot-toast'
 
 const mobileNavItems = [
   { path: '/', icon: Home, label: 'Home' },
@@ -42,63 +40,16 @@ export default function Layout() {
   
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-
-  // Mobile-only profile states & refs
-  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false)
-  const [exporting, setExporting] = useState('')
-  const dropdownRef = useRef(null)
-
   useEffect(() => {
     if (user) {
       subscribeUserToPush()
     }
   }, [user])
 
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setProfileDropdownOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
-  const exportFile = async () => {
-    setExporting('pdf')
-    try {
-      const res = await api.get('/export/pdf', {
-        responseType: 'blob',
-      })
-      const url = window.URL.createObjectURL(res.data)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = 'expense-report.pdf'
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      window.URL.revokeObjectURL(url)
-      toast.success('PDF report downloaded successfully')
-    } catch (err) {
-      toast.error(err.message || 'Export failed')
-    } finally {
-      setExporting('')
-    }
-  }
-
   const handleLogout = () => {
     if (window.confirm('Are you sure you want to logout?')) {
       logout()
       navigate('/login')
-    }
-  }
-
-  const handleSearchSubmit = (e) => {
-    e.preventDefault()
-    if (searchQuery.trim()) {
-      navigate(`/history?search=${encodeURIComponent(searchQuery.trim())}`)
-      setSearchQuery('')
     }
   }
 
@@ -349,90 +300,14 @@ export default function Layout() {
               )}
             </button>
 
-            {/* Mobile Profile Dropdown (Visible only on mobile < 768px) */}
-            <div className="relative flex md:hidden" ref={dropdownRef}>
-              <button
-                onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                className="w-8 h-8 rounded-xl gradient-blue flex items-center justify-center text-white font-bold text-sm shadow-sm active:scale-95 transition-transform"
-                title="Profile Menu"
-              >
-                {user?.name?.[0]?.toUpperCase() || <UserCircle size={16} />}
-              </button>
-              
-              <AnimatePresence>
-                {profileDropdownOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute right-0 mt-10 w-52 rounded-2xl border dark:border-dark-border border-light-border bg-white dark:bg-dark-card shadow-lg p-2 z-50 flex flex-col gap-1"
-                  >
-                    <div className="px-3 py-2 border-b dark:border-dark-border border-light-border mb-1 text-left">
-                      <p className="text-xs font-bold dark:text-gray-200 text-slate-800 truncate">{user?.name || 'User'}</p>
-                      <p className="text-[10px] dark:text-gray-500 text-gray-400 truncate">{user?.email}</p>
-                    </div>
-                    
-                    <button
-                      onClick={() => {
-                        navigate('/profile')
-                        setProfileDropdownOpen(false)
-                      }}
-                      className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left hover:bg-slate-100 dark:hover:bg-dark-border text-xs font-bold dark:text-gray-300 text-slate-700 transition-colors"
-                    >
-                      <UserCircle size={16} className="text-sky-500" />
-                      <span>Profile</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        navigate('/profile')
-                        setProfileDropdownOpen(false)
-                      }}
-                      className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left hover:bg-slate-100 dark:hover:bg-dark-border text-xs font-bold dark:text-gray-300 text-slate-700 transition-colors"
-                    >
-                      <Settings size={16} className="text-sky-500" />
-                      <span>Settings</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        toggle()
-                      }}
-                      className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left hover:bg-slate-100 dark:hover:bg-dark-border text-xs font-bold dark:text-gray-300 text-slate-700 transition-colors"
-                    >
-                      {mode === 'dark' ? <Sun size={16} className="text-yellow-400" /> : <Moon size={16} className="text-sky-500" />}
-                      <span>{mode === 'dark' ? 'Light Theme' : 'Dark Theme'}</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        exportFile()
-                        setProfileDropdownOpen(false)
-                      }}
-                      disabled={exporting === 'pdf'}
-                      className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left hover:bg-slate-100 dark:hover:bg-dark-border text-xs font-bold dark:text-gray-300 text-slate-700 transition-colors disabled:opacity-50"
-                    >
-                      <FileText size={16} className="text-sky-500" />
-                      <span>{exporting === 'pdf' ? 'Exporting PDF...' : 'Export PDF'}</span>
-                    </button>
-
-                    <div className="border-t dark:border-dark-border border-light-border my-1" />
-
-                    <button
-                      onClick={() => {
-                        setProfileDropdownOpen(false)
-                        handleLogout()
-                      }}
-                      className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left hover:bg-danger/10 text-xs font-bold text-danger transition-colors"
-                    >
-                      <LogOut size={16} />
-                      <span>Logout</span>
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+            {/* Mobile Profile Avatar → navigates to Profile page (mobile < 768px only) */}
+            <button
+              onClick={() => navigate('/profile')}
+              className="flex md:hidden w-8 h-8 rounded-xl gradient-blue items-center justify-center text-white font-bold text-sm shadow-sm active:scale-95 transition-transform"
+              title="Go to Profile"
+            >
+              {user?.name?.[0]?.toUpperCase() || <UserCircle size={16} />}
+            </button>
           </div>
         </header>
 
