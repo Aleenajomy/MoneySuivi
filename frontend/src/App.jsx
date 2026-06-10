@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
@@ -42,7 +42,7 @@ export default function App() {
               <NetWorthProvider>
                 <LedgerProvider>
                 <EMIProvider>
-                  <BrowserRouter>
+                  <HashRouter>
                 <Toaster
                   position="top-center"
                   toastOptions={{
@@ -67,7 +67,7 @@ export default function App() {
                     <Route path="edit/:id" element={<AddExpense />} />
                   </Route>
                 </Routes>
-                  </BrowserRouter>
+                  </HashRouter>
                 </EMIProvider>
                 </LedgerProvider>
               </NetWorthProvider>
