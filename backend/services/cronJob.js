@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const prisma = require('../lib/prisma');
 const { checkBudgetAlert } = require('./budgetAlertService');
+const { sendPushNotification } = require('./pushService');
 
 const calcNextRunDate = (from, type) => {
   const d = new Date(from);
@@ -70,15 +71,21 @@ cron.schedule('0 21 * * *', async () => {
       });
       const total = result._sum.amount || 0;
       if (total > 0) {
+        const message = `You spent ₹${total.toFixed(0)} today across all categories.`;
         await prisma.notification.create({
           data: {
             userId: user.id,
             category: 'Daily Summary',
-            message: `You spent ₹${total.toFixed(0)} today across all categories.`,
+            message,
             type: 'info',
             percentage: 0,
           },
         });
+
+        sendPushNotification(user.id, {
+          title: '📅 Daily Spending Summary',
+          body: message,
+        }).catch(err => console.error('[PushService] Cron push trigger error:', err));
       }
     }
     console.log('[Cron] Daily spend notifications sent');

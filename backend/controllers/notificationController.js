@@ -47,4 +47,32 @@ const deleteNotification = async (req, res) => {
   }
 };
 
-module.exports = { getNotifications, markAllRead, markRead, deleteNotification };
+const subscribePush = async (req, res) => {
+  try {
+    const { endpoint, keys } = req.body;
+    if (!endpoint || !keys?.p256dh || !keys?.auth) {
+      return res.status(400).json({ success: false, message: 'Invalid subscription object' });
+    }
+
+    await prisma.pushSubscription.upsert({
+      where: { endpoint },
+      update: {
+        userId: req.user.id,
+        p256dh: keys.p256dh,
+        auth: keys.auth,
+      },
+      create: {
+        userId: req.user.id,
+        endpoint,
+        p256dh: keys.p256dh,
+        auth: keys.auth,
+      },
+    });
+
+    res.status(201).json({ success: true, message: 'Subscribed to push notifications successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = { getNotifications, markAllRead, markRead, deleteNotification, subscribePush };

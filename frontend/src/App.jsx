@@ -59,9 +59,9 @@ export default function App() {
                     <Route path="emis" element={<EMITracker />} />
                     <Route path="networth" element={<NetWorth />} />
                     <Route path="profile" element={<Profile />} />
+                    <Route path="add" element={<AddExpense />} />
+                    <Route path="edit/:id" element={<AddExpense />} />
                   </Route>
-                  <Route path="/add" element={<PrivateRoute><AddExpense /></PrivateRoute>} />
-                  <Route path="/edit/:id" element={<PrivateRoute><AddExpense /></PrivateRoute>} />
                 </Routes>
                   </BrowserRouter>
                 </EMIProvider>

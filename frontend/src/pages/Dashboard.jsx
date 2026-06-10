@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, BarChart3, CreditCard, Repeat, TrendingUp, UserCircle, WalletCards } from 'lucide-react'
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, BarChart3, CreditCard, Repeat, TrendingUp, UserCircle, WalletCards, Clock } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
+import { motion } from 'framer-motion'
 import ExpenseCard from '../components/ExpenseCard'
 import { ExpenseCardSkeleton, StatCardSkeleton } from '../components/Skeleton'
 import { useAuth } from '../context/AuthContext'
@@ -60,43 +61,228 @@ export default function Dashboard() {
 
   const { cash: cashAmount, upi: upiAmount, creditCard: creditCardAmount, debitCard: debitCardAmount, netBanking: netBankingAmount, total: displayBalance } = getDisplayBalances(analytics)
 
+  const savingsRate = totalIncome > 0 ? Math.max(0, Math.round(((totalIncome - totalExpense) / totalIncome) * 100)) : 0
 
   return (
-    <div className="page">
-      <div className="flex items-center justify-between mb-6 animate-fadeIn pr-12">
-        <button
-          type="button"
-          onClick={() => navigate('/profile')}
-          className="flex items-center gap-3 text-left rounded-xl active:scale-95 transition-transform"
-        >
-          <span className="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-500 flex items-center justify-center">
-            <UserCircle size={22} />
-          </span>
-          <span>
-            <span className="block text-gray-500 dark:text-gray-400 text-sm">Good day,</span>
-            <span className="block text-xl font-bold dark:text-white text-slate-800">{user?.name?.split(' ')[0] || 'there'}</span>
-          </span>
-        </button>
+    <div className="page space-y-6">
+      {/* Welcome header/greeting section */}
+      <div className="flex items-center justify-between animate-fadeIn pr-12">
+        <div>
+          <h1 className="text-2xl font-black tracking-tight text-slate-800 dark:text-white">
+            Hello, <span className="text-gradient-blue">{user?.name?.split(' ')[0] || 'there'}</span>
+          </h1>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Here's your financial status overview today.</p>
+        </div>
       </div>
 
-      <button
-        type="button"
-        onClick={() => setShowBalanceBreakdown(true)}
-        className="w-full text-left rounded-2xl p-6 mb-4 relative overflow-hidden animate-slideUp shadow-lg hover:shadow-xl active:scale-[0.98] transition-shadow"
-        style={{ background: 'linear-gradient(135deg, #0284C7 0%, #0EA5E9 50%, #38BDF8 100%)' }}
-      >
-        <div className="absolute -top-6 -right-6 w-32 h-32 rounded-full bg-white/5" />
-        <div className="absolute -bottom-8 -left-4 w-24 h-24 rounded-full bg-white/5" />
-        <p className="text-blue-200 text-xs font-semibold uppercase tracking-widest mb-2">Total Balance</p>
-        {loadingAnalytics
-          ? <div className="h-10 w-44 bg-white/20 rounded-xl animate-pulse mb-3" />
-          : <p className="text-4xl font-extrabold text-white mb-3 tracking-tight">{formatCurrency(displayBalance)}</p>}
-        <p className="text-blue-200 text-xs">
-          Cash, bank and wallet balances
-        </p>
-      </button>
+      {/* Main Responsive Grid: Stacks on mobile/tablet, 3 columns on desktop */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        
+        {/* Column 1: Balance and Stats (Main Financial Summary) */}
+        <div className="space-y-6 lg:col-span-1">
+          {/* Glass Balance Card */}
+          <motion.div
+            whileHover={{ y: -4 }}
+            className="w-full text-left rounded-2xl p-6 relative overflow-hidden border dark:border-dark-border border-sky-500/20 bg-gradient-to-br from-sky-500 to-sky-600 dark:from-sky-950/40 dark:to-sky-900/20 text-white shadow-xl flex flex-col justify-between backdrop-blur-md transition-all duration-300"
+          >
+            {/* Background elements */}
+            <div className="absolute -top-6 -right-6 w-32 h-32 rounded-full bg-white/10 blur-xl pointer-events-none" />
+            <div className="absolute -bottom-8 -left-4 w-24 h-24 rounded-full bg-white/5 blur-lg pointer-events-none" />
+            
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-sky-100 dark:text-sky-300 text-[10px] font-bold uppercase tracking-widest">Total Balance</span>
+                <span className="px-2 py-0.5 rounded-full bg-white/20 text-[9px] font-bold text-white uppercase tracking-wider backdrop-blur-sm">Active</span>
+              </div>
+              {loadingAnalytics ? (
+                <div className="h-10 w-44 bg-white/20 rounded-xl animate-pulse mb-3" />
+              ) : (
+                <p className="text-3xl font-black text-white mb-2 tracking-tight">{formatCurrency(displayBalance)}</p>
+              )}
+            </div>
 
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
+              <span className="text-sky-200 dark:text-sky-400 text-xs">Breakdown by Accounts</span>
+              <button
+                type="button"
+                onClick={() => setShowBalanceBreakdown(true)}
+                className="px-3 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold tracking-wide transition-colors duration-200 flex items-center gap-1 active:scale-95"
+              >
+                <span>View Details</span>
+              </button>
+            </div>
+          </motion.div>
 
+          {/* Metric Grid: 2x2 grid representing core metrics */}
+          <div className="grid grid-cols-2 gap-4">
+            {loadingAnalytics ? (
+              <>
+                <StatCardSkeleton />
+                <StatCardSkeleton />
+                <StatCardSkeleton />
+                <StatCardSkeleton />
+              </>
+            ) : (
+              <>
+                <StatCard
+                  label="Income"
+                  amount={totalIncome}
+                  icon={ArrowDownRight}
+                  tone="secondary"
+                  onClick={() => navigate('/add?type=income')}
+                />
+                <StatCard
+                  label="Expenses"
+                  amount={totalExpense}
+                  icon={ArrowUpRight}
+                  tone="danger"
+                  onClick={() => navigate('/add?type=expense')}
+                />
+                <StatCard
+                  label="Net Worth"
+                  amount={netWorth}
+                  icon={TrendingUp}
+                  tone={isPositiveNW ? "secondary" : "danger"}
+                  onClick={() => navigate('/networth')}
+                />
+                <StatCard
+                  label="Savings Rate"
+                  amount={`${savingsRate}%`}
+                  icon={WalletCards}
+                  tone="info"
+                  isPercentage
+                />
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Column 2: Spending Analysis & Budgets */}
+        <div className="space-y-6">
+          <AnalysisWidget
+            analytics={analytics}
+            loading={loadingAnalytics}
+            onAction={() => navigate('/analytics')}
+          />
+          
+          <Widget title="Category Budgets" action="Manage" onAction={() => navigate('/budgets')} icon={WalletCards}>
+            {topBudgets.length === 0 ? (
+              <p className="text-xs dark:text-gray-500 text-gray-500">No category budgets set yet.</p>
+            ) : (
+              <div className="space-y-3.5 mt-2">
+                {topBudgets.map(budget => (
+                  <div key={budget.id} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold dark:text-gray-200 text-slate-700">{budget.category}</span>
+                      <span className="font-semibold text-sky-500">{budget.percentage}%</span>
+                    </div>
+                    <div className="h-2 dark:bg-dark-border bg-slate-200 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${budgetColor(budget.percentage)}`}
+                        style={{ width: `${Math.min(budget.percentage, 100)}%` }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] dark:text-gray-500 text-gray-400">
+                      <span>{formatCurrency(budget.spent)} / {formatCurrency(budget.monthlyLimit)}</span>
+                      <span className="font-semibold">Left: {formatCurrency(budget.remaining)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Widget>
+        </div>
+
+        {/* Column 3: Recent Activity & Reminders/Alerts */}
+        <div className="space-y-6">
+          {/* Recent Transactions Widget */}
+          <div className="card p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <span className="w-8 h-8 rounded-xl bg-sky-500/10 text-sky-500 flex items-center justify-center">
+                  <Clock size={16} />
+                </span>
+                <h2 className="font-bold dark:text-white text-slate-800 text-sm">Recent Transactions</h2>
+              </div>
+              <button
+                onClick={() => navigate('/history')}
+                className="text-sky-500 text-xs font-semibold px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 transition-all active:scale-95"
+              >
+                See all
+              </button>
+            </div>
+            
+            <div className="space-y-3.5">
+              {loading && expenses.length === 0 ? (
+                Array(4).fill(0).map((_, i) => <ExpenseCardSkeleton key={i} />)
+              ) : expenses.length === 0 ? (
+                <EmptyState />
+              ) : (
+                expenses.slice(0, 4).map(e => <ExpenseCard key={e._id} expense={e} />)
+              )}
+            </div>
+          </div>
+
+          {/* Upcoming EMIs & Recurring Widget */}
+          <div className="space-y-4">
+            {unreadCount > 0 && (
+              <Widget title="Alerts" action="Open" onAction={() => navigate('/notifications')} icon={AlertTriangle}>
+                <div className="space-y-2 mt-2">
+                  {latestAlerts.map(alert => (
+                    <div key={alert.id} className="text-xs dark:text-gray-400 text-gray-600 p-2.5 rounded-xl border border-yellow-500/20 bg-yellow-500/5 dark:bg-yellow-500/5">
+                      <span className={alert.type === 'critical' ? 'text-red-500 font-bold' : 'text-yellow-500 font-bold'}>
+                        {alert.category}:{' '}
+                      </span>
+                      {alert.message}
+                    </div>
+                  ))}
+                </div>
+              </Widget>
+            )}
+
+            <Widget title="Upcoming Payments" action="View All" onAction={() => navigate('/emis')} icon={CreditCard}>
+              <div className="space-y-3 mt-2">
+                {upcomingEMIs.length === 0 && upcomingRecurring.length === 0 ? (
+                  <p className="text-xs dark:text-gray-500 text-gray-500">No upcoming EMIs or recurring dues.</p>
+                ) : (
+                  <>
+                    {upcomingEMIs.map(emi => {
+                      const details = getLoanDetails(emi)
+                      const isFixed = emi.type !== 'FLEXIBLE'
+                      const detailText = isFixed
+                        ? `${emi.paidInstallments}/${emi.totalInstallments} paid · Due ${formatShortDate(emi.nextDueDate)}`
+                        : `Paid: ${formatCurrency(details.amountPaid)} / ${formatCurrency(details.totalPayableAmount)}`
+                      const rightText = isFixed
+                        ? `${formatCurrency(emi.emiAmount)}`
+                        : emi.emiAmount ? `${formatCurrency(emi.emiAmount)}` : `Left: ${formatCurrency(details.remainingBalance)}`
+
+                      return (
+                        <div key={emi.id} className="flex items-center justify-between py-2 border-b dark:border-dark-border border-light-border last:border-0">
+                          <div>
+                            <p className="text-xs font-bold dark:text-gray-200 text-slate-700">{emi.title}</p>
+                            <p className="text-[10px] dark:text-gray-500 text-gray-400">{detailText}</p>
+                          </div>
+                          <span className="text-xs font-bold text-danger">{rightText}</span>
+                        </div>
+                      )
+                    })}
+                    {upcomingRecurring.slice(0, 2).map(item => (
+                      <div key={item._id} className="flex items-center justify-between py-2 border-b dark:border-dark-border border-light-border last:border-0">
+                        <div>
+                          <p className="text-xs font-bold dark:text-gray-200 text-slate-700">{item.title}</p>
+                          <p className="text-[10px] dark:text-gray-500 text-gray-400">{item.recurringType} · Due {formatShortDate(item.nextRunDate)}</p>
+                        </div>
+                        <span className="text-xs font-bold text-danger">{formatCurrency(item.amount)}</span>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            </Widget>
+          </div>
+        </div>
+
+      </div>
 
       {showBalanceBreakdown && !loadingAnalytics && (
         <BalanceModal
@@ -109,139 +295,35 @@ export default function Dashboard() {
           onClose={() => setShowBalanceBreakdown(false)}
         />
       )}
-
-      <div className="grid grid-cols-2 gap-3 mb-5">
-        {loadingAnalytics ? (
-          <><StatCardSkeleton /><StatCardSkeleton /></>
-        ) : (
-          <>
-            <StatCard label="Income" amount={totalIncome} icon={ArrowDownRight} tone="secondary" onClick={() => navigate('/add?type=income')} />
-            <StatCard label="Expenses" amount={totalExpense} icon={ArrowUpRight} tone="danger" onClick={() => navigate('/add?type=expense')} />
-          </>
-        )}
-      </div>
-
-      {/* Net Worth Mini Card */}
-      <button
-        type="button"
-        onClick={() => navigate('/networth')}
-        className="w-full card p-4 mb-5 flex items-center justify-between active:scale-[0.98] transition-transform"
-      >
-        <div className="flex items-center gap-3">
-          <span className={`w-10 h-10 rounded-xl flex items-center justify-center ${isPositiveNW ? 'bg-secondary/10' : 'bg-danger/10'}`}>
-            <TrendingUp size={18} className={isPositiveNW ? 'text-secondary' : 'text-danger'} />
-          </span>
-          <div className="text-left">
-            <p className="text-xs dark:text-gray-500 text-gray-400 font-medium">Net Worth</p>
-            <p className={`text-lg font-extrabold ${isPositiveNW ? 'text-secondary' : 'text-danger'}`}>{formatCurrency(netWorth)}</p>
-          </div>
-        </div>
-        <div className="text-right">
-          <p className="text-[10px] dark:text-gray-600 text-gray-400">Assets</p>
-          <p className="text-xs font-semibold dark:text-gray-300 text-slate-700">{formatCurrency(summary.totalAssets)}</p>
-          <p className="text-[10px] dark:text-gray-600 text-gray-400 mt-1">Liabilities</p>
-          <p className="text-xs font-semibold dark:text-gray-300 text-slate-700">{formatCurrency(summary.totalLiabilities)}</p>
-        </div>
-      </button>
-
-      <AnalysisWidget
-        analytics={analytics}
-        loading={loadingAnalytics}
-        onAction={() => navigate('/analytics')}
-      />
-
-      <Widget title="Upcoming EMIs" action="View All" onAction={() => navigate('/emis')} icon={CreditCard}>
-        {upcomingEMIs.length === 0 ? (
-          <p className="text-xs dark:text-gray-500 text-gray-500">No active EMIs.</p>
-        ) : upcomingEMIs.map(emi => {
-          const details = getLoanDetails(emi)
-          const isFixed = emi.type !== 'FLEXIBLE'
-          const detailText = isFixed 
-            ? `${emi.paidInstallments}/${emi.totalInstallments} paid · Due ${formatShortDate(emi.nextDueDate)}`
-            : `Paid: ${formatCurrency(details.amountPaid)} / ${formatCurrency(details.totalPayableAmount)}${emi.nextDueDate ? ` · Due ${formatShortDate(emi.nextDueDate)}` : ''}`
-          
-          const rightText = isFixed
-            ? `${formatCurrency(emi.emiAmount)}/mo`
-            : emi.emiAmount 
-              ? `${formatCurrency(emi.emiAmount)}/mo`
-              : `Left: ${formatCurrency(details.remainingBalance)}`
-
-          return (
-            <div key={emi.id} className="flex items-center justify-between py-1.5 border-b dark:border-dark-border border-light-border last:border-0">
-              <div>
-                <p className="text-xs font-semibold dark:text-gray-300 text-slate-700">{emi.title}</p>
-                <p className="text-[10px] dark:text-gray-600 text-gray-400">
-                  {detailText}
-                </p>
-              </div>
-              <span className="text-xs font-bold text-danger">{rightText}</span>
-            </div>
-          )
-        })}
-      </Widget>
-
-      <Widget title="Category Budgets" action="Manage" onAction={() => navigate('/budgets')} icon={WalletCards}>
-        {topBudgets.length === 0 ? (
-          <p className="text-xs dark:text-gray-500 text-gray-500">No category budgets set yet.</p>
-        ) : topBudgets.map(budget => (
-          <div key={budget.id} className="mb-3 last:mb-0">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-semibold dark:text-gray-300 text-slate-700">{budget.category}</span>
-              <span className="text-xs dark:text-gray-500 text-gray-500">{budget.percentage}%</span>
-            </div>
-            <div className="h-1.5 dark:bg-dark-border bg-slate-200 rounded-full overflow-hidden">
-              <div className={`h-full ${budgetColor(budget.percentage)}`} style={{ width: `${Math.min(budget.percentage, 100)}%` }} />
-            </div>
-            <div className="flex items-center justify-between mt-1">
-              <p className="text-[10px] dark:text-gray-600 text-gray-400">
-                {formatCurrency(budget.spent)} / {formatCurrency(budget.monthlyLimit)}
-              </p>
-              <p className="text-[10px] font-semibold dark:text-gray-300 text-slate-700">
-                Left: {formatCurrency(budget.remaining)}
-              </p>
-            </div>
-          </div>
-        ))}
-      </Widget>
-
-      <Widget title="Upcoming Recurring" action="View" onAction={() => navigate('/history')} icon={Repeat}>
-        {upcomingRecurring.length === 0 ? (
-          <p className="text-xs dark:text-gray-500 text-gray-500">No recurring expenses due in the next 30 days.</p>
-        ) : upcomingRecurring.map(item => (
-          <div key={item._id} className="flex items-center justify-between py-1">
-            <div>
-              <p className="text-xs font-semibold dark:text-gray-300 text-slate-700">{item.title}</p>
-              <p className="text-[10px] dark:text-gray-600 text-gray-400">{item.recurringType} - {formatShortDate(item.nextRunDate)}</p>
-            </div>
-            <span className="text-xs font-bold text-danger">{formatCurrency(item.amount)}</span>
-          </div>
-        ))}
-      </Widget>
-
-      {unreadCount > 0 && (
-        <Widget title="Budget Alerts" action="Open" onAction={() => navigate('/notifications')} icon={AlertTriangle}>
-          {latestAlerts.map(alert => (
-            <div key={alert.id} className="text-xs dark:text-gray-400 text-gray-600 mb-2 last:mb-0">
-              <span className={alert.type === 'critical' ? 'text-red-500 font-bold' : 'text-yellow-500 font-bold'}>{alert.category}: </span>
-              {alert.message}
-            </div>
-          ))}
-        </Widget>
-      )}
-
-      <div className="flex items-center justify-between mb-4 animate-slideLeft">
-        <h2 className="font-bold dark:text-white">Recent Transactions</h2>
-        <button onClick={() => navigate('/history')} className="text-sky-500 text-xs font-semibold px-3 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 transition-all">
-          See all
-        </button>
-      </div>
-
-      {loading && expenses.length === 0
-        ? Array(4).fill(0).map((_, i) => <ExpenseCardSkeleton key={i} />)
-        : expenses.length === 0
-          ? <EmptyState />
-          : expenses.slice(0, 5).map(e => <ExpenseCard key={e._id} expense={e} />)}
     </div>
+  )
+}
+
+function StatCard({ label, amount, icon: Icon, tone, onClick, isPercentage }) {
+  const color = tone === 'secondary'
+    ? 'text-secondary bg-secondary/10'
+    : tone === 'danger'
+      ? 'text-danger bg-danger/10'
+      : tone === 'info'
+        ? 'text-sky-500 bg-sky-500/10'
+        : 'text-secondary bg-secondary/10'
+  const Component = onClick ? 'button' : 'div'
+  return (
+    <Component
+      type={onClick ? 'button' : undefined}
+      onClick={onClick}
+      className={`card p-4 text-left ${onClick ? 'active:scale-[0.98] transition-all cursor-pointer hover:border-sky-500/30' : ''}`}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[10px] font-bold dark:text-gray-500 text-gray-600 uppercase tracking-wide">{label}</span>
+        <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${color}`}>
+          <Icon size={16} />
+        </div>
+      </div>
+      <p className="dark:text-gray-100 text-slate-800 font-black text-sm sm:text-base md:text-lg">
+        {isPercentage ? amount : formatCurrency(amount)}
+      </p>
+    </Component>
   )
 }
 
@@ -312,26 +394,6 @@ function AnalysisWidget({ analytics, loading, onAction }) {
   )
 }
 
-function StatCard({ label, amount, icon: Icon, tone, onClick }) {
-  const color = tone === 'secondary' ? 'text-secondary bg-secondary/10' : 'text-danger bg-danger/10'
-  const Component = onClick ? 'button' : 'div'
-  return (
-    <Component
-      type={onClick ? 'button' : undefined}
-      onClick={onClick}
-      className={`card p-4 text-left ${onClick ? 'active:scale-[0.98] transition-transform' : ''}`}
-    >
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-semibold dark:text-gray-500 text-gray-600 uppercase tracking-wide">{label}</span>
-        <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${color}`}>
-          <Icon size={16} />
-        </div>
-      </div>
-      <p className="dark:text-gray-100 text-slate-800 font-bold text-lg">{formatCurrency(amount)}</p>
-    </Component>
-  )
-}
-
 function BalanceModal({ cashAmount, upiAmount, creditCardAmount, debitCardAmount, netBankingAmount, total, onClose }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/50 px-4 flex items-center justify-center" onClick={onClose}>
@@ -346,7 +408,7 @@ function BalanceModal({ cashAmount, upiAmount, creditCardAmount, debitCardAmount
         <SummaryRow label="UPI" amount={upiAmount} />
         <SummaryRow label="Credit Card" amount={creditCardAmount} />
         <SummaryRow label="Debit Card" amount={debitCardAmount} />
-        <SummaryRow label="Net Banking" amount={netBankingAmount} />
+        <SummaryRow label="Other" amount={netBankingAmount} />
         <div className="border-t dark:border-dark-border border-light-border mt-4 pt-4">
           <SummaryRow label="Total Balance" amount={total} strong />
         </div>
@@ -368,8 +430,8 @@ function Widget({ title, action, onAction, icon: Icon, children }) {
   return (
     <div className="card p-4 mb-5">
       <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <span className="w-8 h-8 rounded-xl bg-sky-500/10 text-sky-500 flex items-center justify-center">
+        <div className="flex items-center gap-2">
+          <span className="w-8 h-8 rounded-xl bg-sky-500/10 text-sky-500 flex items-center justify-center">
             <Icon size={16} />
           </span>
           <h2 className="font-bold dark:text-white text-slate-800 text-sm">{title}</h2>

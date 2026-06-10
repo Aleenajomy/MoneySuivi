@@ -49,6 +49,46 @@
     @apply bg-light-card border-light-border shadow-sm;
   }
 
+  /* Premium Glassmorphism styling */
+  .glass-card {
+    @apply backdrop-blur-md border rounded-3xl transition-all duration-300;
+  }
+  .dark .glass-card {
+    background: rgba(30, 41, 59, 0.45);
+    border-color: rgba(255, 255, 255, 0.05);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+  }
+  html:not(.dark) .glass-card {
+    background: rgba(255, 255, 255, 0.75);
+    border-color: rgba(226, 232, 240, 0.8);
+    box-shadow: 0 8px 32px 0 rgba(148, 163, 184, 0.1);
+  }
+
+  /* Fintech Card with hover state */
+  .fintech-card {
+    @apply rounded-3xl border p-6 transition-all duration-300 hover:-translate-y-1.5;
+  }
+  .dark .fintech-card {
+    @apply bg-dark-card border-dark-border hover:border-sky-500/30;
+    box-shadow: 0 10px 30px -15px rgba(0, 0, 0, 0.3);
+  }
+  .dark .fintech-card:hover {
+    box-shadow: 0 20px 40px -20px rgba(14, 165, 233, 0.15);
+  }
+  html:not(.dark) .fintech-card {
+    @apply bg-white border-light-border hover:border-sky-500/20 shadow-sm hover:shadow-xl;
+  }
+  html:not(.dark) .fintech-card:hover {
+    box-shadow: 0 20px 40px -20px rgba(14, 165, 233, 0.1);
+  }
+
+  /* Text gradient helper */
+  .text-gradient-blue {
+    background: linear-gradient(135deg, #38BDF8 0%, #0EA5E9 50%, #0284C7 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
   .gradient-blue {
     background: linear-gradient(135deg, #38BDF8 0%, #0EA5E9 100%);
   }

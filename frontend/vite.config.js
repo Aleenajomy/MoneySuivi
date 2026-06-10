@@ -6,7 +6,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
       includeAssets: ['icon-192x192.png', 'icon-512x512.png'],
       manifest: {
         name: 'MoneySuivi',
@@ -33,18 +35,9 @@ export default defineConfig({
           }
         ]
       },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,woff2}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/smartexpencetracker\.onrender\.com\/api\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              networkTimeoutSeconds: 10
-            }
-          }
-        ]
+      devOptions: {
+        enabled: true,
+        type: 'module'
       }
     })
   ],

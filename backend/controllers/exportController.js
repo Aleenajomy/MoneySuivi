@@ -65,6 +65,7 @@ const drawFooter = (doc) => {
 
 const exportPDF = async (req, res) => {
   try {
+    const { startDate, endDate } = req.query;
     const expenses = await getExportData(req.user.id, req.query);
     const totalIncome = expenses.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
     const totalExpense = expenses.filter(e => e.type === 'expense').reduce((sum, e) => sum + e.amount, 0);

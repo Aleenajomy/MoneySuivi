@@ -65,28 +65,34 @@ export default function Budgets() {
     setShowForm(true)
   }
 
-  return (
-    <div className="page">
-      <div className="flex items-center justify-between mb-6 pr-12">
-        <h1 className="text-xl font-bold dark:text-white text-slate-800">Category Budgets</h1>
+return (
+    <div className="page space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between animate-fadeIn pr-12">
+        <div>
+          <h1 className="text-2xl font-black dark:text-white text-slate-800 tracking-tight">Category Budgets</h1>
+          <p className="text-xs dark:text-gray-400 text-gray-500 mt-0.5">Control your spending by category limits</p>
+        </div>
         {availableCategories.length > 0 && (
-          <button type="button" onClick={startCreate} className="w-9 h-9 rounded-xl gradient-blue flex items-center justify-center active:scale-90">
-            <Plus size={18} className="text-white" />
+          <button type="button" onClick={startCreate} className="w-10 h-10 rounded-xl gradient-blue flex items-center justify-center active:scale-95 shadow-md shadow-sky-500/20">
+            <Plus size={20} className="text-white" />
           </button>
         )}
       </div>
 
       {showForm && (
-        <div className="card p-4 mb-5 animate-slideDown">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-semibold dark:text-gray-300 text-slate-700">{editingId ? 'Edit Budget' : 'Set Budget'}</p>
-            <button type="button" onClick={resetForm}><X size={16} className="dark:text-gray-400 text-gray-500" /></button>
+        <div className="card p-5 animate-slideDown border dark:border-dark-border border-light-border">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm font-black dark:text-white text-slate-800">{editingId ? 'Edit Budget' : 'Set Budget'}</p>
+            <button type="button" onClick={resetForm} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-border">
+              <X size={16} className="dark:text-gray-400 text-gray-500" />
+            </button>
           </div>
-          <form onSubmit={handleSave} className="space-y-3">
+          <form onSubmit={handleSave} className="space-y-4">
             <div>
-              <label className="label">Category</label>
+              <label className="text-[10px] font-bold dark:text-gray-500 text-gray-400 uppercase tracking-wide">Category</label>
               <select
-                className="input"
+                className="input text-xs"
                 value={form.category}
                 disabled={Boolean(editingId)}
                 onChange={e => setForm(prev => ({ ...prev, category: e.target.value }))}
@@ -95,10 +101,10 @@ export default function Budgets() {
               </select>
             </div>
             <div>
-              <label className="label">Monthly Limit</label>
+              <label className="text-[10px] font-bold dark:text-gray-500 text-gray-400 uppercase tracking-wide">Monthly Limit (₹)</label>
               <input
                 type="number"
-                className="input"
+                className="input text-xs"
                 placeholder="e.g. 3000"
                 min="1"
                 value={form.monthlyLimit}
@@ -106,11 +112,11 @@ export default function Budgets() {
                 required
               />
             </div>
-            <button type="submit" disabled={saving} className="btn-primary flex items-center justify-center gap-2 disabled:opacity-50">
+            <button type="submit" disabled={saving} className="gradient-blue w-full py-2.5 text-xs font-bold text-white rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5">
               {saving
                 ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                : <Save size={15} />}
-              {saving ? 'Saving...' : 'Save Budget'}
+                : <Save size={14} />}
+              <span>{saving ? 'Saving...' : 'Save Budget'}</span>
             </button>
           </form>
         </div>
@@ -121,63 +127,73 @@ export default function Budgets() {
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       ) : budgets.length === 0 ? (
-        <div className="text-center py-16 animate-scaleIn">
-          <p className="dark:text-gray-400 text-gray-500 font-medium">No budgets set yet</p>
-          <p className="dark:text-gray-600 text-gray-400 text-sm mt-1">Tap plus to set a category budget</p>
+        <div className="text-center py-16 card p-5 flex flex-col items-center justify-center animate-scaleIn">
+          <p className="dark:text-gray-400 text-gray-500 font-bold text-sm">No budgets set yet</p>
+          <p className="dark:text-gray-600 text-gray-400 text-xs mt-1">Tap the plus icon to set category limits</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {budgets.map(b => {
             const pct = Math.min(b.percentage, 100)
             const color = barColor(b.percentage)
+            const isExceeded = b.percentage >= 100
+            
             return (
-              <div key={b.id} className="card p-4 animate-fadeIn">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center" style={{ color: CATEGORY_COLORS[b.category] || '#0066FF' }}>
-                      {(() => { const I = ICONS[b.category] || CircleDot; return <I size={18} /> })()}
-                    </span>
-                    <div>
-                      <p className="font-semibold text-sm dark:text-white text-slate-800">{b.category}</p>
-                      <p className="text-xs dark:text-gray-500 text-gray-400">
-                        {formatCurrency(b.spent)} / {formatCurrency(b.monthlyLimit)}
-                      </p>
+              <div key={b.id} className="card p-5 flex flex-col justify-between border dark:border-dark-border border-light-border bg-white dark:bg-dark-card shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+                <div>
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-9 h-9 rounded-xl bg-sky-500/10 flex items-center justify-center flex-shrink-0" style={{ color: CATEGORY_COLORS[b.category] || '#0066FF' }}>
+                        {(() => { const I = ICONS[b.category] || CircleDot; return <I size={18} /> })()}
+                      </span>
+                      <div>
+                        <p className="font-bold text-xs dark:text-white text-slate-800">{b.category}</p>
+                        <p className="text-[10px] dark:text-gray-500 text-gray-400 mt-0.5">Category budget</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => startEdit(b)}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center dark:text-gray-500 text-gray-400 hover:text-sky-500 dark:hover:text-sky-400 transition-colors"
+                        title="Edit Limit"
+                      >
+                        <Edit2 size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { if (window.confirm('Delete budget?')) deleteBudget(b.id) }}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center dark:text-gray-500 text-gray-400 hover:text-danger transition-colors"
+                        title="Delete Budget"
+                      >
+                        <Trash2 size={13} />
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                      b.percentage >= 100 ? 'bg-red-500/10 text-red-500'
-                        : b.percentage >= 70 ? 'bg-yellow-400/10 text-yellow-500'
-                          : 'bg-emerald-500/10 text-emerald-500'
-                    }`}>
-                      {b.percentage}%
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => startEdit(b)}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center dark:text-gray-600 text-gray-400 hover:text-primary hover:bg-primary/10 transition-colors"
-                    >
-                      <Edit2 size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => deleteBudget(b.id)}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center dark:text-gray-600 text-gray-400 hover:text-danger hover:bg-danger/10 transition-colors"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+
+                  <div className="mb-4">
+                    <div className="flex items-baseline justify-between mb-2">
+                      <span className="text-sm font-black dark:text-white text-slate-800">
+                        {formatCurrency(b.spent)} <span className="text-gray-400 font-semibold text-[10px]">/ {formatCurrency(b.monthlyLimit)}</span>
+                      </span>
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${isExceeded ? 'bg-red-500/10 text-red-500'
+                          : b.percentage >= 70 ? 'bg-yellow-400/10 text-yellow-500'
+                            : 'bg-emerald-500/10 text-emerald-500'
+                        }`}>
+                        {b.percentage}%
+                      </span>
+                    </div>
+                    <div className="h-2 dark:bg-dark-border bg-slate-100 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full transition-all duration-500 ${color}`} style={{ width: `${pct}%` }} />
+                    </div>
                   </div>
                 </div>
 
-                <div className="h-2 dark:bg-dark-border bg-slate-200 rounded-full overflow-hidden">
-                  <div className={`h-full rounded-full transition-all duration-500 ${color}`} style={{ width: `${pct}%` }} />
-                </div>
-
-                <div className="flex justify-between mt-1.5">
-                  <span className="text-[10px] dark:text-gray-600 text-gray-400">
-                    {b.percentage >= 100 ? 'Exceeded' : `${formatCurrency(b.remaining)} remaining`}
+                <div className="flex justify-between items-center mt-2 pt-2 border-t dark:border-dark-border border-light-border text-[10px]">
+                  <span className={`font-bold ${isExceeded ? 'text-red-500' : 'dark:text-gray-500 text-gray-500'}`}>
+                    {isExceeded ? 'Limit Exceeded' : `${formatCurrency(b.remaining)} left`}
                   </span>
-                  <span className="text-[10px] dark:text-gray-600 text-gray-400">
+                  <span className="dark:text-gray-500 text-gray-400 font-semibold">
                     Limit: {formatCurrency(b.monthlyLimit)}
                   </span>
                 </div>

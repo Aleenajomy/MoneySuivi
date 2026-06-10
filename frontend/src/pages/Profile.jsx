@@ -70,148 +70,149 @@ export default function Profile() {
 
   return (
     <div className="page">
-
-      {/* Profile Header */}
-      <div className="card p-5 mb-5 relative overflow-hidden animate-fadeIn">
-        <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-primary/5 -translate-y-8 translate-x-8" />
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl gradient-blue flex items-center justify-center
-                          text-2xl font-bold text-white flex-shrink-0">
-            {user?.name?.[0]?.toUpperCase() || 'U'}
+      <div className="max-w-3xl mx-auto space-y-6">
+        
+        {/* Profile Header */}
+        <div className="card p-5 relative overflow-hidden animate-fadeIn border dark:border-dark-border border-light-border bg-white dark:bg-dark-card shadow-sm">
+          <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-primary/5 -translate-y-8 translate-x-8 pointer-events-none" />
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-2xl gradient-blue flex items-center justify-center text-2xl font-bold text-white flex-shrink-0 shadow-md shadow-sky-500/15">
+              {user?.name?.[0]?.toUpperCase() || 'U'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="font-black text-lg dark:text-gray-100 text-slate-800 truncate">{user?.name}</h2>
+              <p className="text-gray-500 dark:text-gray-500 text-xs truncate mt-0.5">{user?.email}</p>
+              {user?.createdAt && (
+                <p className="text-gray-600 dark:text-gray-700 text-[10px] mt-1.5 font-medium">Joined {formatDate(user.createdAt)}</p>
+              )}
+            </div>
+            <button onClick={() => setEditing(!editing)}
+              className="w-10 h-10 rounded-xl dark:bg-dark-border bg-light-border flex items-center justify-center hover:text-sky-500 hover:dark:bg-dark-border/80 hover:bg-slate-100/60 active:scale-95 transition-all">
+              <User size={16} className="dark:text-gray-400 text-gray-500" />
+            </button>
           </div>
-          <div className="flex-1">
-            <h2 className="font-bold text-lg dark:text-gray-100 text-slate-800">{user?.name}</h2>
-            <p className="text-gray-500 dark:text-gray-500 text-sm">{user?.email}</p>
-            {user?.createdAt && (
-              <p className="text-gray-600 dark:text-gray-700 text-xs mt-1">Joined {formatDate(user.createdAt)}</p>
-            )}
-          </div>
-          <button onClick={() => setEditing(!editing)}
-            className="w-9 h-9 rounded-xl dark:bg-dark-border bg-light-border flex items-center justify-center">
-            <User size={16} className="dark:text-gray-400 text-gray-500" />
-          </button>
         </div>
-      </div>
 
-      {/* Edit Form */}
-      {editing && (
-        <div className="card p-5 mb-4 animate-slideDown">
-          <p className="text-xs font-semibold text-gray-500 dark:text-gray-500 uppercase tracking-widest mb-4">Edit Profile</p>
-          <form onSubmit={handleSave} className="space-y-3">
-            <div>
-              <label className="label">Full Name</label>
-              <input className="input" value={form.name}
-                onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
-            </div>
-            <div>
-              <label className="label">Monthly Budget Limit (₹)</label>
-              <input type="number" className="input" value={form.budgetLimit}
-                onChange={e => setForm(p => ({ ...p, budgetLimit: e.target.value }))} />
-            </div>
-            <div className="flex gap-2 pt-1">
-              <button type="button" onClick={() => setEditing(false)} className="btn-secondary flex-1 py-2.5">
-                Cancel
-              </button>
-              <button type="submit" disabled={loading}
-                className="flex-1 py-2.5 rounded-xl gradient-blue text-white text-sm font-semibold disabled:opacity-50">
-                {loading ? 'Saving...' : 'Save Changes'}
+        {/* Edit Form */}
+        {editing && (
+          <div className="card p-5 animate-slideDown border dark:border-dark-border border-light-border bg-white dark:bg-dark-card">
+            <p className="text-xs font-bold text-gray-500 dark:text-gray-500 uppercase tracking-widest mb-4">Edit Profile</p>
+            <form onSubmit={handleSave} className="space-y-4">
+              <div>
+                <label className="text-[10px] font-bold dark:text-gray-500 text-gray-400 uppercase tracking-wide">Full Name</label>
+                <input className="input text-xs" value={form.name}
+                  onChange={e => setForm(p => ({ ...p, name: e.target.value }))} required />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold dark:text-gray-500 text-gray-400 uppercase tracking-wide">Monthly Budget Limit (₹)</label>
+                <input type="number" className="input text-xs" value={form.budgetLimit}
+                  onChange={e => setForm(p => ({ ...p, budgetLimit: e.target.value }))} required />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setEditing(false)} className="btn-secondary flex-1 py-2.5 text-xs">
+                  Cancel
+                </button>
+                <button type="submit" disabled={loading}
+                  className="flex-1 py-2.5 rounded-xl gradient-blue text-white text-xs font-bold disabled:opacity-50 active:scale-95 shadow-md shadow-sky-500/15">
+                  {loading ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Settings */}
+        <div>
+          <p className="text-xs font-bold text-gray-600 uppercase tracking-widest mb-3 px-1 dark:text-gray-400">Settings</p>
+          <div className="space-y-3">
+            {/* Theme toggle row */}
+            <button
+              onClick={toggle}
+              className="w-full card p-4 flex items-center gap-3 active:scale-[0.99] hover:shadow-md transition-all animate-fadeIn border dark:border-dark-border border-light-border bg-white dark:bg-dark-card"
+            >
+              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
+                {mode === 'dark' ? <Sun size={17} className="text-yellow-400" /> : <Moon size={17} className="text-sky-500" />}
+              </div>
+              <span className="flex-1 text-xs font-bold dark:text-gray-300 text-slate-700 text-left">
+                {mode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              </span>
+              <div className={`w-11 h-6 rounded-full transition-colors duration-200 flex items-center px-0.5 ${mode === 'dark' ? 'bg-sky-500' : 'bg-slate-300 dark:bg-dark-border'}`}>
+                <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${mode === 'dark' ? 'translate-x-5' : 'translate-x-0'}`} />
+              </div>
+            </button>
+
+            <SettingRow icon={<Bell size={17} />} label="Notifications" onClick={() => setModal('notifications')} />
+            <SettingRow icon={<Lock size={17} />} label="Change Password" onClick={() => setChangingPw(p => !p)} />
+            <SettingRow icon={<HelpCircle size={17} />} label="Help & Support" onClick={() => setModal('help')} />
+          </div>
+        </div>
+
+        {/* Inline Password Change */}
+        {changingPw && (
+          <form onSubmit={handleChangePassword} className="card p-5 space-y-4 animate-slideDown border dark:border-dark-border border-light-border bg-white dark:bg-dark-card">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Change Password</p>
+            {[
+              { key: 'current', label: 'Current Password', placeholder: 'Enter current password' },
+              { key: 'newPw', label: 'New Password', placeholder: 'Min. 6 characters' },
+              { key: 'confirm', label: 'Confirm Password', placeholder: 'Re-enter new password' },
+            ].map(({ key, label, placeholder }) => (
+              <div key={key} className="space-y-1">
+                <label className="text-[10px] font-bold dark:text-gray-500 text-gray-400 uppercase tracking-wide">{label}</label>
+                <div className="relative">
+                  <input
+                    type={showPw ? 'text' : 'password'}
+                    className="input text-xs pr-11" placeholder={placeholder}
+                    value={pwForm[key]}
+                    onChange={e => setPwForm(p => ({ ...p, [key]: e.target.value }))}
+                    required
+                  />
+                  {key === 'newPw' && (
+                    <button type="button" onClick={() => setShowPw(s => !s)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-sky-500 p-1">
+                      {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+            <div className="flex gap-2 pt-2">
+              <button type="button" onClick={() => setChangingPw(false)} className="btn-secondary flex-1 py-2.5 text-xs">Cancel</button>
+              <button type="submit" disabled={pwLoading} className="flex-1 py-2.5 rounded-xl gradient-blue text-white text-xs font-bold disabled:opacity-50 active:scale-95 shadow-md shadow-sky-500/15">
+                {pwLoading ? 'Saving...' : 'Update Password'}
               </button>
             </div>
           </form>
-        </div>
-      )}
+        )}
 
-      {/* Settings */}
-      <p className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-3 px-1 dark:text-gray-400">Settings</p>
-      <div className="space-y-2 mb-4">
-        {/* Theme toggle row */}
-        <button
-          onClick={toggle}
-          className="w-full card p-4 flex items-center gap-3 active:scale-[0.98] transition-transform animate-fadeIn"
-        >
-          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-            {mode === 'dark' ? <Sun size={17} className="text-yellow-400" /> : <Moon size={17} className="text-sky-500" />}
-          </div>
-          <span className="flex-1 text-sm font-medium dark:text-gray-300 text-slate-700 text-left">
-            {mode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-          </span>
-          <div className={`w-11 h-6 rounded-full transition-colors duration-200 flex items-center px-0.5 ${
-            mode === 'dark' ? 'bg-primary' : 'bg-slate-300 dark:bg-dark-border'
-          }`}>
-            <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
-              mode === 'dark' ? 'translate-x-5' : 'translate-x-0'
-            }`} />
-          </div>
-        </button>
-
-        <SettingRow icon={<Bell size={17} />}       label="Notifications" onClick={() => setModal('notifications')} />
-        <SettingRow icon={<Lock size={17} />}       label="Change Password" onClick={() => setChangingPw(p => !p)} />
-        <SettingRow icon={<HelpCircle size={17} />} label="Help & Support"  onClick={() => setModal('help')} />
-      </div>
-
-      {/* Inline Password Change */}
-      {changingPw && (
-        <form onSubmit={handleChangePassword} className="card p-5 mb-4 space-y-3 animate-slideDown">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-1">Change Password</p>
-          {[
-            { key: 'current', label: 'Current Password', placeholder: 'Enter current password' },
-            { key: 'newPw',   label: 'New Password',     placeholder: 'Min. 6 characters' },
-            { key: 'confirm', label: 'Confirm Password', placeholder: 'Re-enter new password' },
-          ].map(({ key, label, placeholder }) => (
-            <div key={key}>
-              <label className="label">{label}</label>
-              <div className="relative">
-                <input
-                  type={showPw ? 'text' : 'password'}
-                  className="input pr-11" placeholder={placeholder}
-                  value={pwForm[key]}
-                  onChange={e => setPwForm(p => ({ ...p, [key]: e.target.value }))}
-                  required
-                />
-                {key === 'newPw' && (
-                  <button type="button" onClick={() => setShowPw(s => !s)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
-                    {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                )}
+        <div>
+          <p className="text-xs font-bold text-gray-600 uppercase tracking-widest mb-3 px-1 dark:text-gray-400">Account Control</p>
+          <div className="space-y-3">
+            <button onClick={handleResetAll}
+              className="w-full card p-4 flex items-center gap-3 active:scale-[0.99] border border-orange-500/10 hover:border-orange-500/30 transition-all bg-white dark:bg-dark-card hover:shadow-md">
+              <div className="w-9 h-9 rounded-xl bg-orange-500/10 flex items-center justify-center flex-shrink-0">
+                <Shield size={17} className="text-orange-500" />
               </div>
-            </div>
-          ))}
-          <div className="flex gap-2 pt-1">
-            <button type="button" onClick={() => setChangingPw(false)} className="btn-secondary flex-1 py-2.5">Cancel</button>
-            <button type="submit" disabled={pwLoading} className="flex-1 py-2.5 rounded-xl gradient-blue text-white text-sm font-semibold disabled:opacity-50">
-              {pwLoading ? 'Saving...' : 'Update Password'}
+              <div className="flex-1 text-left">
+                <span className="text-xs font-bold text-orange-500 block">Reset All Data</span>
+                <span className="text-[10px] dark:text-gray-500 text-gray-400">Delete all transactions, budgets, EMIs & more</span>
+              </div>
+            </button>
+            <button onClick={handleLogout}
+              className="w-full card p-4 flex items-center gap-3 active:scale-[0.99] border border-danger/10 hover:border-danger/30 transition-all bg-white dark:bg-dark-card hover:shadow-md">
+              <div className="w-9 h-9 rounded-xl bg-danger/10 flex items-center justify-center flex-shrink-0">
+                <LogOut size={17} className="text-danger" />
+              </div>
+              <span className="text-xs font-bold text-danger">Logout Account</span>
             </button>
           </div>
-        </form>
-      )}
+        </div>
 
-      <p className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-3 px-1 dark:text-gray-400">Account</p>
-      <div className="space-y-2">
-        <button onClick={handleResetAll}
-          className="w-full card p-4 flex items-center gap-3 border-orange-500/20 active:scale-[0.98] transition-transform">
-          <div className="w-9 h-9 rounded-xl bg-orange-500/10 flex items-center justify-center">
-            <Shield size={17} className="text-orange-500" />
-          </div>
-          <div className="flex-1 text-left">
-            <span className="text-sm font-semibold text-orange-500 block">Reset All Data</span>
-            <span className="text-xs dark:text-gray-500 text-gray-400">Delete all transactions, budgets, EMIs & more</span>
-          </div>
-        </button>
-        <button onClick={handleLogout}
-          className="w-full card p-4 flex items-center gap-3 border-danger/20 active:scale-[0.98] transition-transform">
-          <div className="w-9 h-9 rounded-xl bg-danger/10 flex items-center justify-center">
-            <LogOut size={17} className="text-danger" />
-          </div>
-          <span className="text-sm font-semibold text-danger">Logout</span>
-        </button>
+        <p className="text-center dark:text-gray-700 text-gray-400 text-xs pt-4">MoneySuivi Finance Tracker v1.0.0</p>
       </div>
-
-      <p className="text-center dark:text-gray-700 text-gray-400 text-xs mt-8">MoneySuivi v1.0.0</p>
 
       {/* Modals */}
       {modal === 'notifications' && <NotificationsModal onClose={() => setModal(null)} />}
-      {modal === 'help'           && <HelpModal          onClose={() => setModal(null)} />}
+      {modal === 'help' && <HelpModal onClose={() => setModal(null)} />}
     </div>
   )
 }
@@ -302,11 +303,11 @@ function NotificationsModal({ onClose }) {
   return (
     <Modal title="Notifications" onClose={onClose}>
       <div className="mb-2">
-        <ToggleRow label="Push Notifications"    description="Receive alerts on your device"            value={settings.pushEnabled}    onChange={toggle('pushEnabled')} />
-        <ToggleRow label="Budget Alerts"          description="Warn when spending reaches 80% of budget" value={settings.budgetAlerts}   onChange={toggle('budgetAlerts')} />
-        <ToggleRow label="Expense Added"          description="Notify when a new expense is recorded"    value={settings.expenseAdded}   onChange={toggle('expenseAdded')} />
-        <ToggleRow label="Weekly Report"          description="Get a summary every Monday"               value={settings.weeklyReport}   onChange={toggle('weeklyReport')} />
-        <ToggleRow label="Monthly Report"         description="Receive monthly spending summary"         value={settings.monthlyReport}  onChange={toggle('monthlyReport')} />
+        <ToggleRow label="Push Notifications" description="Receive alerts on your device" value={settings.pushEnabled} onChange={toggle('pushEnabled')} />
+        <ToggleRow label="Budget Alerts" description="Warn when spending reaches 80% of budget" value={settings.budgetAlerts} onChange={toggle('budgetAlerts')} />
+        <ToggleRow label="Expense Added" description="Notify when a new expense is recorded" value={settings.expenseAdded} onChange={toggle('expenseAdded')} />
+        <ToggleRow label="Weekly Report" description="Get a summary every Monday" value={settings.weeklyReport} onChange={toggle('weeklyReport')} />
+        <ToggleRow label="Monthly Report" description="Receive monthly spending summary" value={settings.monthlyReport} onChange={toggle('monthlyReport')} />
       </div>
       <button onClick={handleSave} className="btn-primary mt-4">Save Preferences</button>
     </Modal>
@@ -355,9 +356,9 @@ function PrivacyModal({ onClose, user }) {
 
       {tab === 'privacy' ? (
         <>
-          <ToggleRow label="Share Analytics Data"  description="Help improve the app with anonymous usage data" value={privacy.shareData}  onChange={togglePrivacy('shareData')} />
-          <ToggleRow label="In-App Analytics"      description="Allow analytics tracking within the app"        value={privacy.analytics}  onChange={togglePrivacy('analytics')} />
-          <ToggleRow label="Two-Factor Auth"        description="Extra security on login (coming soon)"         value={privacy.twoFactor}  onChange={togglePrivacy('twoFactor')} />
+          <ToggleRow label="Share Analytics Data" description="Help improve the app with anonymous usage data" value={privacy.shareData} onChange={togglePrivacy('shareData')} />
+          <ToggleRow label="In-App Analytics" description="Allow analytics tracking within the app" value={privacy.analytics} onChange={togglePrivacy('analytics')} />
+          <ToggleRow label="Two-Factor Auth" description="Extra security on login (coming soon)" value={privacy.twoFactor} onChange={togglePrivacy('twoFactor')} />
 
           <div className="mt-4 p-3.5 rounded-xl dark:bg-dark-bg dark:border-dark-border border
                           bg-light-bg border-light-border">
@@ -372,9 +373,9 @@ function PrivacyModal({ onClose, user }) {
       ) : (
         <form onSubmit={handleChangePassword} className="space-y-4 pb-6">
           {[
-            { key: 'current', label: 'Current Password',  placeholder: 'Enter current password' },
-            { key: 'newPw',   label: 'New Password',      placeholder: 'Min. 6 characters' },
-            { key: 'confirm', label: 'Confirm Password',  placeholder: 'Re-enter new password' },
+            { key: 'current', label: 'Current Password', placeholder: 'Enter current password' },
+            { key: 'newPw', label: 'New Password', placeholder: 'Min. 6 characters' },
+            { key: 'confirm', label: 'Confirm Password', placeholder: 'Re-enter new password' },
           ].map(({ key, label, placeholder }) => (
             <div key={key}>
               <label className="label">{label}</label>
@@ -398,9 +399,9 @@ function PrivacyModal({ onClose, user }) {
           <button type="submit" disabled={loading} className="btn-primary w-full">
             {loading
               ? <span className="flex items-center justify-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Changing...
-                </span>
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Changing...
+              </span>
               : 'Change Password'}
           </button>
         </form>

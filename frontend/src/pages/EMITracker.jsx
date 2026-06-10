@@ -113,7 +113,7 @@ export default function EMITracker() {
   const previewAmount = Number(form.totalAmount) || 0
   const previewEmi = Number(form.emiAmount) || 0
   const previewTenure = Number(form.totalInstallments) || 0
-  
+
   const previewDetails = getLoanDetails({
     type: form.type,
     totalAmount: previewAmount,
@@ -219,12 +219,13 @@ export default function EMITracker() {
               )}
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {displayedLoans.map(emi => (
                 <EMICard key={emi.id} emi={emi} onPay={payInstallment} onDelete={deleteEMI} onEdit={openEdit} onDeletePayment={deletePayment} />
               ))}
             </div>
-          )}
+          )
+        }
         </>
       )}
 
@@ -364,7 +365,7 @@ export default function EMITracker() {
                     <div className="flex items-center gap-1 text-[10px] font-bold text-sky-500 uppercase tracking-wider">
                       <Info size={11} /> Live preview
                     </div>
-                    
+
                     <div className="flex justify-between items-baseline text-xs mt-1">
                       <span className="dark:text-gray-400 text-gray-500">Remaining Balance:</span>
                       <span className="font-extrabold dark:text-white text-slate-800">{formatCurrency(previewRemaining)}</span>
@@ -442,6 +443,10 @@ function EMICard({ emi, onPay, onDelete, onEdit, onDeletePayment }) {
   const pct = details.hasInterest
     ? (details.totalPayableAmount > 0 ? Math.min(100, Math.round((amountPaid / details.totalPayableAmount) * 100)) : 0)
     : (emi.totalAmount > 0 ? Math.min(100, Math.round((amountPaid / emi.totalAmount) * 100)) : 0)
+
+  const blockCount = Math.min(10, Math.max(0, Math.round(pct / 10)))
+  const emptyCount = 10 - blockCount
+  const progressBlocks = '█'.repeat(blockCount) + '░'.repeat(emptyCount)
 
   const nextDue = isFixed
     ? getNextDue(emi.startDate, paid)
@@ -537,8 +542,9 @@ function EMICard({ emi, onPay, onDelete, onEdit, onDeletePayment }) {
       </div>
 
       {/* Progress bar */}
-      <div className="h-2 dark:bg-dark-border bg-slate-200 rounded-full overflow-hidden mb-3">
-        <div className="h-full rounded-full transition-all duration-300 bg-sky-500" style={{ width: `${pct}%` }} />
+      <div className="flex items-center justify-between mb-3.5 text-xs font-semibold tracking-wider font-mono bg-slate-50 dark:bg-dark-bg/40 p-2.5 rounded-xl border dark:border-dark-border border-light-border">
+        <span className="text-sky-500 dark:text-sky-400">{progressBlocks}</span>
+        <span className="dark:text-gray-400 text-gray-500">{pct}%</span>
       </div>
 
       {/* Mini grid of numbers */}

@@ -1,4 +1,5 @@
 const prisma = require('../lib/prisma');
+const { sendPushNotification } = require('./pushService');
 
 const getCurrentMonthRange = () => {
   const now = new Date();
@@ -43,7 +44,7 @@ const checkBudgetAlert = async (userId, category) => {
       ? `${category} budget exceeded. Spent Rs. ${roundedSpent} of Rs. ${roundedLimit}.`
       : `${category} budget is ${Math.round(percentage)}% used. Rs. ${Math.max(roundedLimit - roundedSpent, 0)} remaining.`;
 
-    return prisma.notification.create({
+    const notification = await prisma.notification.create({
       data: {
         userId,
         category,
@@ -52,6 +53,13 @@ const checkBudgetAlert = async (userId, category) => {
         type,
       },
     });
+
+    sendPushNotification(userId, {
+      title: type === 'critical' ? `🚨 Budget Exceeded: ${category}` : `⚠️ Budget Warning: ${category}`,
+      body: message,
+    }).catch(err => console.error('[PushService] Trigger error:', err));
+
+    return notification;
   } catch (error) {
     console.error('[BudgetAlert] Error:', error.message);
     return null;

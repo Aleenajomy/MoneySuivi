@@ -16,11 +16,11 @@ Live: [smartexpencetracker-frontend.onrender.com](https://smartexpencetracker-fr
 - **Budget Manager** — Set monthly spending limits per category with alert notifications
 - **EMI Tracker** — Track loan repayments with installment progress, overdue detection, edit & pay
 - **Net Worth** — Track assets and liabilities, view net worth summary
-- **Notifications** — Budget breach alerts with read/unread management
+- **Notifications** — Budget breach alerts with read/unread management, integrated with PWA Web Push notifications (daily spend summary at 9 PM and instant budget breach warnings directly via browser push even when the app is closed)
 - **Export** — Download transaction history as CSV or PDF
 - **Auth** — JWT-based register/login with profile management
 - **Dark Mode** — Full dark/light theme support
-- **PWA** — Installable on Android/iOS, works offline
+- **PWA** — Installable on Android/iOS, works offline, native OS push alerts
 
 ---
 
@@ -55,7 +55,8 @@ MyExpences/
 │   │   └── notifications.js
 │   ├── services/
 │   │   ├── budgetAlertService.js
-│   │   └── cronJob.js
+│   │   ├── cronJob.js
+│   │   └── pushService.js
 │   ├── .env
 │   ├── package.json
 │   └── server.js
@@ -93,9 +94,11 @@ MyExpences/
     │   ├── services/
     │   │   └── api.js
     │   ├── utils/
-    │   │   └── constants.js
+    │   │   ├── constants.js
+    │   │   └── pushManager.js
     │   ├── App.jsx
     │   ├── index.css
+    │   ├── sw.js
     │   └── main.jsx
     ├── index.html
     ├── vite.config.js
@@ -116,6 +119,7 @@ MyExpences/
 | Asset | Assets for net worth calculation |
 | Liability | Liabilities for net worth calculation |
 | Notification | Budget alert notifications |
+| PushSubscription | Store user browser push endpoints & keys |
 
 ---
 
@@ -140,6 +144,7 @@ MyExpences/
 | GET/POST | `/api/networth/liabilities` | List / add liability |
 | GET | `/api/networth/summary` | Net worth summary |
 | GET | `/api/notifications` | List notifications |
+| POST | `/api/notifications/subscribe` | Register browser push subscription |
 | PUT | `/api/notifications/read-all` | Mark all read |
 | GET | `/api/export/csv` | Export CSV |
 | GET | `/api/export/pdf` | Export PDF |
@@ -163,6 +168,8 @@ DATABASE_URL="postgresql://postgres:<password>@localhost:5432/smart_expense_trac
 JWT_SECRET=your_super_secret_key
 JWT_EXPIRE=7d
 NODE_ENV=development
+VAPID_PUBLIC_KEY="BPoDZKyX7psVM7kdtsWz5HJ_u_VRoxnDqOpnJagVOhRISg6MIma28kgB80AY1Hj8HU-u9bJFAJD5aP2T86piLto"
+VAPID_PRIVATE_KEY="XyrOGbsWwUy9eQCPul2tZ-6ei8iFpeNfBDUCxEGYX4Q"
 ```
 
 ```bash

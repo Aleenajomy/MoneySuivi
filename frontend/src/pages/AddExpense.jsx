@@ -16,7 +16,6 @@ import {
 } from '../utils/constants'
 
 const today = new Date().toISOString().split('T')[0]
-const INCOME_ACCOUNT_TYPES = ACCOUNT_TYPES.filter(type => type !== 'Credit Card')
 
 const accountTypeForPayment = (paymentMethod) => {
   if (paymentMethod === 'UPI' || paymentMethod === 'Debit Card' || paymentMethod === 'Net Banking') return 'Bank'
@@ -46,6 +45,7 @@ export default function AddExpense() {
   const { budgets, fetchBudgets } = useBudget()
   const [form, setForm] = useState(defaultForm)
   const [loading, setLoading] = useState(false)
+  const [customizeTitle, setCustomizeTitle] = useState(false)
 
   useEffect(() => {
     fetchBudgets()
@@ -55,11 +55,12 @@ export default function AddExpense() {
     if (!isEditing) return
     api.get(`/expenses/${id}`).then(res => {
       const e = res.data.expense
+      const isInc = e.type === 'income'
       setForm({
         title: e.title,
         amount: e.amount,
         category: e.category,
-        type: e.type === 'income' ? 'income' : 'expense',
+        type: isInc ? 'income' : 'expense',
         accountType: e.accountType || e.paymentMethod || ACCOUNT_TYPES[0],
         paymentMethod: e.paymentMethod,
         note: e.note || '',
@@ -67,6 +68,9 @@ export default function AddExpense() {
         recurring: Boolean(e.recurring),
         recurringType: e.recurringType || 'monthly',
       })
+      if (isInc && (e.title !== e.category || e.category === 'Other')) {
+        setCustomizeTitle(true)
+      }
     }).catch(() => toast.error('Failed to load transaction'))
   }, [id, isEditing])
 
@@ -89,15 +93,37 @@ export default function AddExpense() {
   const activeCategories = form.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
   const selectedBudget = form.type === 'expense' ? budgets.find(b => b.category === form.category) : null
 
+  const handleCategorySelect = (cat) => {
+    setForm(prev => {
+      const updated = { ...prev, category: cat }
+      if (prev.type === 'income' && !customizeTitle && cat !== 'Other') {
+        updated.title = cat
+      }
+      return updated
+    })
+  }
+
+  const handleCustomizeTitleToggle = (val) => {
+    setCustomizeTitle(val)
+    if (val && !form.title.trim()) {
+      setForm(prev => ({ ...prev, title: prev.category }))
+    }
+  }
+
   const handleTypeChange = (type) => {
     const cats = type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
+    const newCategory = cats[0]
     setForm(prev => ({
       ...prev,
       type,
-      category: cats[0],
+      category: newCategory,
+      title: type === 'income' && !customizeTitle && newCategory !== 'Other' ? newCategory : prev.title,
       accountType: type === 'expense' ? accountTypeForPayment(prev.paymentMethod) : prev.accountType,
       recurring: type === 'expense' ? prev.recurring : false,
     }))
+    if (type === 'expense') {
+      setCustomizeTitle(false)
+    }
   }
 
   const handlePaymentChange = (e) => {
@@ -111,7 +137,17 @@ export default function AddExpense() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!form.title.trim()) return toast.error('Title is required')
+    let finalTitle = form.title.trim()
+    if (form.type === 'income') {
+      if (!customizeTitle && form.category !== 'Other') {
+        finalTitle = form.category
+      } else {
+        if (!finalTitle) return toast.error('Title is required')
+      }
+    } else {
+      if (!finalTitle) return toast.error('Title is required')
+    }
+
     if (!form.amount || Number(form.amount) <= 0) return toast.error('Enter a valid amount')
 
     setLoading(true)
@@ -119,6 +155,7 @@ export default function AddExpense() {
       const isExpense = form.type === 'expense'
       const data = {
         ...form,
+        title: finalTitle,
         amount: Number(form.amount),
         paymentMethod: form.paymentMethod,
         accountType: accountTypeForPayment(form.paymentMethod),
@@ -137,171 +174,256 @@ export default function AddExpense() {
   }
 
   return (
-    <div className="min-h-screen dark:bg-dark-bg bg-light-bg px-4 py-6">
-      <div className="flex items-center gap-3 mb-7">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="w-10 h-10 rounded-xl dark:bg-dark-card bg-light-card dark:border-dark-border border-light-border border flex items-center justify-center"
-        >
-          <ArrowLeft size={18} className="dark:text-gray-400 text-gray-500" />
-        </button>
-        <h1 className="text-lg font-bold dark:text-white text-slate-800">
-          {isEditing ? 'Edit Transaction' : 'New Transaction'}
-        </h1>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-5">
-        <div className="card p-1.5 flex gap-1">
-          {['expense', 'income'].map(type => (
-            <button
-              key={type}
-              type="button"
-              onClick={() => handleTypeChange(type)}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                form.type === type
-                  ? type === 'expense'
-                    ? 'bg-red-500 text-white shadow-sm'
-                    : 'bg-green-500 text-white shadow-sm'
-                  : 'dark:text-gray-600 text-gray-400 hover:text-gray-500'
-              }`}
-            >
-              {type === 'expense' ? 'Expense' : 'Income'}
-            </button>
-          ))}
+    <div className="max-w-3xl w-full mx-auto space-y-6">
+        
+        {/* Header */}
+        <div className="animate-fadeIn">
+          <h1 className="text-2xl font-black dark:text-white text-slate-800 tracking-tight">
+            {isEditing ? 'Edit Transaction' : 'New Transaction'}
+          </h1>
+          <p className="text-xs dark:text-gray-500 text-gray-400 mt-0.5">
+            {isEditing ? 'Modify transaction logs' : 'Record a new expense or income'}
+          </p>
         </div>
 
-        <div className="card p-5 text-center">
-          <label className="label text-center block mb-3">Amount</label>
-          <div className="flex items-center justify-center gap-2">
-            <span className="text-2xl font-bold dark:text-gray-400 text-gray-500">Rs.</span>
-            <input
-              type="number"
-              step="0.01"
-              min="0.01"
-              required
-              className="text-4xl font-extrabold dark:text-white text-slate-800 bg-transparent outline-none text-center w-full dark:placeholder-gray-700 placeholder-gray-300"
-              placeholder="0.00"
-              value={form.amount}
-              onChange={set('amount')}
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="label">Title</label>
-          <input className="input" placeholder="e.g. Lunch, Salary, Rent" value={form.title} onChange={set('title')} required />
-        </div>
-
-        <div>
-          <label className="label">Category</label>
-          <div className="grid grid-cols-4 gap-2">
-            {activeCategories.map(cat => {
-              const isSelected = form.category === cat
-              const color = CATEGORY_COLORS[cat] || '#0066FF'
-              return (
+        {/* Form Panel */}
+        <div className="card p-6 sm:p-8 animate-scaleIn">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            
+            {/* Income vs Expense sliding pills */}
+            <div className="card p-1 flex gap-1 bg-slate-100 dark:bg-dark-bg/60 border-none rounded-2xl">
+              {['expense', 'income'].map(type => (
                 <button
-                  key={cat}
+                  key={type}
                   type="button"
-                  onClick={() => setForm(prev => ({ ...prev, category: cat }))}
-                  className={`p-2.5 rounded-xl text-center transition-all border ${
-                      isSelected ? 'border-sky-500 bg-sky-500/10' : 'dark:border-dark-border border-light-border dark:bg-dark-card bg-light-card'
+                  onClick={() => handleTypeChange(type)}
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                    form.type === type
+                      ? type === 'expense'
+                        ? 'bg-red-500 text-white shadow-md'
+                        : 'bg-emerald-500 text-white shadow-md'
+                      : 'dark:text-gray-500 text-gray-400 hover:text-slate-700 hover:dark:text-white'
                   }`}
                 >
-                  <div className="flex justify-center mb-1" style={{ color }}>{(() => { const I = ICONS[cat] || CircleDot; return <I size={18} /> })()}</div>
-                  <div className={`text-[10px] font-semibold truncate ${isSelected ? 'text-primary' : 'dark:text-gray-600 text-gray-500'}`}>
-                    {cat}
-                  </div>
+                  {type === 'expense' ? 'Expense' : 'Income'}
                 </button>
-              )
-            })}
-          </div>
-        </div>
+              ))}
+            </div>
 
-        {selectedBudget && (
-          <div className="card p-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-semibold dark:text-gray-500 text-gray-500 uppercase tracking-widest">Category Balance</p>
-              <p className="text-xs font-bold dark:text-gray-300 text-slate-700">{selectedBudget.percentage}% used</p>
+            {/* Amount Card Container */}
+            <div className="card p-5 bg-slate-50 dark:bg-dark-bg/25 border-light-border dark:border-dark-border text-center flex flex-col items-center justify-center relative transition-all focus-within:border-sky-500/40">
+              <label className="label text-center block mb-2 text-gray-450 dark:text-gray-550 uppercase tracking-widest font-bold">Transaction Amount</label>
+              <div className="flex items-center justify-center gap-1.5 w-full max-w-[280px]">
+                <span className="text-3xl font-extrabold text-primary flex-shrink-0">₹</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  required
+                  className="text-4xl font-black dark:text-white text-slate-800 bg-transparent outline-none text-center w-full dark:placeholder-gray-700 placeholder-gray-300"
+                  placeholder="0.00"
+                  value={form.amount}
+                  onChange={set('amount')}
+                />
+              </div>
             </div>
-            <div className="h-1.5 dark:bg-dark-border bg-slate-200 rounded-full overflow-hidden mb-2">
-              <div className="h-full bg-emerald-500" style={{ width: `${Math.min(selectedBudget.percentage, 100)}%` }} />
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="dark:text-gray-500 text-gray-500">
-                {formatCurrency(selectedBudget.spent)} spent
-              </span>
-              <span className="font-semibold dark:text-white text-slate-800">
-                {formatCurrency(selectedBudget.remaining)} left
-              </span>
-            </div>
-          </div>
-        )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {form.type === 'income' ? (
-            <div>
-              <label className="label">Payment Method</label>
-              <select className="input" value={form.paymentMethod} onChange={set('paymentMethod')}>
-                {PAYMENT_METHODS.map(m => <option key={m}>{m}</option>)}
-              </select>
-            </div>
-          ) : (
-            <div>
-              <label className="label">Payment</label>
-              <select className="input" value={form.paymentMethod} onChange={handlePaymentChange}>
-                {PAYMENT_METHODS.map(m => <option key={m}>{m}</option>)}
-              </select>
-            </div>
-          )}
-          <div>
-            <label className="label">Date</label>
-            <input type="date" className="input" max={today} value={form.expenseDate} onChange={set('expenseDate')} />
-          </div>
-        </div>
+            {/* Title Input */}
+            {form.type === 'income' ? (
+              <div className="space-y-3">
+                {form.category !== 'Other' && (
+                  <label className="flex items-center gap-2 cursor-pointer w-fit">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded accent-sky-500 cursor-pointer"
+                      checked={customizeTitle}
+                      onChange={(e) => handleCustomizeTitleToggle(e.target.checked)}
+                    />
+                    <span className="text-xs font-semibold dark:text-gray-400 text-gray-500 uppercase tracking-wide">
+                      Customize Title
+                    </span>
+                  </label>
+                )}
 
-        {form.type === 'expense' && (
-          <div className="card p-4">
-            <label className="flex items-center justify-between gap-3">
-              <span className="flex items-center gap-2">
-                <span className="w-8 h-8 rounded-xl bg-sky-500/10 flex items-center justify-center">
-                  <Repeat size={16} className="text-sky-500" />
-                </span>
-                <span>
-                  <span className="block text-sm font-semibold dark:text-white text-slate-800">Recurring</span>
-                  <span className="block text-xs dark:text-gray-500 text-gray-500">Auto-create future expenses (rent, subscriptions). For loan EMIs, use the EMI Tracker tab.</span>
-                </span>
-              </span>
-              <input type="checkbox" className="w-5 h-5 accent-sky-500" checked={form.recurring} onChange={setChecked('recurring')} />
-            </label>
-
-            {form.recurring && (
-              <div className="mt-4">
-                <label className="label">Repeat</label>
-                <select className="input" value={form.recurringType} onChange={set('recurringType')}>
-                  <option value="weekly">Weekly</option>
-                  <option value="monthly">Monthly</option>
-                </select>
+                {(customizeTitle || form.category === 'Other') ? (
+                  <div className="animate-slideDown">
+                    <label className="label">Title</label>
+                    <input
+                      className="input"
+                      placeholder="e.g. Freelance project, Gift from friend"
+                      value={form.title}
+                      onChange={set('title')}
+                      required
+                    />
+                  </div>
+                ) : (
+                  <div className="text-xs text-gray-500 dark:text-gray-450 bg-slate-50 dark:bg-dark-bg/25 px-4 py-3.5 rounded-xl border dark:border-dark-border border-light-border flex items-center justify-between transition-all animate-fadeIn">
+                    <span className="font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider text-[10px]">Derived Title</span>
+                    <span className="font-bold dark:text-white text-slate-800">{form.category}</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div>
+                <label className="label">Title</label>
+                <input
+                  className="input"
+                  placeholder="e.g. Lunch, Rent, Grocery"
+                  value={form.title}
+                  onChange={set('title')}
+                  required
+                />
               </div>
             )}
-          </div>
-        )}
 
-        <div>
-          <label className="label">Note <span className="normal-case text-gray-700">(optional)</span></label>
-          <textarea className="input resize-none" rows={3} placeholder="Add a note..." value={form.note} onChange={set('note')} />
-        </div>
+            {/* Category Selector Grid */}
+            <div>
+              <label className="label mb-3">Category</label>
+              <div className={`grid ${form.type === 'income' ? 'grid-cols-3 sm:grid-cols-5' : 'grid-cols-4 sm:grid-cols-7'} gap-3 bg-slate-50 dark:bg-dark-bg/25 p-4 rounded-2xl border dark:border-dark-border border-light-border`}>
+                {activeCategories.map(cat => {
+                  const isSelected = form.category === cat
+                  const color = CATEGORY_COLORS[cat] || '#0066FF'
+                  const Icon = ICONS[cat] || CircleDot
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => handleCategorySelect(cat)}
+                      className="flex flex-col items-center justify-center py-1.5 focus:outline-none"
+                    >
+                      <div
+                        className={`w-12 h-12 rounded-full flex items-center justify-center mb-1.5 transition-all border ${
+                          isSelected
+                            ? 'scale-105 border-transparent shadow-md'
+                            : 'dark:border-dark-border border-light-border dark:bg-dark-card bg-light-card dark:text-gray-400 text-gray-500 hover:scale-105'
+                        }`}
+                        style={{
+                          backgroundColor: isSelected ? `${color}20` : undefined,
+                          borderColor: isSelected ? color : undefined,
+                          color: isSelected ? color : undefined,
+                          boxShadow: isSelected ? `0 0 12px ${color}30` : undefined
+                        }}
+                      >
+                        <Icon size={20} />
+                      </div>
+                      <span className={`text-[10px] font-bold tracking-tight truncate max-w-[65px] ${
+                        isSelected ? 'dark:text-white text-slate-800 font-extrabold' : 'dark:text-gray-500 text-gray-400'
+                      }`}>
+                        {cat}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className={`w-full py-4 rounded-xl text-white font-bold text-sm active:scale-95 transition-all disabled:opacity-50 ${
-            form.type === 'income' ? 'gradient-green' : 'gradient-blue'
-          }`}
-        >
-          {loading ? 'Saving...' : isEditing ? 'Update Transaction' : 'Add Transaction'}
-        </button>
-      </form>
+            {/* Category Budget Balance Indicator */}
+            {selectedBudget && (
+              <div className="card p-4 bg-slate-50/50 dark:bg-dark-bg/20 border-light-border dark:border-dark-border animate-fadeIn">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-extrabold dark:text-gray-500 text-gray-400 uppercase tracking-widest">Category Balance</p>
+                  <p className="text-[11px] font-bold dark:text-gray-300 text-slate-700">{selectedBudget.percentage}% used</p>
+                </div>
+                <div className="h-2 dark:bg-dark-border bg-slate-200 rounded-full overflow-hidden mb-2">
+                  <div 
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      selectedBudget.percentage >= 90 ? 'bg-red-500' : selectedBudget.percentage >= 70 ? 'bg-orange-500' : 'bg-emerald-500'
+                    }`} 
+                    style={{ width: `${Math.min(selectedBudget.percentage, 100)}%` }} 
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="dark:text-gray-500 text-gray-500 font-semibold">
+                    {formatCurrency(selectedBudget.spent)} spent
+                  </span>
+                  <span className="font-bold dark:text-white text-slate-850">
+                    {formatCurrency(selectedBudget.remaining)} left
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Payment Method and Date Selection */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="label">{form.type === 'income' ? 'Received In' : 'Paid Using'}</label>
+                <select
+                  className="input cursor-pointer"
+                  value={form.paymentMethod}
+                  onChange={form.type === 'income' ? set('paymentMethod') : handlePaymentChange}
+                >
+                  {PAYMENT_METHODS.map(m => <option key={m}>{m}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="label">Date</label>
+                <input
+                  type="date"
+                  className="input cursor-pointer"
+                  max={today}
+                  value={form.expenseDate}
+                  onChange={set('expenseDate')}
+                />
+              </div>
+            </div>
+
+            {/* Recurring Options */}
+            {form.type === 'expense' && (
+              <div className="card p-4 bg-slate-50/50 dark:bg-dark-bg/20 border-light-border dark:border-dark-border space-y-4">
+                <label className="flex items-center justify-between gap-3 cursor-pointer">
+                  <span className="flex items-center gap-2.5">
+                    <span className="w-8 h-8 rounded-xl bg-sky-500/10 flex items-center justify-center text-sky-500 flex-shrink-0">
+                      <Repeat size={16} />
+                    </span>
+                    <span>
+                      <span className="block text-xs font-bold dark:text-white text-slate-800 uppercase tracking-wide">Recurring Transaction</span>
+                      <span className="block text-[10px] dark:text-gray-550 text-gray-500 mt-0.5">Auto-create future charges (rent, subscriptions)</span>
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded accent-sky-500 cursor-pointer"
+                    checked={form.recurring}
+                    onChange={setChecked('recurring')}
+                  />
+                </label>
+
+                {form.recurring && (
+                  <div className="pt-3 border-t dark:border-dark-border border-light-border animate-slideDown">
+                    <label className="label">Repeat Interval</label>
+                    <select className="input cursor-pointer" value={form.recurringType} onChange={set('recurringType')}>
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Note Input */}
+            <div>
+              <label className="label">Note <span className="normal-case text-gray-500">(optional)</span></label>
+              <textarea
+                className="input resize-none"
+                rows={3}
+                placeholder="Add details, tags, or reminders..."
+                value={form.note}
+                onChange={set('note')}
+              />
+            </div>
+
+            {/* Submit Action */}
+            <button
+              type="submit"
+              disabled={loading}
+              className={`w-full py-3.5 rounded-xl text-white font-bold text-sm active:scale-[0.98] transition-all hover:opacity-95 shadow-md ${
+                form.type === 'income' ? 'gradient-green' : 'gradient-blue'
+              }`}
+            >
+              {loading ? 'Saving...' : isEditing ? 'Update Transaction' : 'Add Transaction'}
+            </button>
+          </form>
+      </div>
     </div>
   )
 }
