@@ -1,5 +1,4 @@
 const prisma = require('../lib/prisma');
-const { Parser } = require('json2csv');
 const PDFDocument = require('pdfkit');
 
 const buildDateFilter = (startDate, endDate) => {
@@ -11,8 +10,15 @@ const buildDateFilter = (startDate, endDate) => {
 };
 
 const getExportData = async (userId, query = {}) => {
+  if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+    throw new Error('Unauthorized: Valid User ID is required');
+  }
   const { startDate, endDate, type, category, search } = query;
-  const where = { userId };
+  const where = {
+    userId: {
+      equals: userId
+    }
+  };
   const expenseDate = buildDateFilter(startDate, endDate);
   if (expenseDate) where.expenseDate = expenseDate;
   if (type && type !== 'All') where.type = type;
@@ -23,36 +29,6 @@ const getExportData = async (userId, query = {}) => {
 
 const formatDate = (date) => new Date(date).toLocaleDateString('en-IN');
 const formatAmount = (amount) => `Rs. ${Number(amount).toLocaleString('en-IN')}`;
-
-const exportCSV = async (req, res) => {
-  try {
-    const expenses = await getExportData(req.user.id, req.query);
-
-    const parser = new Parser({
-      fields: ['date', 'title', 'category', 'type', 'amount', 'accountType', 'fromAccountType', 'toAccountType', 'paymentMethod', 'note', 'recurring', 'nextRunDate'],
-    });
-    const csv = parser.parse(expenses.map(e => ({
-      date: formatDate(e.expenseDate),
-      title: e.title,
-      category: e.category,
-      type: e.type,
-      amount: e.amount,
-      accountType: e.accountType || '',
-      fromAccountType: e.fromAccountType || '',
-      toAccountType: e.toAccountType || '',
-      paymentMethod: e.paymentMethod,
-      note: e.note || '',
-      recurring: e.recurring ? e.recurringType : '',
-      nextRunDate: e.nextRunDate ? formatDate(e.nextRunDate) : '',
-    })));
-
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="transactions-${Date.now()}.csv"`);
-    res.send(csv);
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
 
 const drawFooter = (doc) => {
   const bottom = doc.page.height - 36;
@@ -65,6 +41,9 @@ const drawFooter = (doc) => {
 
 const exportPDF = async (req, res) => {
   try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ success: false, message: 'Unauthorized: User is not authenticated' });
+    }
     const { startDate, endDate } = req.query;
     const expenses = await getExportData(req.user.id, req.query);
     const totalIncome = expenses.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
@@ -138,4 +117,4 @@ const exportPDF = async (req, res) => {
   }
 };
 
-module.exports = { exportCSV, exportPDF };
+module.exports = { exportPDF };
