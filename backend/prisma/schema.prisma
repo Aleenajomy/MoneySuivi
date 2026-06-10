@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -21,8 +22,42 @@ model User {
   assets        Asset[]
   liabilities   Liability[]
   pushSubscriptions PushSubscription[]
+  ledgerContacts LedgerContact[]
+  ledgerEntries  LedgerEntry[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+}
+
+model LedgerContact {
+  id        String        @id @default(uuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String        @db.VarChar(50)
+  phone     String?       @db.VarChar(20)
+  note      String?       @db.VarChar(300)
+  entries   LedgerEntry[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([userId])
+}
+
+model LedgerEntry {
+  id          String        @id @default(uuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contactId   String
+  contact     LedgerContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  type        String        // LENT | BORROWED | REPAYMENT_RECEIVED | REPAYMENT_MADE
+  amount      Float
+  date        DateTime      @default(now())
+  note        String?       @db.VarChar(500)
+  settled     Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([userId, contactId])
+  @@index([userId, date])
 }
 
 model Expense {

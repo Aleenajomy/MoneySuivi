@@ -7,6 +7,7 @@ import { BudgetProvider } from './context/BudgetContext'
 import { NotificationProvider } from './context/NotificationContext'
 import { EMIProvider } from './context/EMIContext'
 import { NetWorthProvider } from './context/NetWorthContext'
+import { LedgerProvider } from './context/LedgerContext'
 import Login from './pages/auth/Login'
 import Register from './pages/auth/Register'
 import Dashboard from './pages/Dashboard'
@@ -18,6 +19,7 @@ import Budgets from './pages/Budgets'
 import Notifications from './pages/Notifications'
 import EMITracker from './pages/EMITracker'
 import NetWorth from './pages/NetWorth'
+import Ledger from './pages/Ledger'
 import Layout from './components/Layout'
 
 function PrivateRoute({ children }) {
@@ -38,6 +40,7 @@ export default function App() {
           <ExpenseProvider>
             <BudgetProvider>
               <NetWorthProvider>
+                <LedgerProvider>
                 <EMIProvider>
                   <BrowserRouter>
                 <Toaster
@@ -58,6 +61,7 @@ export default function App() {
                     <Route path="notifications" element={<Notifications />} />
                     <Route path="emis" element={<EMITracker />} />
                     <Route path="networth" element={<NetWorth />} />
+                    <Route path="ledger" element={<Ledger />} />
                     <Route path="profile" element={<Profile />} />
                     <Route path="add" element={<AddExpense />} />
                     <Route path="edit/:id" element={<AddExpense />} />
@@ -65,6 +69,7 @@ export default function App() {
                 </Routes>
                   </BrowserRouter>
                 </EMIProvider>
+                </LedgerProvider>
               </NetWorthProvider>
             </BudgetProvider>
           </ExpenseProvider>

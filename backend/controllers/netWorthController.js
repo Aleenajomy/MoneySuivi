@@ -210,7 +210,7 @@ const getLoanDetails = (emi) => {
 // ── Net Worth ────────────────────────────────────────────
 const getNetWorth = async (req, res) => {
   try {
-    const [assets, activeEmis, transactions] = await Promise.all([
+    const [assets, activeEmis, transactions, ledgerContacts] = await Promise.all([
       prisma.asset.findMany({ where: { userId: req.user.id } }),
       prisma.eMI.findMany({
         where: { userId: req.user.id, active: true },
@@ -219,6 +219,10 @@ const getNetWorth = async (req, res) => {
       prisma.expense.findMany({
         where: { userId: req.user.id },
         select: { amount: true, type: true, accountType: true, paymentMethod: true, fromAccountType: true, toAccountType: true },
+      }),
+      prisma.ledgerContact.findMany({
+        where: { userId: req.user.id },
+        include: { entries: true },
       }),
     ]);
 
@@ -247,7 +251,24 @@ const getNetWorth = async (req, res) => {
       };
     });
 
-    const totalLiabilities = outstandingLoans + outstandingEMIs;
+    // ── Ledger receivables / payables ────────────────────
+    let ledgerReceivable = 0;  // money others owe user  → asset
+    let ledgerPayable    = 0;  // money user owes others → liability
+
+    for (const c of ledgerContacts) {
+      let bal = 0;
+      for (const e of c.entries) {
+        const amt = Number(e.amount);
+        if (e.type === 'LENT')               bal += amt;
+        if (e.type === 'REPAYMENT_RECEIVED') bal -= amt;
+        if (e.type === 'BORROWED')           bal -= amt;
+        if (e.type === 'REPAYMENT_MADE')     bal += amt;
+      }
+      if (bal > 0) ledgerReceivable += bal;
+      else         ledgerPayable    += Math.abs(bal);
+    }
+
+    const totalLiabilities = outstandingLoans + outstandingEMIs + ledgerPayable;
 
     const breakdown = assets.reduce((totals, asset) => {
       const value = asset.value || 0;
@@ -274,7 +295,9 @@ const getNetWorth = async (req, res) => {
       outstandingEMIs,
       totalLiabilities,
       cashBalance,
-      netWorth: totalAssets + cashBalance - totalLiabilities,
+      ledgerReceivable,
+      ledgerPayable,
+      netWorth: totalAssets + cashBalance + ledgerReceivable - totalLiabilities,
       cashInHand: accountBalances.cashBalance || breakdown.inHand,
       bankBalance: (accountBalances.debitCardBalance + accountBalances.netBankingBalance) || breakdown.bank,
       walletBalance: accountBalances.upiBalance,
@@ -286,5 +309,6 @@ const getNetWorth = async (req, res) => {
     });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
+
 
 module.exports = { getAssets, createAsset, updateAsset, deleteAsset, getLiabilities, createLiability, updateLiability, deleteLiability, getNetWorth };

@@ -3,7 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   Home, Clock, WalletCards, CreditCard, Plus,
   BarChart3, WalletIcon, BellIcon, UserCircle, LogOut, Settings,
-  Menu, Sun, Moon, ChevronLeft, ChevronRight, X
+  Menu, Sun, Moon, ChevronLeft, ChevronRight, X, HandCoins
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useNotification } from '../context/NotificationContext'
@@ -28,6 +28,7 @@ const sidebarNavItems = [
   { path: '/analytics', icon: BarChart3, label: 'Analytics' },
   { path: '/budgets', icon: WalletIcon, label: 'Budgets' },
   { path: '/notifications', icon: BellIcon, label: 'Alerts' },
+  { path: '/ledger', icon: HandCoins, label: 'Ledger' },
   { path: '/profile', icon: Settings, label: 'Profile' },
 ]
 

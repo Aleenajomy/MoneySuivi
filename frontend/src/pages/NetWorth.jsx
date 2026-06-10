@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Pencil, Trash2, X, TrendingUp, TrendingDown, Coins, Landmark, Calendar, Wallet, Info } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, TrendingUp, TrendingDown, Coins, Landmark, Calendar, Wallet, Info, HandCoins } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { useNetWorth } from '../context/NetWorthContext'
 import { formatCurrency } from '../utils/constants'
@@ -96,7 +96,7 @@ export default function NetWorth() {
         <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest mb-1">Final Net Worth</p>
         <p className="text-4xl font-black text-white mb-2 tracking-tight">{formatCurrency(netWorth)}</p>
         <p className="text-white/60 text-[10px] font-semibold mt-1">
-          Formula: Assets ({formatCurrency(summary.totalAssets)}) + Cash ({formatCurrency(summary.cashBalance || 0)}) - Liabilities ({formatCurrency(summary.totalLiabilities)})
+          Formula: Assets ({formatCurrency(summary.totalAssets)}) + Cash ({formatCurrency(summary.cashBalance || 0)}) + Receivables ({formatCurrency(summary.ledgerReceivable || 0)}) − Liabilities ({formatCurrency(summary.totalLiabilities)})
         </p>
       </div>
 
@@ -145,6 +145,33 @@ export default function NetWorth() {
           </div>
           <p className="text-base md:text-lg font-black text-red-400 mt-3">{formatCurrency(summary.outstandingEMIs || 0)}</p>
         </div>
+
+        {/* Ledger Receivable Card */}
+        {(summary.ledgerReceivable > 0 || summary.ledgerPayable > 0) && (
+          <>
+            <div className="card p-4 flex flex-col justify-between border dark:border-dark-border border-light-border bg-white dark:bg-dark-card shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+              <div className="flex justify-between items-start">
+                <span className="text-[10px] dark:text-gray-500 text-gray-400 uppercase font-bold tracking-wider">Lent Out</span>
+                <span className="w-7 h-7 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                  <HandCoins size={14} />
+                </span>
+              </div>
+              <p className="text-base md:text-lg font-black text-emerald-500 mt-3">{formatCurrency(summary.ledgerReceivable || 0)}</p>
+              <p className="text-[9px] dark:text-gray-600 text-gray-400 mt-1">Receivable asset</p>
+            </div>
+
+            <div className="card p-4 flex flex-col justify-between border dark:border-dark-border border-light-border bg-white dark:bg-dark-card shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+              <div className="flex justify-between items-start">
+                <span className="text-[10px] dark:text-gray-500 text-gray-400 uppercase font-bold tracking-wider">Borrowed</span>
+                <span className="w-7 h-7 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center">
+                  <HandCoins size={14} />
+                </span>
+              </div>
+              <p className="text-base md:text-lg font-black text-rose-500 mt-3">{formatCurrency(summary.ledgerPayable || 0)}</p>
+              <p className="text-[9px] dark:text-gray-600 text-gray-400 mt-1">Payable liability</p>
+            </div>
+          </>
+        )}
 
         {/* Total Liabilities: Spans all 4 columns on desktop/tablet, 2 columns on mobile */}
         <div className="card p-4 flex flex-col justify-between border dark:border-dark-border border-light-border bg-white dark:bg-dark-card shadow-sm hover:shadow-md col-span-2 md:col-span-4 transition-all">
