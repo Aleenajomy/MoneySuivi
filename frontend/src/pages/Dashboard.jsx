@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, BarChart3, CreditCard, Repeat, TrendingUp, UserCircle, WalletCards, Clock } from 'lucide-react'
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, BarChart3, CreditCard, Repeat, TrendingUp, WalletCards, Clock } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import { motion } from 'framer-motion'
 import ExpenseCard from '../components/ExpenseCard'

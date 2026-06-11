@@ -25,7 +25,8 @@ const register = async (req, res) => {
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-      return res.status(400).json({ success: false, message: 'Email already registered' });
+      // 409 Conflict — email already taken
+      return res.status(409).json({ success: false, code: 'EMAIL_EXISTS', message: 'An account with this email already exists.' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
@@ -36,12 +37,12 @@ const register = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Registration successful',
+      message: 'Account created successfully.',
       token,
       user: { id: user.id, name: user.name, email: user.email },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: 'Registration failed. Please try again.' });
   }
 };
 
@@ -52,9 +53,18 @@ const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // Step 1: check if the account exists
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user || !(await bcrypt.compare(password, user.password))) {
-      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    if (!user) {
+      // 404 — no account with that email
+      return res.status(404).json({ success: false, code: 'USER_NOT_FOUND', message: 'No account found with this email address. Please create an account first.' });
+    }
+
+    // Step 2: verify the password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      // 401 — account exists but password is wrong
+      return res.status(401).json({ success: false, code: 'WRONG_PASSWORD', message: 'Incorrect password. Please try again.' });
     }
 
     const token = generateToken(user.id);
@@ -66,7 +76,7 @@ const login = async (req, res) => {
       user: { id: user.id, name: user.name, email: user.email },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: 'Login failed. Please try again.' });
   }
 };
 

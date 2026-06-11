@@ -1,4 +1,5 @@
 const prisma = require('../lib/prisma');
+const { getLoanDetails } = require('../utils/loanUtils');
 
 // nextDueDate = startDate + (paidInstallments + 1) months
 const calcNextDue = (startDate, paidInstallments) => {
@@ -32,7 +33,17 @@ const createEMI = async (req, res) => {
     if (resolvedType === 'FLEXIBLE') {
       const total = Number(totalAmount);
       const paid = Number(paidAmount) || 0;
-      const active = paid < total;
+      const tempEmi = {
+        type: resolvedType,
+        totalAmount: total,
+        interestRate: parsedInterestRate,
+        paidAmount: paid,
+        startDate: start,
+        payments: [],
+        active: true
+      };
+      const details = getLoanDetails(tempEmi);
+      const active = details.remainingBalance > 0;
       
       emi = await prisma.eMI.create({
         data: {
@@ -95,8 +106,23 @@ const payInstallment = async (req, res) => {
         return res.status(400).json({ success: false, message: 'Invalid payment amount' });
       }
       
+      const dbPayments = await prisma.eMIPayment.findMany({
+        where: { emiId: existing.id }
+      });
+      const newPayment = {
+        amount: payAmount,
+        paidAt: paidAt ? new Date(paidAt) : new Date(),
+      };
       const newPaidAmount = existing.paidAmount + payAmount;
-      const done = newPaidAmount >= existing.totalAmount;
+      const tempEmi = {
+        ...existing,
+        interestRate: existing.interestRate,
+        paidAmount: newPaidAmount,
+        payments: [...dbPayments, newPayment],
+        active: true
+      };
+      const details = getLoanDetails(tempEmi);
+      const done = details.remainingBalance <= 0;
       
       emi = await prisma.$transaction(async (tx) => {
         await tx.eMIPayment.create({
@@ -166,7 +192,20 @@ const updateEMI = async (req, res) => {
     if (resolvedType === 'FLEXIBLE') {
       const total = Number(totalAmount);
       const paid = paidAmount !== undefined && paidAmount !== '' ? Number(paidAmount) : existing.paidAmount;
-      const active = paid < total;
+      const dbPayments = await prisma.eMIPayment.findMany({
+        where: { emiId: existing.id }
+      });
+      const tempEmi = {
+        type: resolvedType,
+        totalAmount: total,
+        interestRate: parsedInterestRate,
+        paidAmount: paid,
+        startDate: start,
+        payments: dbPayments,
+        active: true
+      };
+      const details = getLoanDetails(tempEmi);
+      const active = details.remainingBalance > 0;
       
       emi = await prisma.eMI.update({
         where: { id: existing.id },
@@ -232,7 +271,7 @@ const deletePayment = async (req, res) => {
   try {
     const payment = await prisma.eMIPayment.findUnique({
       where: { id: req.params.paymentId },
-      include: { emi: true },
+      include: { emi: { include: { payments: true } } },
     });
     if (!payment || payment.emi.userId !== req.user.id) {
       return res.status(404).json({ success: false, message: 'Payment not found' });
@@ -259,7 +298,16 @@ const deletePayment = async (req, res) => {
         });
       });
     } else {
-      const active = newPaidAmount < emi.totalAmount;
+      const remainingPayments = emi.payments.filter(p => p.id !== payment.id);
+      const tempEmi = {
+        ...emi,
+        paidAmount: newPaidAmount,
+        payments: remainingPayments,
+        active: true
+      };
+      const details = getLoanDetails(tempEmi);
+      const active = details.remainingBalance > 0;
+      
       updatedEmi = await prisma.$transaction(async (tx) => {
         await tx.eMIPayment.delete({ where: { id: payment.id } });
         return await tx.eMI.update({

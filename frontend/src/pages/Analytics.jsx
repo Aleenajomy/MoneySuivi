@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useExpense } from '../context/ExpenseContext'
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from 'recharts'
-import { CATEGORY_COLORS, CATEGORY_ICONS, formatCurrency } from '../utils/constants'
+import { CATEGORY_COLORS, formatCurrency } from '../utils/constants'
 import { RefreshCw, TrendingUp, Coins, Activity, Wallet } from 'lucide-react'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']

@@ -34,6 +34,7 @@ export function AuthProvider({ children }) {
   }, [token])
 
   const login = async (email, password) => {
+    // Let the original API error propagate so callers can read err.status / err.code
     const res = await api.post('/auth/login', { email, password })
     const auth = readAuthPayload(res)
     localStorage.setItem('token', auth.token)
@@ -43,6 +44,7 @@ export function AuthProvider({ children }) {
   }
 
   const register = async (name, email, password) => {
+    // Let the original API error propagate so callers can read err.status / err.code
     const res = await api.post('/auth/register', { name, email, password })
     const auth = readAuthPayload(res)
     localStorage.setItem('token', auth.token)

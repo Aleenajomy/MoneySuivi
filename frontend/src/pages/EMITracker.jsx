@@ -123,7 +123,8 @@ export default function EMITracker() {
     paidInstallments: Number(form.paidInstallments) || 0,
     paidAmount: Number(form.paidAmount) || 0,
     startDate: form.startDate,
-    payments: []
+    payments: [],
+    active: true
   })
 
   const previewPaid = previewDetails.amountPaid
@@ -441,7 +442,11 @@ function EMICard({ emi, onPay, onDelete, onEdit, onDeletePayment }) {
   const amountPaid = details.amountPaid
   const amountRemaining = details.remainingBalance
   const pct = details.hasInterest
-    ? (details.totalPayableAmount > 0 ? Math.min(100, Math.round((amountPaid / details.totalPayableAmount) * 100)) : 0)
+    ? (isFixed
+        // Fixed EMI: repaid % = principal paid ÷ original principal (from amortisation schedule)
+        ? (emi.totalAmount > 0 ? Math.min(100, Math.round((details.principalPaid / emi.totalAmount) * 100)) : 0)
+        // Flexible: repaid % = total paid ÷ total payable (includes accrued interest)
+        : (details.totalPayableAmount > 0 ? Math.min(100, Math.round((amountPaid / details.totalPayableAmount) * 100)) : 0))
     : (emi.totalAmount > 0 ? Math.min(100, Math.round((amountPaid / emi.totalAmount) * 100)) : 0)
 
   const blockCount = Math.min(10, Math.max(0, Math.round(pct / 10)))
@@ -636,38 +641,62 @@ function EMICard({ emi, onPay, onDelete, onEdit, onDeletePayment }) {
       )}
 
       {/* Collapsible Payment History list */}
-      {emi.payments && emi.payments.length > 0 && (
-        <div className="mt-2.5">
-          <button
-            type="button"
-            onClick={() => setShowHistory(!showHistory)}
-            className="flex items-center gap-1 text-[10px] dark:text-gray-400 text-gray-500 font-semibold hover:text-sky-500 transition-colors">
-            {showHistory ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-            {showHistory ? 'Hide Repayment Logs' : `Show Repayment Logs (${emi.payments.length})`}
-          </button>
+      {(() => {
+        // Surface the hidden initial payment (stored in emi.paidAmount but not as a payment record)
+        const logSum = (emi.payments || []).reduce((s, p) => s + Number(p.amount), 0)
+        const initialHidden = Number(emi.paidAmount) - logSum
+        const hasInitial = !isFixed && initialHidden > 0
+        const totalLogCount = (emi.payments?.length || 0) + (hasInitial ? 1 : 0)
 
-          {showHistory && (
-            <div className="mt-2.5 pt-2 border-t dark:border-dark-border border-light-border space-y-1.5 max-h-36 overflow-y-auto pr-1 animate-fadeIn scrollbar-none">
-              {emi.payments.map(payment => (
-                <div key={payment.id} className="flex items-center justify-between text-[11px] dark:bg-dark-bg bg-slate-50 p-2 rounded-xl border dark:border-dark-border border-slate-100">
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-extrabold text-secondary">{formatCurrency(payment.amount)}</span>
-                      <span className="dark:text-gray-500 text-gray-400 text-[10px]">{formatShortDate(payment.paidAt)}</span>
+        if (totalLogCount === 0) return null
+        return (
+          <div className="mt-2.5">
+            <button
+              type="button"
+              onClick={() => setShowHistory(!showHistory)}
+              className="flex items-center gap-1 text-[10px] dark:text-gray-400 text-gray-500 font-semibold hover:text-sky-500 transition-colors">
+              {showHistory ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+              {showHistory ? 'Hide Repayment Logs' : `Show Repayment Logs (${totalLogCount})`}
+            </button>
+
+            {showHistory && (
+              <div className="mt-2.5 pt-2 border-t dark:border-dark-border border-light-border space-y-1.5 max-h-36 overflow-y-auto pr-1 animate-fadeIn scrollbar-none">
+                {/* Hidden initial payment — show as read-only first entry */}
+                {hasInitial && (
+                  <div className="flex items-center justify-between text-[11px] dark:bg-dark-bg bg-slate-50 p-2 rounded-xl border dark:border-dark-border border-slate-100 opacity-70">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-extrabold text-secondary">{formatCurrency(initialHidden)}</span>
+                        <span className="dark:text-gray-500 text-gray-400 text-[10px]">{formatShortDate(emi.startDate)}</span>
+                      </div>
+                      <p className="text-[10px] dark:text-gray-500 text-gray-400 mt-0.5">Initial payment (loan creation)</p>
                     </div>
-                    {payment.note && <p className="text-[10px] dark:text-gray-500 text-gray-400 mt-0.5">{payment.note}</p>}
+                    {/* No delete button — this entry is part of the EMI record itself */}
+                    <span className="text-[9px] text-gray-400 dark:text-gray-600 italic">auto</span>
                   </div>
-                  <button type="button" onClick={() => { if (window.confirm('Delete this repayment record?')) onDeletePayment(payment.id) }}
-                    className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-500/10 transition-colors"
-                    title="Delete payment log">
-                    <Trash2 size={11} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+                )}
+                {/* Regular payment log entries */}
+                {(emi.payments || []).map(payment => (
+                  <div key={payment.id} className="flex items-center justify-between text-[11px] dark:bg-dark-bg bg-slate-50 p-2 rounded-xl border dark:border-dark-border border-slate-100">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-extrabold text-secondary">{formatCurrency(payment.amount)}</span>
+                        <span className="dark:text-gray-500 text-gray-400 text-[10px]">{formatShortDate(payment.paidAt)}</span>
+                      </div>
+                      {payment.note && <p className="text-[10px] dark:text-gray-500 text-gray-400 mt-0.5">{payment.note}</p>}
+                    </div>
+                    <button type="button" onClick={() => { if (window.confirm('Delete this repayment record?')) onDeletePayment(payment.id) }}
+                      className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-500/10 transition-colors"
+                      title="Delete payment log">
+                      <Trash2 size={11} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })()}
     </div>
   )
 }
