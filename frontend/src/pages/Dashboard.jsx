@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, BarChart3, CreditCard, Repeat, TrendingUp, WalletCards, Clock } from 'lucide-react'
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, BarChart3, CreditCard, Repeat, TrendingUp, WalletCards, Clock, X, TrendingDown, Sparkles } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import { motion } from 'framer-motion'
 import ExpenseCard from '../components/ExpenseCard'
@@ -21,13 +21,13 @@ const budgetColor = (pct) => {
 }
 
 const getDisplayBalances = (analytics) => {
-  const cash = Number(analytics.cashBalance || 0)
-  const upi = Number(analytics.upiBalance || 0)
-  const creditCard = Number(analytics.creditCardBalance || 0)
-  const debitCard = Number(analytics.debitCardBalance || 0)
-  const netBanking = Number(analytics.netBankingBalance || 0)
+  const cash = Math.max(0, Number(analytics.cashBalance || 0))
+  const upi = Math.max(0, Number(analytics.upiBalance || 0))
+  const creditCard = Number(analytics.creditCardBalance || 0) // Credit card can be negative (money owed)
+  const debitCard = Math.max(0, Number(analytics.debitCardBalance || 0))
+  const netBanking = Math.max(0, Number(analytics.netBankingBalance || 0))
   const breakdown = cash + upi + creditCard + debitCard + netBanking
-  const total = breakdown !== 0 ? breakdown : Number(analytics.totalBalance ?? analytics.balance ?? 0)
+  const total = breakdown !== 0 ? Math.max(0, breakdown) : Math.max(0, Number(analytics.totalBalance ?? analytics.balance ?? 0))
   return { cash, upi, creditCard, debitCard, netBanking, total }
 }
 
@@ -39,6 +39,8 @@ export default function Dashboard() {
   const { emis, fetchEMIs } = useEMI()
   const { summary, fetchNetWorth } = useNetWorth()
   const [showBalanceBreakdown, setShowBalanceBreakdown] = useState(false)
+  const [showDailyAlert, setShowDailyAlert] = useState(false)
+  const [todaySpend, setTodaySpend] = useState(0)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -49,6 +51,21 @@ export default function Dashboard() {
     fetchEMIs()
     fetchNetWorth()
   }, [fetchAnalytics, fetchExpenses, fetchBudgets, fetchNotifications, fetchEMIs, fetchNetWorth])
+
+  // Daily spending alert — show once per calendar day
+  useEffect(() => {
+    if (loadingAnalytics || !analytics) return
+    const today = new Date().toISOString().slice(0, 10)
+    const lastShown = localStorage.getItem('dailyAlertShownDate')
+    if (lastShown === today) return
+
+    const todayTotal = Number(analytics.totalExpense || 0)
+    if (todayTotal > 0) {
+      setTodaySpend(todayTotal)
+      setShowDailyAlert(true)
+      localStorage.setItem('dailyAlertShownDate', today)
+    }
+  }, [loadingAnalytics, analytics])
 
   const totalIncome = analytics.totalIncome ?? 0
   const totalExpense = analytics.totalExpense ?? 0
@@ -295,6 +312,13 @@ export default function Dashboard() {
           onClose={() => setShowBalanceBreakdown(false)}
         />
       )}
+
+      {showDailyAlert && (
+        <DailySpendAlert
+          amount={todaySpend}
+          onClose={() => setShowDailyAlert(false)}
+        />
+      )}
     </div>
   )
 }
@@ -454,6 +478,116 @@ function EmptyState() {
       <button onClick={() => navigate('/add')} className="mt-4 px-5 py-2.5 rounded-xl bg-sky-500/10 text-sky-500 text-sm font-semibold hover:bg-sky-500/20 transition-all active:scale-95">
         Add Expense
       </button>
+    </div>
+  )
+}
+
+function DailySpendAlert({ amount, onClose }) {
+  const timerRef = useRef(null)
+  const [progress, setProgress] = useState(100)
+
+  useEffect(() => {
+    const duration = 8000
+    const interval = 50
+    let elapsed = 0
+    timerRef.current = setInterval(() => {
+      elapsed += interval
+      setProgress(Math.max(0, 100 - (elapsed / duration) * 100))
+      if (elapsed >= duration) {
+        clearInterval(timerRef.current)
+        onClose()
+      }
+    }, interval)
+    return () => clearInterval(timerRef.current)
+  }, [onClose])
+
+  const isHigh = amount > 1000
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-start justify-center pt-8 px-4" onClick={onClose}>
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+
+      {/* Alert Card */}
+      <motion.div
+        initial={{ opacity: 0, y: -40, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -20, scale: 0.95 }}
+        transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-sm overflow-hidden rounded-2xl border shadow-2xl
+          dark:bg-dark-card dark:border-dark-border bg-white border-slate-200"
+      >
+        {/* Gradient top accent */}
+        <div className={`h-1.5 w-full ${
+          isHigh
+            ? 'bg-gradient-to-r from-orange-400 via-red-400 to-pink-500'
+            : 'bg-gradient-to-r from-emerald-400 via-sky-400 to-blue-500'
+        }`} />
+
+        <div className="p-5">
+          {/* Header */}
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                isHigh
+                  ? 'bg-orange-500/10 text-orange-500'
+                  : 'bg-emerald-500/10 text-emerald-500'
+              }`}>
+                {isHigh ? <TrendingDown size={20} /> : <Sparkles size={20} />}
+              </div>
+              <div>
+                <p className="text-sm font-bold dark:text-white text-slate-800">Daily Spending Summary</p>
+                <p className="text-[10px] dark:text-gray-500 text-gray-400 font-medium">
+                  {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' })}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-7 h-7 rounded-lg dark:bg-dark-border bg-slate-100 flex items-center justify-center dark:text-gray-400 text-gray-500 hover:text-red-400 transition-colors"
+            >
+              <X size={14} />
+            </button>
+          </div>
+
+          {/* Amount */}
+          <div className="text-center py-4">
+            <p className="text-[10px] uppercase tracking-widest dark:text-gray-500 text-gray-400 font-bold mb-2">Total Spent Today</p>
+            <p className={`text-3xl font-black tracking-tight ${
+              isHigh ? 'text-orange-500' : 'text-emerald-500'
+            }`}>
+              {formatCurrency(amount)}
+            </p>
+          </div>
+
+          {/* Message */}
+          <div className={`rounded-xl p-3 mt-2 ${
+            isHigh
+              ? 'bg-orange-500/5 dark:bg-orange-500/10 border border-orange-500/10'
+              : 'bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/10'
+          }`}>
+            <p className="text-xs dark:text-gray-300 text-slate-600 leading-relaxed text-center">
+              {isHigh
+                ? '⚠️ Your spending is on the higher side today. Review your expenses and try to cut back on non-essential purchases.'
+                : '✅ Great job keeping your spending in check today! Keep up the smart money habits.'
+              }
+            </p>
+          </div>
+        </div>
+
+        {/* Auto-dismiss progress bar */}
+        <div className="h-0.5 w-full dark:bg-dark-border bg-slate-100">
+          <div
+            className={`h-full transition-all duration-100 ease-linear ${
+              isHigh
+                ? 'bg-gradient-to-r from-orange-400 to-red-400'
+                : 'bg-gradient-to-r from-emerald-400 to-sky-400'
+            }`}
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </motion.div>
     </div>
   )
 }

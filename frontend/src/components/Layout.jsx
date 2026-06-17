@@ -3,7 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   Home, Clock, WalletCards, CreditCard, Plus,
   BarChart3, WalletIcon, BellIcon, UserCircle, LogOut, Settings,
-  Menu, Sun, Moon, ChevronLeft, ChevronRight, X, HandCoins
+  Menu, Sun, Moon, ChevronLeft, ChevronRight, X, HandCoins, Download, Smartphone, Share2
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useNotification } from '../context/NotificationContext'
@@ -58,6 +58,9 @@ export default function Layout() {
 
   return (
     <div className="flex min-h-screen dark:bg-dark-bg bg-light-bg transition-colors duration-300">
+
+      {/* ── PWA Install Banner ──────────────────────────────────── */}
+      <InstallBanner />
 
       {/* ── Desktop Sidebar ───────────────────────────────────────── */}
       <aside className={`sidebar border-r dark:border-dark-border border-light-border transition-all duration-300 hidden lg:flex flex-col fixed left-0 top-0 h-screen z-50
@@ -353,5 +356,196 @@ export default function Layout() {
 
       </div>
     </div>
+  )
+}
+
+/* ── PWA Install Banner Component ───────────────────────────── */
+function InstallBanner() {
+  const [show, setShow] = useState(false)
+  const [deferredPrompt, setDeferredPrompt] = useState(null)
+  const [isIOS, setIsIOS] = useState(false)
+  const [showIOSGuide, setShowIOSGuide] = useState(false)
+
+  useEffect(() => {
+    // Don't show if already installed as PWA
+    const isStandalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      window.navigator.standalone === true
+    if (isStandalone) return
+
+    // Don't show on desktop
+    const isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    if (!isMobile) return
+
+    // Check if dismissed within 7 days
+    const dismissedAt = localStorage.getItem('installBannerDismissed')
+    if (dismissedAt) {
+      const dismissedDate = new Date(dismissedAt)
+      const daysSince = (Date.now() - dismissedDate.getTime()) / (1000 * 60 * 60 * 24)
+      if (daysSince < 7) return
+    }
+
+    // Detect iOS
+    const iosDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
+    setIsIOS(iosDevice)
+
+    if (iosDevice) {
+      // iOS doesn't have beforeinstallprompt — show banner immediately
+      setShow(true)
+    } else {
+      // Android / Chrome — listen for beforeinstallprompt
+      const handler = (e) => {
+        e.preventDefault()
+        setDeferredPrompt(e)
+        setShow(true)
+      }
+      window.addEventListener('beforeinstallprompt', handler)
+      return () => window.removeEventListener('beforeinstallprompt', handler)
+    }
+  }, [])
+
+  const handleInstall = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt()
+      const result = await deferredPrompt.userChoice
+      if (result.outcome === 'accepted') {
+        setShow(false)
+      }
+      setDeferredPrompt(null)
+    } else if (isIOS) {
+      setShowIOSGuide(true)
+    }
+  }
+
+  const handleDismiss = () => {
+    setShow(false)
+    setShowIOSGuide(false)
+    localStorage.setItem('installBannerDismissed', new Date().toISOString())
+  }
+
+  if (!show) return null
+
+  return (
+    <>
+      <AnimatePresence>
+        <motion.div
+          initial={{ y: -80, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: -80, opacity: 0 }}
+          transition={{ type: 'spring', damping: 20, stiffness: 250 }}
+          className="fixed top-0 left-0 right-0 z-[80] px-3 pt-2 lg:hidden"
+        >
+          <div className="w-full max-w-lg mx-auto rounded-2xl border shadow-xl overflow-hidden
+            dark:bg-dark-card dark:border-dark-border bg-white border-slate-200">
+            {/* Gradient accent */}
+            <div className="h-1 w-full bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500" />
+
+            <div className="p-3.5 flex items-center gap-3">
+              {/* Icon */}
+              <div className="w-10 h-10 rounded-xl gradient-blue flex items-center justify-center flex-shrink-0 shadow-md shadow-sky-500/20">
+                <Smartphone size={18} className="text-white" />
+              </div>
+
+              {/* Text */}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold dark:text-white text-slate-800 leading-tight">
+                  Install MoneySuivi
+                </p>
+                <p className="text-[10px] dark:text-gray-500 text-gray-400 mt-0.5 leading-tight">
+                  Add to your home screen for the best experience
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={handleInstall}
+                  className="px-3.5 py-1.5 rounded-xl gradient-blue text-white text-[11px] font-bold shadow-md shadow-sky-500/20 active:scale-95 transition-transform flex items-center gap-1.5"
+                >
+                  <Download size={12} />
+                  Install
+                </button>
+                <button
+                  onClick={handleDismiss}
+                  className="w-7 h-7 rounded-lg dark:bg-dark-border bg-slate-100 flex items-center justify-center dark:text-gray-500 text-gray-400 hover:text-red-400 transition-colors"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      </AnimatePresence>
+
+      {/* iOS Install Guide Overlay */}
+      <AnimatePresence>
+        {showIOSGuide && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[90] bg-black/50 backdrop-blur-sm flex items-center justify-center px-4"
+            onClick={handleDismiss}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm rounded-2xl border shadow-2xl overflow-hidden
+                dark:bg-dark-card dark:border-dark-border bg-white border-slate-200"
+            >
+              <div className="h-1.5 w-full bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500" />
+              <div className="p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-bold dark:text-white text-slate-800">Install on iPhone</h3>
+                  <button
+                    onClick={handleDismiss}
+                    className="w-7 h-7 rounded-lg dark:bg-dark-border bg-slate-100 flex items-center justify-center dark:text-gray-400 text-gray-500"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 p-3 rounded-xl dark:bg-dark-bg bg-slate-50">
+                    <div className="w-8 h-8 rounded-lg bg-sky-500/10 text-sky-500 flex items-center justify-center font-bold text-sm">1</div>
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold dark:text-gray-200 text-slate-700">Tap the Share button</p>
+                      <p className="text-[10px] dark:text-gray-500 text-gray-400 flex items-center gap-1 mt-0.5">
+                        <Share2 size={10} /> at the bottom of Safari
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-3 rounded-xl dark:bg-dark-bg bg-slate-50">
+                    <div className="w-8 h-8 rounded-lg bg-sky-500/10 text-sky-500 flex items-center justify-center font-bold text-sm">2</div>
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold dark:text-gray-200 text-slate-700">Scroll down and tap</p>
+                      <p className="text-[10px] dark:text-gray-500 text-gray-400 mt-0.5">"Add to Home Screen"</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-3 rounded-xl dark:bg-dark-bg bg-slate-50">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold text-sm">3</div>
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold dark:text-gray-200 text-slate-700">Tap "Add" to confirm</p>
+                      <p className="text-[10px] dark:text-gray-500 text-gray-400 mt-0.5">MoneySuivi will appear on your home screen</p>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleDismiss}
+                  className="w-full mt-4 py-2.5 rounded-xl gradient-blue text-white text-xs font-bold shadow-md shadow-sky-500/20 active:scale-95 transition-transform"
+                >
+                  Got it!
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   )
 }
