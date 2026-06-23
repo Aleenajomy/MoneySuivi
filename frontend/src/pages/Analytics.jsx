@@ -173,7 +173,17 @@ export default function Analytics() {
             </div>
           </div>
           <p className="text-2xl font-black dark:text-white text-slate-800">{formatCurrency(analytics.investmentBalance || 0)}</p>
-          <p className="text-[10px] text-gray-500 mt-1.5">Total investment value</p>
+          <p className="text-[10px] text-gray-500 mt-1.5">Transactions + Assets (Stocks, MF, FD, Gold)</p>
+          {analytics.investmentBreakdown && Object.keys(analytics.investmentBreakdown).length > 0 && (
+            <div className="mt-3 space-y-1 border-t dark:border-dark-border border-light-border pt-3">
+              {Object.entries(analytics.investmentBreakdown).map(([type, val]) => (
+                <div key={type} className="flex justify-between text-[10px]">
+                  <span className="dark:text-gray-500 text-gray-400">{type}</span>
+                  <span className="font-bold dark:text-gray-300 text-slate-700">{formatCurrency(val)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

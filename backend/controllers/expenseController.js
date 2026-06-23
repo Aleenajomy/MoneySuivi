@@ -145,7 +145,7 @@ const getAnalytics = async (req, res) => {
     const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
     const next30Days = new Date(now); next30Days.setDate(now.getDate() + 30);
 
-    const [monthlyTotals, categoryTotals, monthlyTrendRows, balanceGrowthRows, upcomingRecurring, accountTotals, investmentTotals, categoryAllTime, allTransactions] = await Promise.all([
+    const [monthlyTotals, categoryTotals, monthlyTrendRows, balanceGrowthRows, upcomingRecurring, accountTotals, investmentTotals, categoryAllTime, allTransactions, investmentAssets] = await Promise.all([
       prisma.expense.groupBy({ by: ['type'], where: { userId: req.user.id, type: { in: ['expense', 'income'] }, expenseDate: { gte: startOfMonth, lte: endOfMonth } }, _sum: { amount: true } }),
       prisma.expense.groupBy({ by: ['category'], where: { userId: req.user.id, type: 'expense', expenseDate: { gte: startOfMonth, lte: endOfMonth } }, _sum: { amount: true }, orderBy: { _sum: { amount: 'desc' } } }),
       prisma.$queryRaw`
@@ -166,6 +166,7 @@ const getAnalytics = async (req, res) => {
       prisma.expense.groupBy({ by: ['type'], where: { userId: req.user.id, category: 'Investment' }, _sum: { amount: true } }),
       prisma.expense.groupBy({ by: ['category', 'type'], where: { userId: req.user.id, type: { in: ['expense', 'income'] } }, _sum: { amount: true } }),
       prisma.expense.findMany({ where: { userId: req.user.id }, select: { amount: true, type: true, accountType: true, paymentMethod: true, fromAccountType: true, toAccountType: true } }),
+      prisma.asset.findMany({ where: { userId: req.user.id, type: { in: ['Stocks', 'Mutual Funds', 'Fixed Deposit', 'Gold'] } }, select: { type: true, value: true } }),
     ]);
 
     const totalIncome = monthlyTotals.find(i => i.type === 'income')?._sum.amount || 0;
@@ -184,7 +185,13 @@ const getAnalytics = async (req, res) => {
     const balances = calculateBalances(allTransactions);
     const balanceAlerts = buildBalanceAlerts(balances);
 
-    const investmentBalance = (investmentTotals.find(i => i.type === 'income')?._sum.amount || 0) - (investmentTotals.find(i => i.type === 'expense')?._sum.amount || 0)
+    const txInvestment = (investmentTotals.find(i => i.type === 'income')?._sum.amount || 0) - (investmentTotals.find(i => i.type === 'expense')?._sum.amount || 0)
+    const assetInvestment = investmentAssets.reduce((sum, a) => sum + a.value, 0)
+    const investmentBalance = txInvestment + assetInvestment
+    const investmentBreakdown = investmentAssets.reduce((acc, a) => {
+      acc[a.type] = (acc[a.type] || 0) + a.value
+      return acc
+    }, {})
 
     const categoryBalancesMap = {}
     if (categoryAllTime) {
@@ -211,6 +218,7 @@ const getAnalytics = async (req, res) => {
         expensesByAccountType,
         incomeByAccountType,
         investmentBalance,
+        investmentBreakdown,
         categoryBalances,
       },
     });
