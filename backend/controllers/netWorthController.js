@@ -163,7 +163,7 @@ const getNetWorth = async (req, res) => {
       cashBalance,
       ledgerReceivable,
       ledgerPayable,
-      netWorth: totalAssets - totalLiabilities + ledgerReceivable,
+      netWorth: totalAssets + cashBalance + ledgerReceivable - totalLiabilities,
       cashInHand: accountBalances.cashBalance || breakdown.inHand,
       bankBalance: (accountBalances.debitCardBalance + accountBalances.netBankingBalance) || breakdown.bank,
       walletBalance: accountBalances.upiBalance,

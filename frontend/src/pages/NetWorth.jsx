@@ -98,7 +98,7 @@ export default function NetWorth() {
         <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest mb-1">Final Net Worth</p>
         <p className="text-4xl font-black text-white mb-2 tracking-tight">{formatCurrency(netWorth)}</p>
         <p className="text-white/60 text-[10px] font-semibold mt-1">
-          Formula: Assets ({formatCurrency(summary.totalAssets)}) + Receivables ({formatCurrency(summary.ledgerReceivable || 0)}) − Liabilities ({formatCurrency(summary.totalLiabilities)})
+          Formula: Assets ({formatCurrency(summary.totalAssets)}) + Cash ({formatCurrency(summary.cashBalance || 0)}) + Receivables ({formatCurrency(summary.ledgerReceivable || 0)}) − Liabilities ({formatCurrency(summary.totalLiabilities)})
         </p>
       </div>
 
