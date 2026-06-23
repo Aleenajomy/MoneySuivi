@@ -3,6 +3,7 @@ import toast from 'react-hot-toast'
 import { Edit2, Plus, Save, Trash2, X, Utensils, Bus, ShoppingBag, Receipt, Tv, Banknote, HeartPulse, Briefcase, TrendingUp, Gift, CircleDot } from 'lucide-react'
 import { useBudget } from '../context/BudgetContext'
 import { CATEGORY_COLORS, EXPENSE_CATEGORIES, formatCurrency } from '../utils/constants'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 const ICONS = {
   Food: Utensils, Travel: Bus, Shopping: ShoppingBag, Bills: Receipt,
@@ -23,6 +24,7 @@ export default function Budgets() {
   const [editingId, setEditingId] = useState('')
   const [form, setForm] = useState({ category: EXPENSE_CATEGORIES[0], monthlyLimit: '' })
   const [saving, setSaving] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(null)
 
   useEffect(() => {
     fetchBudgets()
@@ -162,7 +164,7 @@ return (
                       </button>
                       <button
                         type="button"
-                        onClick={() => { if (window.confirm('Delete budget?')) deleteBudget(b.id) }}
+                        onClick={() => setConfirmDelete(b.id)}
                         className="w-7 h-7 rounded-lg flex items-center justify-center dark:text-gray-500 text-gray-400 hover:text-danger transition-colors"
                         title="Delete Budget"
                       >
@@ -202,6 +204,15 @@ return (
           })}
         </div>
       )}
+      <ConfirmDialog
+        open={!!confirmDelete}
+        variant="delete"
+        title="Delete Budget?"
+        message="This budget limit will be permanently removed."
+        confirmText="Delete"
+        onConfirm={() => { deleteBudget(confirmDelete); setConfirmDelete(null) }}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   )
 }

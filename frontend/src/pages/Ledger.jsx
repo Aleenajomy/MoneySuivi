@@ -10,6 +10,7 @@ import {
 } from 'recharts'
 import { useLedger } from '../context/LedgerContext'
 import { formatCurrency, formatDate } from '../utils/constants'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -251,6 +252,8 @@ function PersonLedgerView({ contact, onBack, onRefreshContacts }) {
   const [entryModal, setEntryModal] = useState(null)  // null | {} | {edit entry}
   const [editContactModal, setEditContactModal] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [confirmEntry, setConfirmEntry] = useState(null)
+  const [confirmContact, setConfirmContact] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -284,12 +287,7 @@ function PersonLedgerView({ contact, onBack, onRefreshContacts }) {
     } finally { setSaving(false) }
   }
 
-  const handleDeleteEntry = async (id) => {
-    if (!window.confirm('Delete this entry?')) return
-    await deleteEntry(id, contact.id)
-    await load()
-    onRefreshContacts()
-  }
+  const handleDeleteEntry = (id) => setConfirmEntry(id)
 
   const handleEditContact = async (form) => {
     setSaving(true)
@@ -299,11 +297,7 @@ function PersonLedgerView({ contact, onBack, onRefreshContacts }) {
     } finally { setSaving(false) }
   }
 
-  const handleDeleteContact = async () => {
-    if (!window.confirm(`Delete ${contact.name} and all their transactions? This cannot be undone.`)) return
-    await deleteContact(contact.id)
-    onBack()
-  }
+  const handleDeleteContact = () => setConfirmContact(true)
 
   return (
     <div className="space-y-5">
@@ -416,6 +410,35 @@ function PersonLedgerView({ contact, onBack, onRefreshContacts }) {
           />
         )}
       </AnimatePresence>
+
+      <ConfirmDialog
+        open={!!confirmEntry}
+        variant="delete"
+        title="Delete Entry?"
+        message="This transaction will be permanently removed."
+        confirmText="Delete"
+        onConfirm={async () => {
+          const id = confirmEntry
+          setConfirmEntry(null)
+          await deleteEntry(id, contact.id)
+          await load()
+          onRefreshContacts()
+        }}
+        onCancel={() => setConfirmEntry(null)}
+      />
+      <ConfirmDialog
+        open={confirmContact}
+        variant="delete"
+        title={`Delete ${contact.name}?`}
+        message="This contact and all their transactions will be permanently deleted."
+        confirmText="Delete"
+        onConfirm={async () => {
+          setConfirmContact(false)
+          await deleteContact(contact.id)
+          onBack()
+        }}
+        onCancel={() => setConfirmContact(false)}
+      />
     </div>
   )
 }

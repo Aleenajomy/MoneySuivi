@@ -6,6 +6,7 @@ import { LogOut, ChevronRight, User, Bell, Shield, HelpCircle, X, Mail, Lock, Ey
 import { formatDate } from '../utils/constants'
 import toast from 'react-hot-toast'
 import api from '../services/api'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function Profile() {
   const { user, logout, updateProfile } = useAuth()
@@ -19,6 +20,7 @@ export default function Profile() {
   const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
   const [pwLoading, setPwLoading] = useState(false)
+  const [confirm, setConfirm] = useState(null) // { type: 'logout' | 'reset' }
 
   const handleSave = async (e) => {
     e.preventDefault()
@@ -50,21 +52,24 @@ export default function Profile() {
     }
   }
 
-  const handleLogout = () => {
-    if (window.confirm('Are you sure you want to logout?')) {
+  const handleLogout = () => setConfirm('logout')
+  const handleResetAll = () => setConfirm('reset1')
+
+  const handleConfirm = async () => {
+    if (confirm === 'logout') {
+      setConfirm(null)
       logout()
       navigate('/login')
-    }
-  }
-
-  const handleResetAll = async () => {
-    if (!window.confirm('This will delete ALL your transactions, budgets, EMIs, assets and liabilities. This cannot be undone. Continue?')) return
-    if (!window.confirm('Are you absolutely sure? All data will be permanently deleted.')) return
-    try {
-      await api.delete('/auth/reset')
-      toast.success('All data has been reset')
-    } catch (e) {
-      toast.error(e.message || 'Reset failed')
+    } else if (confirm === 'reset1') {
+      setConfirm('reset2')
+    } else if (confirm === 'reset2') {
+      setConfirm(null)
+      try {
+        await api.delete('/auth/reset')
+        toast.success('All data has been reset')
+      } catch (e) {
+        toast.error(e.message || 'Reset failed')
+      }
     }
   }
 
@@ -214,6 +219,34 @@ export default function Profile() {
       {/* Modals */}
       {modal === 'notifications' && <NotificationsModal onClose={() => setModal(null)} />}
       {modal === 'help' && <HelpModal onClose={() => setModal(null)} />}
+
+      <ConfirmDialog
+        open={confirm === 'logout'}
+        variant="logout"
+        title="Logout?"
+        message="You'll be signed out of your account."
+        confirmText="Logout"
+        onConfirm={handleConfirm}
+        onCancel={() => setConfirm(null)}
+      />
+      <ConfirmDialog
+        open={confirm === 'reset1'}
+        variant="warning"
+        title="Reset All Data?"
+        message="This will permanently delete all transactions, budgets, EMIs, assets and liabilities. This cannot be undone."
+        confirmText="Yes, Continue"
+        onConfirm={handleConfirm}
+        onCancel={() => setConfirm(null)}
+      />
+      <ConfirmDialog
+        open={confirm === 'reset2'}
+        variant="critical"
+        title="Are You Absolutely Sure?"
+        message="All your financial data will be permanently deleted with no way to recover it."
+        confirmText="Delete Everything"
+        onConfirm={handleConfirm}
+        onCancel={() => setConfirm(null)}
+      />
     </div>
   )
 }

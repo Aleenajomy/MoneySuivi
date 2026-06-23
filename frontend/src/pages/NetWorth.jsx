@@ -4,6 +4,7 @@ import { Plus, Pencil, Trash2, X, TrendingUp, TrendingDown, Coins, Landmark, Cal
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { useNetWorth } from '../context/NetWorthContext'
 import { formatCurrency } from '../utils/constants'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 const ASSET_TYPES = ['Savings', 'Fixed Deposit', 'Gold', 'Stocks', 'Mutual Funds', 'Property', 'Vehicle', 'Other']
 const LIABILITY_TYPES = ['Home Loan', 'Education Loan', 'Personal Loan', 'Credit Card', 'Other']
@@ -14,8 +15,9 @@ const emptyLiability = { name: '', type: 'Home Loan', value: '', note: '' }
 export default function NetWorth() {
   const { summary, loading, fetchNetWorth, addAsset, updateAsset, deleteAsset, addLiability, updateLiability, deleteLiability } = useNetWorth()
   const [tab, setTab] = useState('assets')
-  const [form, setForm] = useState(null)  // null = closed, {mode, data, kind}
+  const [form, setForm] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(null) // { id, kind }
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -298,7 +300,7 @@ export default function NetWorth() {
                           title="Edit">
                           <Pencil size={13} />
                         </button>
-                        <button onClick={() => { if (window.confirm('Delete?')) tab === 'assets' ? deleteAsset(item.id) : deleteLiability(item.id) }}
+                        <button onClick={() => setConfirmDelete({ id: item.id, kind: tab === 'assets' ? 'asset' : 'liability' })}
                           className="w-7 h-7 rounded-lg flex items-center justify-center dark:text-gray-500 text-gray-400 hover:text-danger transition-colors"
                           title="Delete">
                           <Trash2 size={13} />
@@ -377,6 +379,19 @@ export default function NetWorth() {
         </div>
 
       </div>
+      <ConfirmDialog
+        open={!!confirmDelete}
+        variant="delete"
+        title={`Delete ${confirmDelete?.kind === 'asset' ? 'Asset' : 'Liability'}?`}
+        message="This entry will be permanently removed from your net worth."
+        confirmText="Delete"
+        onConfirm={() => {
+          if (confirmDelete.kind === 'asset') deleteAsset(confirmDelete.id)
+          else deleteLiability(confirmDelete.id)
+          setConfirmDelete(null)
+        }}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   )
 }

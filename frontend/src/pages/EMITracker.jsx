@@ -3,6 +3,7 @@ import { CheckCircle, ChevronDown, ChevronUp, Pencil, Plus, Trash2, X, Calendar,
 import { useEMI } from '../context/EMIContext'
 import { formatCurrency, formatShortDate, getLoanDetails } from '../utils/constants'
 import { FaTag } from "react-icons/fa";
+import ConfirmDialog from '../components/ConfirmDialog'
 
 const todayStr = new Date().toISOString().split('T')[0]
 const empty = { title: '', totalAmount: '', emiAmount: '', totalInstallments: '', startDate: todayStr, paidInstallments: '0', note: '', type: 'FIXED', nextDueDate: '', paidAmount: '0', interestRate: '' }
@@ -467,6 +468,9 @@ function EMICard({ emi, onPay, onDelete, onEdit, onDeletePayment }) {
   const [payNote, setPayNote] = useState('')
   const [payDate, setPayDate] = useState(todayStr)
   const [savingPayment, setSavingPayment] = useState(false)
+  const [confirmPay, setConfirmPay] = useState(false)
+  const [confirmDeleteLoan, setConfirmDeleteLoan] = useState(false)
+  const [confirmDeletePayment, setConfirmDeletePayment] = useState(null)
 
   const handlePaySubmit = async (e) => {
     e.preventDefault()
@@ -480,13 +484,7 @@ function EMICard({ emi, onPay, onDelete, onEdit, onDeletePayment }) {
     finally { setSavingPayment(false) }
   }
 
-  const handleQuickPayFixed = async () => {
-    if (window.confirm(`Record repayment of ${formatCurrency(emi.emiAmount)}?`)) {
-      try {
-        await onPay(emi.id)
-      } catch { }
-    }
-  }
+  const handleQuickPayFixed = () => setConfirmPay(true)
 
   return (
     <div className={`card p-4 relative overflow-hidden transition-all duration-300 ${isOverdue ? 'border border-red-500/30 dark:bg-red-500/2 bg-red-500/1' : ''}`}>
@@ -528,7 +526,7 @@ function EMICard({ emi, onPay, onDelete, onEdit, onDeletePayment }) {
             className="w-8 h-8 rounded-xl hover:bg-sky-500/10 text-gray-400 hover:text-sky-500 flex items-center justify-center transition-colors">
             <Pencil size={14} />
           </button>
-          <button onClick={() => { if (window.confirm('Delete this loan?')) onDelete(emi.id) }}
+          <button onClick={() => setConfirmDeleteLoan(true)}
             className="w-8 h-8 rounded-xl hover:bg-red-500/10 text-gray-400 hover:text-red-500 flex items-center justify-center transition-colors">
             <Trash2 size={14} />
           </button>
@@ -685,7 +683,7 @@ function EMICard({ emi, onPay, onDelete, onEdit, onDeletePayment }) {
                       </div>
                       {payment.note && <p className="text-[10px] dark:text-gray-500 text-gray-400 mt-0.5">{payment.note}</p>}
                     </div>
-                    <button type="button" onClick={() => { if (window.confirm('Delete this repayment record?')) onDeletePayment(payment.id) }}
+                    <button type="button" onClick={() => setConfirmDeletePayment(payment.id)}
                       className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-500/10 transition-colors"
                       title="Delete payment log">
                       <Trash2 size={11} />
@@ -697,6 +695,34 @@ function EMICard({ emi, onPay, onDelete, onEdit, onDeletePayment }) {
           </div>
         )
       })()}
+
+      <ConfirmDialog
+        open={confirmPay}
+        variant="warning"
+        title="Record Repayment?"
+        message={`Mark payment of ${formatCurrency(emi.emiAmount)} for "${emi.title}"?`}
+        confirmText="Yes, Record"
+        onConfirm={async () => { setConfirmPay(false); try { await onPay(emi.id) } catch {} }}
+        onCancel={() => setConfirmPay(false)}
+      />
+      <ConfirmDialog
+        open={confirmDeleteLoan}
+        variant="delete"
+        title="Delete Loan?"
+        message={`"${emi.title}" and all its repayment history will be permanently deleted.`}
+        confirmText="Delete"
+        onConfirm={() => { setConfirmDeleteLoan(false); onDelete(emi.id) }}
+        onCancel={() => setConfirmDeleteLoan(false)}
+      />
+      <ConfirmDialog
+        open={!!confirmDeletePayment}
+        variant="delete"
+        title="Delete Repayment?"
+        message="This repayment record will be permanently removed."
+        confirmText="Delete"
+        onConfirm={() => { const id = confirmDeletePayment; setConfirmDeletePayment(null); onDeletePayment(id) }}
+        onCancel={() => setConfirmDeletePayment(null)}
+      />
     </div>
   )
 }
