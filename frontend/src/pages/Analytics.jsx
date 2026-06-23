@@ -51,35 +51,39 @@ export default function Analytics() {
     color: CATEGORY_COLORS[item._id] || '#0EA5E9'
   }))
 
-  const trendData = (analytics.monthlyTrend || []).map(item => ({
-    month: MONTHS[item._id.month - 1],
-    amount: item.total
-  }))
-  let chartTrendData = [...trendData]
-  if (chartTrendData.length === 1 && analytics.monthlyTrend && analytics.monthlyTrend[0]) {
-    const currentMonthNum = analytics.monthlyTrend[0]._id.month
-    const prevMonthNum = currentMonthNum === 1 ? 12 : currentMonthNum - 1
-    const prevMonthName = MONTHS[prevMonthNum - 1]
-    chartTrendData.unshift({
-      month: prevMonthName,
-      amount: 0
-    })
+  // ── Build a guaranteed 6-month rolling window (oldest → newest) ──────────
+  const build6MonthWindow = (rawData) => {
+    const now = new Date()
+    const window = []
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const label = MONTHS[d.getMonth()]
+      const year  = d.getFullYear()
+      const month = d.getMonth() + 1
+      const found = rawData.find(r => r._id.year === year && r._id.month === month)
+      window.push({ month: label, amount: found ? found.total : 0 })
+    }
+    return window
   }
 
-  const growthData = (analytics.monthlyBalanceGrowth || []).map(item => ({
-    month: MONTHS[item._id.month - 1],
-    amount: item.total
-  }))
-  let chartGrowthData = [...growthData]
-  if (chartGrowthData.length === 1 && analytics.monthlyBalanceGrowth && analytics.monthlyBalanceGrowth[0]) {
-    const currentMonthNum = analytics.monthlyBalanceGrowth[0]._id.month
-    const prevMonthNum = currentMonthNum === 1 ? 12 : currentMonthNum - 1
-    const prevMonthName = MONTHS[prevMonthNum - 1]
-    chartGrowthData.unshift({
-      month: prevMonthName,
-      amount: 0
-    })
+  const chartTrendData  = build6MonthWindow(analytics.monthlyTrend || [])
+  const chartGrowthData = build6MonthWindow(analytics.monthlyBalanceGrowth || [])
+
+  // ── Compute clean Y-axis domain + evenly spaced ticks ────────────────────
+  const getYAxisProps = (data) => {
+    const max = Math.max(...data.map(d => Math.abs(d.amount)), 0)
+    if (max === 0) return { domain: [0, 100], ticks: [0, 25, 50, 75, 100] }
+    const magnitude = Math.pow(10, Math.floor(Math.log10(max)))
+    const step = Math.ceil(max / (4 * magnitude)) * magnitude
+    const top  = step * 4
+    return {
+      domain: [0, top],
+      ticks: [0, step, step * 2, step * 3, top],
+    }
   }
+
+  const trendYAxis  = getYAxisProps(chartTrendData)
+  const growthYAxis = getYAxisProps(chartGrowthData)
 
   const expensesByAccountType = (analytics.expensesByAccountType || []).filter(item => item.total > 0).map(item => ({
     name: item.accountType,
@@ -297,21 +301,17 @@ export default function Analytics() {
           <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">
             6-Month Expense Trend
           </p>
-          {trendData.length === 0 ? (
-            <EmptyState title="No trend data available" subtitle="Spend across multiple months to visualize your spending trend." />
-          ) : (
-            <div className="w-full">
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={chartTrendData} barSize={24} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                  <CartesianGrid vertical={false} stroke="rgba(148,163,184,0.08)" strokeDasharray="3 3" />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--tick-color)' }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--tick-color)' }} tickFormatter={formatYAxisTick} />
-                  <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-                  <Bar dataKey="amount" fill="#0EA5E9" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
+          <div className="w-full">
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={chartTrendData} barSize={24} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                <CartesianGrid vertical={false} stroke="rgba(148,163,184,0.08)" strokeDasharray="3 3" />
+                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--tick-color)' }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--tick-color)' }} tickFormatter={formatYAxisTick} domain={trendYAxis.domain} ticks={trendYAxis.ticks} />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+                <Bar dataKey="amount" fill="#0EA5E9" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
         {/* Section 4: Monthly Balance Growth */}
@@ -319,21 +319,17 @@ export default function Analytics() {
           <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">
             Monthly Balance Growth
           </p>
-          {growthData.length === 0 ? (
-            <EmptyState title="No growth data available" subtitle="Add transactions over multiple months to track your balance growth." />
-          ) : (
-            <div className="w-full">
-              <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={chartGrowthData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                  <CartesianGrid vertical={false} stroke="rgba(148,163,184,0.08)" strokeDasharray="3 3" />
-                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--tick-color)' }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--tick-color)' }} tickFormatter={formatYAxisTick} />
-                  <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(14,165,233,0.25)' }} />
-                  <Line type="monotone" dataKey="amount" stroke="#22C55E" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          )}
+          <div className="w-full">
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={chartGrowthData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                <CartesianGrid vertical={false} stroke="rgba(148,163,184,0.08)" strokeDasharray="3 3" />
+                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--tick-color)' }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--tick-color)' }} tickFormatter={formatYAxisTick} domain={growthYAxis.domain} ticks={growthYAxis.ticks} />
+                <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(14,165,233,0.25)' }} />
+                <Line type="monotone" dataKey="amount" stroke="#22C55E" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
       </div>
