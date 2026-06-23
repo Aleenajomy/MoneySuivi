@@ -1,11 +1,14 @@
+import { useState } from 'react'
 import { Repeat, Trash2, Utensils, Bus, ShoppingBag, Receipt, Tv, Banknote, HeartPulse, Briefcase, TrendingUp, Gift, CircleDot, ArrowRightLeft } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useExpense } from '../context/ExpenseContext'
 import { CATEGORY_COLORS, CATEGORY_ICONS, formatCurrency, formatShortDate } from '../utils/constants'
+import ConfirmDialog from './ConfirmDialog'
 
 export default function ExpenseCard({ expense, showActions = false }) {
   const navigate = useNavigate()
   const { deleteExpense } = useExpense()
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const isIncome = expense.type === 'income'
   const isTransfer = expense.type === 'transfer'
   const color = CATEGORY_COLORS[expense.category] || '#0066FF'
@@ -19,7 +22,7 @@ export default function ExpenseCard({ expense, showActions = false }) {
 
   const handleDelete = (e) => {
     e.stopPropagation()
-    if (window.confirm('Delete this transaction?')) deleteExpense(expense._id)
+    setConfirmDelete(true)
   }
 
   return (
@@ -73,6 +76,16 @@ export default function ExpenseCard({ expense, showActions = false }) {
           </button>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        variant="delete"
+        title="Delete Transaction?"
+        message={`"${expense.title}" will be permanently deleted.`}
+        confirmText="Delete"
+        onConfirm={() => { setConfirmDelete(false); deleteExpense(expense._id) }}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </div>
   )
 }
