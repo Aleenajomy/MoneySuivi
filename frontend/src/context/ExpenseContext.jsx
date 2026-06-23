@@ -35,10 +35,10 @@ export function ExpenseProvider({ children }) {
     }
   }, [])
 
-  const fetchAnalytics = useCallback(async () => {
+  const fetchAnalytics = useCallback(async (period = 'this_month') => {
     setLoadingAnalytics(true)
     try {
-      const res = await api.get('/expenses/analytics')
+      const res = await api.get('/expenses/analytics', { params: { period } })
       setAnalytics(res.data.analytics)
     } catch (err) {
       console.error(err)

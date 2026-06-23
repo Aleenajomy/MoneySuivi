@@ -41,16 +41,17 @@ export default function Dashboard() {
   const [showBalanceBreakdown, setShowBalanceBreakdown] = useState(false)
   const [showDailyAlert, setShowDailyAlert] = useState(false)
   const [todaySpend, setTodaySpend] = useState(0)
+  const [period, setPeriod] = useState('this_month')
   const navigate = useNavigate()
 
   useEffect(() => {
-    fetchAnalytics()
+    fetchAnalytics(period)
     fetchExpenses({ page: 1 })
     fetchBudgets()
     fetchNotifications()
     fetchEMIs()
     fetchNetWorth()
-  }, [fetchAnalytics, fetchExpenses, fetchBudgets, fetchNotifications, fetchEMIs, fetchNetWorth])
+  }, [fetchAnalytics, fetchExpenses, fetchBudgets, fetchNotifications, fetchEMIs, fetchNetWorth, period])
 
   // Daily spending alert — show once per calendar day
   useEffect(() => {
@@ -78,6 +79,14 @@ export default function Dashboard() {
 
   const { cash: cashAmount, upi: upiAmount, creditCard: creditCardAmount, debitCard: debitCardAmount, netBanking: netBankingAmount, total: displayBalance } = getDisplayBalances(analytics)
 
+  const PERIODS = [
+    { key: 'this_month', label: 'This Month' },
+    { key: 'last_month', label: 'Last Month' },
+    { key: 'this_year',  label: 'This Year'  },
+    { key: 'all_time',   label: 'All Time'   },
+  ]
+
+  const periodLabel = PERIODS.find(p => p.key === period)?.label || 'This Month'
   const savingsRate = totalIncome > 0 ? Math.max(0, Math.round(((totalIncome - totalExpense) / totalIncome) * 100)) : 0
 
   return (
@@ -130,6 +139,24 @@ export default function Dashboard() {
             </div>
           </motion.div>
 
+          {/* Period Toggle */}
+          <div className="flex gap-1 p-1 rounded-2xl dark:bg-dark-card bg-slate-100 border dark:border-dark-border border-light-border">
+            {PERIODS.map(p => (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => setPeriod(p.key)}
+                className={`flex-1 py-1.5 rounded-xl text-[10px] font-bold transition-all ${
+                  period === p.key
+                    ? 'gradient-blue text-white shadow-sm'
+                    : 'dark:text-gray-500 text-gray-400 hover:dark:text-gray-300 hover:text-gray-600'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
           {/* Metric Grid: 2x2 grid representing core metrics */}
           <div className="grid grid-cols-2 gap-4">
             {loadingAnalytics ? (
@@ -142,14 +169,14 @@ export default function Dashboard() {
             ) : (
               <>
                 <StatCard
-                  label="Income"
+                  label={`Income · ${periodLabel}`}
                   amount={totalIncome}
                   icon={ArrowDownRight}
                   tone="secondary"
                   onClick={() => navigate('/add?type=income')}
                 />
                 <StatCard
-                  label="Expenses"
+                  label={`Expenses · ${periodLabel}`}
                   amount={totalExpense}
                   icon={ArrowUpRight}
                   tone="danger"

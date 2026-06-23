@@ -127,8 +127,21 @@ const deleteExpense = async (req, res) => {
 const getAnalytics = async (req, res) => {
   try {
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const period = req.query.period || 'this_month';
+    let startOfMonth, endOfMonth;
+    if (period === 'last_month') {
+      startOfMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      endOfMonth   = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+    } else if (period === 'this_year') {
+      startOfMonth = new Date(now.getFullYear(), 0, 1);
+      endOfMonth   = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+    } else if (period === 'all_time') {
+      startOfMonth = new Date('2000-01-01');
+      endOfMonth   = new Date('2099-12-31');
+    } else {
+      startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      endOfMonth   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    }
     const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
     const next30Days = new Date(now); next30Days.setDate(now.getDate() + 30);
 
