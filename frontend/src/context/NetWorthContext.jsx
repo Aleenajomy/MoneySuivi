@@ -40,7 +40,7 @@ export function NetWorthProvider({ children }) {
     setSummary(prev => {
       const assets = [res.data.asset, ...prev.assets]
       const totalAssets = assets.reduce((s, a) => s + a.value, 0)
-      return { ...prev, assets, totalAssets, netWorth: totalAssets - prev.totalLiabilities + (prev.ledgerReceivable || 0) - (prev.ledgerPayable || 0) }
+      return { ...prev, assets, totalAssets, netWorth: totalAssets - prev.totalLiabilities + (prev.ledgerReceivable || 0) }
     })
     toast.success('Asset added')
   }
@@ -50,7 +50,7 @@ export function NetWorthProvider({ children }) {
     setSummary(prev => {
       const assets = prev.assets.map(a => a.id === id ? res.data.asset : a)
       const totalAssets = assets.reduce((s, a) => s + a.value, 0)
-      return { ...prev, assets, totalAssets, netWorth: totalAssets - prev.totalLiabilities + (prev.ledgerReceivable || 0) - (prev.ledgerPayable || 0) }
+      return { ...prev, assets, totalAssets, netWorth: totalAssets - prev.totalLiabilities + (prev.ledgerReceivable || 0) }
     })
     toast.success('Asset updated')
   }
@@ -60,7 +60,7 @@ export function NetWorthProvider({ children }) {
     setSummary(prev => {
       const assets = prev.assets.filter(a => a.id !== id)
       const totalAssets = assets.reduce((s, a) => s + a.value, 0)
-      return { ...prev, assets, totalAssets, netWorth: totalAssets - prev.totalLiabilities + (prev.ledgerReceivable || 0) - (prev.ledgerPayable || 0) }
+      return { ...prev, assets, totalAssets, netWorth: totalAssets - prev.totalLiabilities + (prev.ledgerReceivable || 0) }
     })
     toast.success('Asset deleted')
   }
@@ -70,7 +70,7 @@ export function NetWorthProvider({ children }) {
     setSummary(prev => {
       const liabilities = [res.data.liability, ...prev.liabilities]
       const totalLiabilities = liabilities.reduce((s, l) => s + l.value, 0)
-      return { ...prev, liabilities, totalLiabilities, netWorth: prev.totalAssets - totalLiabilities + (prev.ledgerReceivable || 0) - (prev.ledgerPayable || 0) }
+      return { ...prev, liabilities, totalLiabilities, netWorth: prev.totalAssets - totalLiabilities + (prev.ledgerReceivable || 0) }
     })
     toast.success('Liability added')
   }
@@ -80,7 +80,7 @@ export function NetWorthProvider({ children }) {
     setSummary(prev => {
       const liabilities = prev.liabilities.map(l => l.id === id ? res.data.liability : l)
       const totalLiabilities = liabilities.reduce((s, l) => s + l.value, 0)
-      return { ...prev, liabilities, totalLiabilities, netWorth: prev.totalAssets - totalLiabilities + (prev.ledgerReceivable || 0) - (prev.ledgerPayable || 0) }
+      return { ...prev, liabilities, totalLiabilities, netWorth: prev.totalAssets - totalLiabilities + (prev.ledgerReceivable || 0) }
     })
     toast.success('Liability updated')
   }
@@ -90,7 +90,7 @@ export function NetWorthProvider({ children }) {
     setSummary(prev => {
       const liabilities = prev.liabilities.filter(l => l.id !== id)
       const totalLiabilities = liabilities.reduce((s, l) => s + l.value, 0)
-      return { ...prev, liabilities, totalLiabilities, netWorth: prev.totalAssets - totalLiabilities + (prev.ledgerReceivable || 0) - (prev.ledgerPayable || 0) }
+      return { ...prev, liabilities, totalLiabilities, netWorth: prev.totalAssets - totalLiabilities + (prev.ledgerReceivable || 0) }
     })
     toast.success('Liability deleted')
   }
