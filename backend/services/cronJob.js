@@ -54,13 +54,16 @@ const processRecurring = async () => {
 // Run every day at midnight
 cron.schedule('0 0 * * *', processRecurring);
 
-// Daily spend summary notification at 9 PM
-cron.schedule('0 21 * * *', async () => {
+// Daily spend summary notification at 9 PM IST (15:30 UTC)
+cron.schedule('30 15 * * *', async () => {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(today.getDate() + 1);
+    // IST = UTC+5:30, so today 00:00 IST = yesterday 18:30 UTC
+    const now = new Date();
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+    const istNow = new Date(now.getTime() + IST_OFFSET_MS);
+    const istMidnight = new Date(Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate()));
+    const today = new Date(istMidnight.getTime() - IST_OFFSET_MS);   // today 00:00 IST in UTC
+    const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
 
     const users = await prisma.user.findMany({ select: { id: true } });
 
