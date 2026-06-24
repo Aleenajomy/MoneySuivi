@@ -53,20 +53,27 @@ export default function Dashboard() {
     fetchNetWorth()
   }, [fetchAnalytics, fetchExpenses, fetchBudgets, fetchNotifications, fetchEMIs, fetchNetWorth, period])
 
-  // Daily spending alert — show once per calendar day
+  // Daily spending alert — show once per calendar day, using only today's expenses
   useEffect(() => {
-    if (loadingAnalytics || !analytics) return
+    if (loading || expenses.length === 0) return
     const today = new Date().toISOString().slice(0, 10)
     const lastShown = localStorage.getItem('dailyAlertShownDate')
     if (lastShown === today) return
 
-    const todayTotal = Number(analytics.totalExpense || 0)
+    const todayTotal = expenses
+      .filter(e => {
+        if (e.type !== 'expense') return false
+        const d = new Date(e.expenseDate)
+        return d.toISOString().slice(0, 10) === today
+      })
+      .reduce((sum, e) => sum + Number(e.amount), 0)
+
     if (todayTotal > 0) {
       setTodaySpend(todayTotal)
       setShowDailyAlert(true)
       localStorage.setItem('dailyAlertShownDate', today)
     }
-  }, [loadingAnalytics, analytics])
+  }, [loading, expenses])
 
   const totalIncome = analytics.totalIncome ?? 0
   const totalExpense = analytics.totalExpense ?? 0
