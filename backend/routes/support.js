@@ -43,6 +43,7 @@ router.post('/ticket', protect, async (req, res) => {
 
     await sendEmail({
       to: process.env.EMAIL_TO || 'aleenallu34@gmail.com',
+      replyTo: userEmail,
       subject: emailSubject,
       text: textBody,
       html: emailBody

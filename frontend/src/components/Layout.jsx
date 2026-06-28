@@ -14,8 +14,8 @@ import { subscribeUserToPush } from '../utils/pushManager'
 const mobileNavItems = [
   { path: '/', icon: Home, label: 'Home' },
   { path: '/history', icon: Clock, label: 'History' },
-  { path: '/add', icon: Plus, label: 'Add', isFab: true },
   { path: '/emis', icon: CreditCard, label: 'Loans' },
+  { path: '/ledger', icon: HandCoins, label: 'Ledger' },
   { path: '/networth', icon: WalletCards, label: 'Net Worth' },
 ]
 
@@ -266,7 +266,7 @@ export default function Layout() {
             {/* Hamburger button (Hidden on mobile < 768px, visible on tablet, hidden on desktop >= 1024px) */}
             <button
               onClick={() => setMobileDrawerOpen(true)}
-              className="hidden md:block lg:hidden p-2 dark:text-gray-400 text-gray-500 hover:dark:bg-dark-border hover:bg-light-muted rounded-xl transition-colors"
+              className="block lg:hidden p-2 dark:text-gray-400 text-gray-500 hover:dark:bg-dark-border hover:bg-light-muted rounded-xl transition-colors"
               title="Menu"
             >
               <Menu size={20} />

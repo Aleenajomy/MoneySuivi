@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, BarChart3, CreditCard, Repeat, TrendingUp, WalletCards, Clock, X, TrendingDown, Sparkles } from 'lucide-react'
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, BarChart3, CreditCard, Repeat, TrendingUp, WalletCards, Clock, X, TrendingDown, Sparkles, Plus } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import { motion } from 'framer-motion'
 import ExpenseCard from '../components/ExpenseCard'
@@ -353,6 +353,15 @@ export default function Dashboard() {
           onClose={() => setShowDailyAlert(false)}
         />
       )}
+
+      {/* Floating Action Button (FAB) on mobile/tablet */}
+      <button
+        onClick={() => navigate('/add')}
+        className="fixed bottom-24 right-6 z-40 w-14 h-14 rounded-full gradient-blue text-white shadow-lg hover:shadow-xl active:scale-95 transition-all flex items-center justify-center lg:hidden"
+        title="Add Transaction"
+      >
+        <Plus size={24} strokeWidth={2.5} />
+      </button>
     </div>
   )
 }

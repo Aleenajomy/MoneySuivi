@@ -146,7 +146,6 @@ export default function Profile() {
               </div>
             </button>
 
-            <SettingRow icon={<HandCoins size={17} />} label="Borrow & Lend Ledger" onClick={() => navigate('/ledger')} />
             <SettingRow icon={<Bell size={17} />} label="Notifications" onClick={() => setModal('notifications')} />
             <SettingRow icon={<Lock size={17} />} label="Change Password" onClick={() => setChangingPw(p => !p)} />
             <SettingRow icon={<HelpCircle size={17} />} label="Help & Support" onClick={() => setModal('help')} />
@@ -436,12 +435,14 @@ function HelpModal({ onClose }) {
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Contact info tiles */}
           <div className="mb-2">
-            <div className="p-3 rounded-xl dark:bg-dark-bg dark:border-dark-border border bg-light-bg border-light-border text-center">
-              <Mail size={20} className="text-primary mx-auto mb-1" />
-              <p className="text-[10px] dark:text-gray-500 text-gray-600 font-semibold uppercase">Email</p>
-              <p className="text-xs dark:text-gray-300 text-gray-700 mt-0.5">aleenallu34@gmail.com</p>
+            <div className="p-4 rounded-xl dark:bg-dark-bg dark:border-dark-border border bg-light-bg border-light-border text-center">
+              <p className="text-sm font-bold dark:text-gray-200 text-slate-800 flex items-center justify-center gap-1.5 mb-1">
+                📧 Contact Support
+              </p>
+              <p className="text-xs dark:text-gray-400 text-gray-500 leading-relaxed">
+                Need help? Send us a message and we'll reply to your email within 24–48 hours.
+              </p>
             </div>
           </div>
 

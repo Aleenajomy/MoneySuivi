@@ -1,6 +1,6 @@
 const nodemailer = require('nodemailer');
 
-const sendEmail = async ({ to, subject, text, html }) => {
+const sendEmail = async ({ to, replyTo, subject, text, html }) => {
   const host = process.env.EMAIL_HOST || 'smtp.gmail.com';
   const port = parseInt(process.env.EMAIL_PORT || '587', 10);
   const user = process.env.EMAIL_USER;
@@ -27,7 +27,7 @@ const sendEmail = async ({ to, subject, text, html }) => {
   const mailOptions = {
     from: `"SmartExpense Support" <${user}>`,
     to: to || process.env.EMAIL_TO || 'aleenallu34@gmail.com',
-    replyTo: user,
+    replyTo: replyTo || user,
     subject,
     text,
     html,
