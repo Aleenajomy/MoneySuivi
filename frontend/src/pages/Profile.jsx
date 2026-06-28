@@ -389,11 +389,16 @@ function HelpModal({ onClose }) {
     },
   ]
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    toast.success('Support ticket submitted! We\'ll reply within 24 hours.')
-    setTicket({ subject: '', message: '' })
-    onClose()
+    try {
+      await api.post('/support/ticket', ticket)
+      toast.success('Support ticket submitted! We\'ll reply within 24 hours.')
+      setTicket({ subject: '', message: '' })
+      onClose()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to submit support ticket.')
+    }
   }
 
   return (
@@ -436,7 +441,7 @@ function HelpModal({ onClose }) {
             <div className="p-3 rounded-xl dark:bg-dark-bg dark:border-dark-border border bg-light-bg border-light-border text-center">
               <Mail size={20} className="text-primary mx-auto mb-1" />
               <p className="text-[10px] dark:text-gray-500 text-gray-600 font-semibold uppercase">Email</p>
-              <p className="text-xs dark:text-gray-300 text-gray-700 mt-0.5">aleena.jomy.tech@gmail.com</p>
+              <p className="text-xs dark:text-gray-300 text-gray-700 mt-0.5">aleenallu34@gmail.com</p>
             </div>
           </div>
 

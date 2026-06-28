@@ -96,6 +96,10 @@
 - **Forgot password** / reset flow
 - Profile management with password change
 
+### ✉️ Help & Support
+- Submit support tickets directly from the Profile page
+- Automated email dispatch using **Nodemailer** to the administrator inbox
+
 ### 🎨 UI / UX
 - Premium **dark & light** theme with system preference detection
 - Glassmorphism card design with micro-animations (Framer Motion)
@@ -156,10 +160,12 @@ MoneySuivi/
 │   │   ├── export.js
 │   │   ├── ledger.js
 │   │   ├── networth.js
-│   │   └── notifications.js
+│   │   ├── notifications.js
+│   │   └── support.js                # Support/ticket route
 │   ├── services/
 │   │   ├── budgetAlertService.js     # Budget breach detection
 │   │   ├── cronJob.js                # Recurring expense automation
+│   │   ├── mailService.js            # Nodemailer transport utility
 │   │   └── pushService.js            # Web Push delivery
 │   ├── utils/
 │   │   └── loanUtils.js              # Amortisation & interest calculation engine
@@ -301,6 +307,11 @@ MoneySuivi/
 | `POST` | `/api/notifications/subscribe` | Register push subscription |
 | `DELETE` | `/api/notifications/unsubscribe` | Remove push subscription |
 
+### Support & Tickets
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/support/ticket` | Submit a support ticket (sends email via SMTP) |
+
 ---
 
 ## ⚙️ Local Setup
@@ -334,6 +345,11 @@ JWT_EXPIRE=7d
 NODE_ENV=development
 VAPID_PUBLIC_KEY="your_vapid_public_key"
 VAPID_PRIVATE_KEY="your_vapid_private_key"
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=aleenallu34@gmail.com
+EMAIL_PASS=your_gmail_app_password
+EMAIL_TO=aleenallu34@gmail.com
 ```
 
 > Generate VAPID keys: `npx web-push generate-vapid-keys`

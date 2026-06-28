@@ -41,7 +41,7 @@ app.use('/api/export', require('./routes/export'));
 app.use('/api/emis', require('./routes/emis'));
 app.use('/api/networth', require('./routes/networth'));
 app.use('/api/ledger', require('./routes/ledger'));
-
+app.use('/api/support', require('./routes/support'));
 
 app.get('/api/health', (req, res) => res.json({ success: true, message: 'MoneySuivi API is running' }));
 
