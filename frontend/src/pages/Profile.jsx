@@ -352,6 +352,7 @@ function HelpModal({ onClose }) {
   const [openFaq, setOpenFaq] = useState(null)
   const [ticket, setTicket] = useState({ subject: '', message: '' })
   const [tab, setTab] = useState('faq') // 'faq' | 'contact'
+  const [submitting, setSubmitting] = useState(false)
 
   const faqs = [
     {
@@ -390,13 +391,16 @@ function HelpModal({ onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    setSubmitting(true)
     try {
       await api.post('/support/ticket', ticket)
       toast.success('Support ticket submitted! We\'ll reply within 24 hours.')
       setTicket({ subject: '', message: '' })
       onClose()
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to submit support ticket.')
+      toast.error(err.message || 'Failed to submit support ticket.')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -459,7 +463,9 @@ function HelpModal({ onClose }) {
               value={ticket.message} required
               onChange={e => setTicket(p => ({ ...p, message: e.target.value }))} />
           </div>
-          <button type="submit" className="btn-primary">Send Message</button>
+          <button type="submit" disabled={submitting} className="btn-primary flex items-center justify-center gap-2">
+            {submitting ? 'Sending...' : 'Send Message'}
+          </button>
         </form>
       )}
     </Modal>
