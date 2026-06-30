@@ -11,18 +11,29 @@ const sendEmail = async ({ to, replyTo, subject, text, html }) => {
     return { success: false, error: 'SMTP credentials not configured' };
   }
 
-  const transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465, // true for 465, false for other ports
-    auth: {
-      user,
-      pass,
-    },
-    tls: {
-      rejectUnauthorized: false
-    }
-  });
+  let transporter;
+  if (host.includes('gmail.com')) {
+    transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user,
+        pass,
+      },
+    });
+  } else {
+    transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465, // true for 465, false for other ports
+      auth: {
+        user,
+        pass,
+      },
+      tls: {
+        rejectUnauthorized: false
+      }
+    });
+  }
 
   const mailOptions = {
     from: `"SmartExpense Support" <${user}>`,
