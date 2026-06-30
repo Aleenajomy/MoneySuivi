@@ -91,7 +91,7 @@ function ContactModal({ initial, onSave, onClose, saving }) {
 function EntryModal({ contactName, initial, onSave, onClose, saving }) {
   const today = new Date().toISOString().split('T')[0]
   const [form, setForm] = useState({
-    type: 'LENT', amount: '', date: today, note: '', ...initial,
+    type: 'LENT', amount: '', note: '', ...initial,
     date: initial?.date ? new Date(initial.date).toISOString().split('T')[0] : today,
   })
   const set = k => e => setForm(p => ({ ...p, [k]: e.target.value }))

@@ -71,7 +71,7 @@ model Expense {
   accountType    String    @default("Cash")
   fromAccountType String?
   toAccountType   String?
-  paymentMethod  String    @default("Cash")
+  paymentMethod  String    @default("UPI")
   note           String?   @db.VarChar(500)
   expenseDate    DateTime  @default(now())
   recurring      Boolean   @default(false)

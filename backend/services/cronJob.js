@@ -54,8 +54,8 @@ const processRecurring = async () => {
 // Run every day at midnight
 cron.schedule('0 0 * * *', processRecurring);
 
-// Daily spend summary notification at 9 PM IST (15:30 UTC)
-cron.schedule('30 15 * * *', async () => {
+// Daily spend summary notification at 9 PM IST (21:00 Asia/Kolkata)
+cron.schedule('0 21 * * *', async () => {
   try {
     // IST = UTC+5:30, so today 00:00 IST = yesterday 18:30 UTC
     const now = new Date();
@@ -73,28 +73,29 @@ cron.schedule('30 15 * * *', async () => {
         _sum: { amount: true },
       });
       const total = result._sum.amount || 0;
-      if (total > 0) {
-        const message = `You spent ₹${total.toFixed(0)} today across all categories.`;
-        await prisma.notification.create({
-          data: {
-            userId: user.id,
-            category: 'Daily Summary',
-            message,
-            type: 'info',
-            percentage: 0,
-          },
-        });
+      
+      const message = `You spent ₹${total.toFixed(0)} today across all categories.`;
+      await prisma.notification.create({
+        data: {
+          userId: user.id,
+          category: 'Daily Summary',
+          message,
+          type: 'info',
+          percentage: 0,
+        },
+      });
 
-        sendPushNotification(user.id, {
-          title: '📅 Daily Spending Summary',
-          body: message,
-        }).catch(err => console.error('[PushService] Cron push trigger error:', err));
-      }
+      sendPushNotification(user.id, {
+        title: '📅 Daily Spending Summary',
+        body: message,
+      }).catch(err => console.error('[PushService] Cron push trigger error:', err));
     }
     console.log('[Cron] Daily spend notifications sent');
   } catch (error) {
     console.error('[Cron] Daily notification error:', error.message);
   }
+}, {
+  timezone: "Asia/Kolkata"
 });
 
 console.log('[Cron] Recurring expense scheduler started');

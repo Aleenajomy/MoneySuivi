@@ -67,7 +67,7 @@ const createExpense = async (req, res) => {
         amount: Number(amount),
         type: normalizedType,
         accountType: normalizedAccountType,
-        paymentMethod: paymentMethod || 'Cash',
+        paymentMethod: paymentMethod || 'UPI',
         note: note || null,
         expenseDate: date,
         userId: req.user.id,

@@ -41,18 +41,27 @@ router.post('/ticket', protect, async (req, res) => {
 
     const textBody = `Support Ticket:\nFrom: ${userName} (${userEmail})\nSubject: ${subject}\n\nMessage:\n${message}`;
 
-    await sendEmail({
-      to: process.env.EMAIL_TO || 'aleenallu34@gmail.com',
-      replyTo: userEmail,
-      subject: emailSubject,
-      text: textBody,
-      html: emailBody
-    });
+    try {
+      await sendEmail({
+        to: process.env.EMAIL_TO || 'aleenallu34@gmail.com',
+        replyTo: userEmail,
+        subject: emailSubject,
+        text: textBody,
+        html: emailBody
+      });
+    } catch (emailError) {
+      console.error('Failed to send support email via SMTP:', emailError);
+      console.log('--- FALLBACK LOGGING FOR SUPPORT TICKET ---');
+      console.log(`From: ${userName} (${userEmail})`);
+      console.log(`Subject: ${subject}`);
+      console.log(`Message: ${message}`);
+      console.log('------------------------------------------');
+    }
 
-    res.json({ success: true, message: 'Support ticket sent successfully' });
+    res.json({ success: true, message: 'Support ticket submitted successfully' });
   } catch (error) {
-    console.error('Failed to send support email:', error);
-    res.status(500).json({ success: false, message: 'Failed to send support ticket' });
+    console.error('Unexpected error in support route:', error);
+    res.status(500).json({ success: false, message: 'An unexpected error occurred' });
   }
 });
 

@@ -1,10 +1,10 @@
 const nodemailer = require('nodemailer');
 
 const sendEmail = async ({ to, replyTo, subject, text, html }) => {
-  const host = process.env.EMAIL_HOST || 'smtp.gmail.com';
-  const port = parseInt(process.env.EMAIL_PORT || '587', 10);
-  const user = process.env.EMAIL_USER;
-  const pass = process.env.EMAIL_PASS;
+  const host = (process.env.EMAIL_HOST || 'smtp.gmail.com').trim();
+  const port = parseInt(String(process.env.EMAIL_PORT || '587').trim(), 10);
+  const user = process.env.EMAIL_USER ? process.env.EMAIL_USER.trim() : undefined;
+  const pass = process.env.EMAIL_PASS ? process.env.EMAIL_PASS.trim() : undefined;
 
   if (!user || !pass) {
     console.warn('⚠️ SMTP credentials (EMAIL_USER / EMAIL_PASS) not configured in .env. Email was not sent.');
