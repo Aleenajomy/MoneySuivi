@@ -168,9 +168,15 @@
   /* Bottom nav — mobile & tablet only, hidden on desktop */
   .bottom-nav {
     @apply fixed bottom-0 left-0 right-0 w-full
-           flex items-center justify-around px-2 py-3 z-40
+           flex items-center justify-around px-2 py-2.5 z-40
            border-t transition-all duration-300
            lg:hidden;
+  }
+
+  @media (min-width: 1024px) and (min-height: 501px) {
+    .bottom-nav {
+      display: none !important;
+    }
   }
 
   .dark .bottom-nav {
@@ -183,14 +189,21 @@
 
   /* Page content — mobile: full pad + bottom space for nav; desktop: no bottom pad */
   .page {
-    @apply pb-28 pt-5 px-4 min-h-screen transition-colors duration-300
+    @apply pb-28 pt-4 px-3 min-h-screen transition-colors duration-300
+           sm:px-4 sm:pt-5
            lg:pb-8 lg:pt-8 lg:px-8;
   }
 
-  /* Sidebar */
+  /* Sidebar — desktop only, strictly hidden on mobile portrait & mobile landscape / side view */
   .sidebar {
     @apply hidden lg:flex flex-col fixed left-0 top-0 h-screen z-50
            w-60 border-r transition-all duration-300;
+  }
+
+  @media (max-width: 1023px), (max-height: 500px) {
+    .sidebar {
+      display: none !important;
+    }
   }
 
   .dark .sidebar {
@@ -203,7 +216,13 @@
 
   /* Main content shifts right when sidebar is visible */
   .with-sidebar {
-    @apply lg:ml-60;
+    @apply ml-0 lg:ml-60;
+  }
+
+  @media (max-width: 1023px), (max-height: 500px) {
+    .with-sidebar, .main-content-container {
+      margin-left: 0 !important;
+    }
   }
 
   /* Animation utilities */

@@ -90,7 +90,7 @@ export default function Register() {
         <div className="absolute -bottom-24 -right-12 w-80 h-80 rounded-full bg-white/5" />
         <div className="flex items-center gap-3">
           <img
-            src="/logo.png"
+              src="/logo.png?v=2"
             alt="MoneySuivi Logo"
             className="w-11 h-11 rounded-xl object-contain shadow-lg shadow-sky-500/30 flex-shrink-0"
           />
@@ -110,7 +110,7 @@ export default function Register() {
         <div className="w-full max-w-md flex justify-between items-center mb-8 lg:hidden">
           <div className="flex items-center gap-2.5">
             <img
-              src="/logo.png"
+                src="/logo.png?v=2"
               alt="MoneySuivi Logo"
               className="w-8 h-8 rounded-lg object-contain shadow-md shadow-sky-500/20 flex-shrink-0"
             />

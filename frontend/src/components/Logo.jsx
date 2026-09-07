@@ -38,7 +38,7 @@ export default function Logo({
     >
       <div className="relative flex-shrink-0 flex items-center justify-center">
         <img
-          src="/logo.png"
+          src="/logo.png?v=2"
           alt="MoneySuivi Logo"
           className={`${selectedSize.img} object-contain shadow-md shadow-sky-500/20 transition-transform duration-200 hover:scale-105 ${imgClassName}`}
           loading="eager"
