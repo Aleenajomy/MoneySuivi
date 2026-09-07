@@ -16,6 +16,7 @@ export function ExpenseProvider({ children }) {
   const [filters, setFilters] = useState({ category: 'All', type: 'All', search: '' })
 
   const fetchExpenses = useCallback(async (params = {}, append = false) => {
+    if (!localStorage.getItem('token')) return
     setLoading(true)
     try {
       const query = { ...params }
@@ -36,6 +37,7 @@ export function ExpenseProvider({ children }) {
   }, [])
 
   const fetchAnalytics = useCallback(async (period = 'this_month') => {
+    if (!localStorage.getItem('token')) return
     setLoadingAnalytics(true)
     try {
       const res = await api.get('/expenses/analytics', { params: { period } })

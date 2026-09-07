@@ -14,7 +14,8 @@ const getBaseURL = () => {
 
 const api = axios.create({
   baseURL: getBaseURL(),
-  headers: { 'Content-Type': 'application/json' }
+  headers: { 'Content-Type': 'application/json' },
+  timeout: 15000
 })
 
 // Attach JWT token to every request
@@ -35,7 +36,11 @@ api.interceptors.response.use(
     const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/register') || url.includes('/auth/forgot-password') || url.includes('/auth/me')
     if (status === 401 && !isAuthEndpoint) {
       localStorage.removeItem('token')
-      window.location.href = '/#/login'
+      localStorage.removeItem('user')
+      window.dispatchEvent(new CustomEvent('auth:unauthorized'))
+      if (!window.location.hash.includes('/login')) {
+        window.location.hash = '#/login'
+      }
     }
     const rejectError = new Error(err.response?.data?.message || err.message || 'Something went wrong')
     if (err.response) {

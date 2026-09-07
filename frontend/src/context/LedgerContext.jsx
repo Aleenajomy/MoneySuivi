@@ -11,6 +11,7 @@ export function LedgerProvider({ children }) {
   const [loading, setLoading] = useState(false)
 
   const fetchContacts = useCallback(async () => {
+    if (!localStorage.getItem('token')) return
     setLoading(true)
     try {
       const res = await api.get('/ledger/contacts')
@@ -23,6 +24,7 @@ export function LedgerProvider({ children }) {
   }, [])
 
   const fetchSummary = useCallback(async () => {
+    if (!localStorage.getItem('token')) return
     try {
       const res = await api.get('/ledger/summary')
       setSummary(res.data)

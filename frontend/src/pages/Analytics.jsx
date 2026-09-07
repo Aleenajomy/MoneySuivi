@@ -206,18 +206,16 @@ export default function Analytics() {
             <EmptyState title="No spending data this month" subtitle="Add more transactions to build your category distribution chart." />
           ) : (
             <div className="flex flex-col sm:flex-row items-center gap-6 my-auto">
-              <div className="relative flex-shrink-0 mx-auto">
-                <ResponsiveContainer width={150} height={150}>
-                  <PieChart>
-                    <Pie data={categoryData} cx="50%" cy="50%"
-                      innerRadius={48} outerRadius={70}
-                      dataKey="value" paddingAngle={3} startAngle={90} endAngle={-270}>
-                      {categoryData.map((entry, i) => (
-                        <Cell key={i} fill={entry.color} stroke="transparent" />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
+              <div className="relative flex-shrink-0 mx-auto w-[150px] h-[150px] flex items-center justify-center">
+                <PieChart width={150} height={150}>
+                  <Pie data={categoryData} cx="50%" cy="50%"
+                    innerRadius={48} outerRadius={70}
+                    dataKey="value" paddingAngle={3} startAngle={90} endAngle={-270}>
+                    {categoryData.map((entry, i) => (
+                      <Cell key={i} fill={entry.color} stroke="transparent" />
+                    ))}
+                  </Pie>
+                </PieChart>
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                   <p className="text-[10px] dark:text-gray-500 text-gray-400">Total</p>
                   <p className="text-sm font-bold dark:text-white text-slate-850">{formatCurrency(totalSpent)}</p>
@@ -350,14 +348,12 @@ function AccountPieChart({ data }) {
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <div className="relative flex-shrink-0">
-        <ResponsiveContainer width={130} height={130}>
-          <PieChart>
-            <Pie data={data} cx="50%" cy="50%" innerRadius={36} outerRadius={54} dataKey="value" paddingAngle={3}>
-              {data.map((entry, i) => <Cell key={i} fill={entry.color} stroke="transparent" />)}
-            </Pie>
-          </PieChart>
-        </ResponsiveContainer>
+      <div className="relative flex-shrink-0 w-[130px] h-[130px] flex items-center justify-center">
+        <PieChart width={130} height={130}>
+          <Pie data={data} cx="50%" cy="50%" innerRadius={36} outerRadius={54} dataKey="value" paddingAngle={3}>
+            {data.map((entry, i) => <Cell key={i} fill={entry.color} stroke="transparent" />)}
+          </Pie>
+        </PieChart>
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
           <p className="text-[8px] dark:text-gray-500 text-gray-400">Total</p>
           <p className="text-xs font-bold dark:text-white text-slate-800">{formatCurrency(total)}</p>

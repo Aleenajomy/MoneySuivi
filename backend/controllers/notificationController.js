@@ -75,4 +75,49 @@ const subscribePush = async (req, res) => {
   }
 };
 
-module.exports = { getNotifications, markAllRead, markRead, deleteNotification, subscribePush };
+const registerFcmToken = async (req, res) => {
+  try {
+    const { token, device, platform, isNewLogin } = req.body;
+    if (!token) {
+      return res.status(400).json({ success: false, message: 'FCM token is required' });
+    }
+
+    const notificationService = require('../services/notificationService');
+    const record = await notificationService.registerFcmToken(req.user.id, {
+      token,
+      device,
+      platform,
+      isNewLogin: Boolean(isNewLogin),
+    });
+
+    res.status(200).json({ success: true, message: 'FCM token registered successfully', record });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const unregisterFcmToken = async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ success: false, message: 'FCM token is required' });
+    }
+
+    const notificationService = require('../services/notificationService');
+    await notificationService.unregisterFcmToken(req.user.id, token);
+
+    res.status(200).json({ success: true, message: 'FCM token unregistered successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = {
+  getNotifications,
+  markAllRead,
+  markRead,
+  deleteNotification,
+  subscribePush,
+  registerFcmToken,
+  unregisterFcmToken,
+};

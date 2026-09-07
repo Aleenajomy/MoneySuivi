@@ -212,7 +212,10 @@ export default function Profile() {
           </div>
         </div>
 
-        <p className="text-center dark:text-gray-700 text-gray-400 text-xs pt-4">MoneySuivi Finance Tracker v1.0.0</p>
+        <div className="flex flex-col items-center justify-center gap-1.5 pt-6 pb-2">
+          <img src="/logo.png" alt="MoneySuivi" className="w-8 h-8 rounded-xl object-contain opacity-80" />
+          <p className="text-center dark:text-gray-500 text-gray-400 text-xs font-medium">MoneySuivi Finance Tracker v1.0.0</p>
+        </div>
       </div>
 
       {/* Modals */}

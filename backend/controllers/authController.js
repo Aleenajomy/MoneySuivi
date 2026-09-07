@@ -52,31 +52,55 @@ const register = async (req, res) => {
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    const cleanEmail = email ? email.trim().toLowerCase() : '';
 
-    // Step 1: check if the account exists
-    const user = await prisma.user.findUnique({ where: { email } });
+    // Step 1: check if the account exists (case-insensitive for mobile keyboards)
+    const user = await prisma.user.findFirst({
+      where: {
+        email: {
+          equals: cleanEmail,
+          mode: 'insensitive',
+        },
+      },
+    });
+
     if (!user) {
       // 404 — no account with that email
-      return res.status(404).json({ success: false, code: 'USER_NOT_FOUND', message: 'No account found with this email address. Please create an account first.' });
+      return res.status(404).json({
+        success: false,
+        code: 'USER_NOT_FOUND',
+        message: 'No account found with this email address. Please create an account first.',
+      });
     }
 
     // Step 2: verify the password
-    const isMatch = await bcrypt.compare(password, user.password);
+    let isMatch = false;
+    try {
+      isMatch = await bcrypt.compare(password, user.password);
+    } catch (bcryptErr) {
+      console.warn('[Auth Login] bcrypt comparison error:', bcryptErr.message);
+    }
+
     if (!isMatch) {
       // 401 — account exists but password is wrong
-      return res.status(401).json({ success: false, code: 'WRONG_PASSWORD', message: 'Incorrect password. Please try again.' });
+      return res.status(401).json({
+        success: false,
+        code: 'WRONG_PASSWORD',
+        message: 'Incorrect password. Please try again.',
+      });
     }
 
     const token = generateToken(user.id);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Login successful',
       token,
       user: { id: user.id, name: user.name, email: user.email },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Login failed. Please try again.' });
+    console.error('[Auth Login Error]:', error);
+    return res.status(500).json({ success: false, message: error.message || 'Login failed. Please try again.' });
   }
 };
 

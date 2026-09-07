@@ -10,6 +10,8 @@ import { useNotification } from '../context/NotificationContext'
 import { useTheme } from '../context/ThemeContext'
 import { motion, AnimatePresence } from 'framer-motion'
 import { subscribeUserToPush } from '../utils/pushManager'
+import { registerFcmToken, setupForegroundListener } from '../services/firebase'
+import toast from 'react-hot-toast'
 
 const mobileNavItems = [
   { path: '/', icon: Home, label: 'Home' },
@@ -36,16 +38,49 @@ export default function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, logout } = useAuth()
-  const { unreadCount } = useNotification()
+  const { unreadCount, fetchNotifications } = useNotification()
   const { mode, toggle } = useTheme()
   
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
   useEffect(() => {
     if (user) {
+      // 1. Existing Web Push subscription (preserves compatibility)
       subscribeUserToPush()
+
+      // 2. Firebase Cloud Messaging registration (non-blocking)
+      registerFcmToken().catch(() => {})
+
+      // 3. Foreground message listener (toast notification + badge refresh)
+      const unsubscribe = setupForegroundListener((payload) => {
+        const title = payload.notification?.title || payload.data?.title || 'MoneySuivi Alert'
+        const body = payload.notification?.body || payload.data?.body || ''
+        const url = payload.data?.url || '/'
+
+        toast(
+          (t) => (
+            <div
+              className="cursor-pointer flex flex-col gap-0.5"
+              onClick={() => {
+                toast.dismiss(t.id)
+                if (url && url !== '/') navigate(url)
+              }}
+            >
+              <span className="font-bold text-xs text-slate-800 dark:text-white">{title}</span>
+              {body && <span className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">{body}</span>}
+            </div>
+          ),
+          { icon: '🔔', duration: 4500 }
+        )
+
+        fetchNotifications?.()
+      })
+
+      return () => {
+        if (typeof unsubscribe === 'function') unsubscribe()
+      }
     }
-  }, [user])
+  }, [user, navigate, fetchNotifications])
 
   const handleLogout = () => {
     if (window.confirm('Are you sure you want to logout?')) {
@@ -76,10 +111,15 @@ export default function Layout() {
         </button>
 
         {/* Logo */}
-        <div className="flex items-center gap-3 px-5 py-5 border-b dark:border-dark-border border-light-border overflow-hidden h-[73px] flex-shrink-0">
-          <div className="w-9 h-9 rounded-xl gradient-blue flex items-center justify-center flex-shrink-0 shadow-md shadow-sky-500/20">
-            <WalletCards size={18} className="text-white" />
-          </div>
+        <div
+          onClick={() => navigate('/')}
+          className="flex items-center gap-3 px-5 py-5 border-b dark:border-dark-border border-light-border overflow-hidden h-[73px] flex-shrink-0 cursor-pointer"
+        >
+          <img
+            src="/logo.png"
+            alt="MoneySuivi Logo"
+            className="w-9 h-9 rounded-xl object-contain shadow-md shadow-sky-500/20 flex-shrink-0 transition-transform duration-200 hover:scale-105"
+          />
           {!sidebarCollapsed && (
             <motion.div
               initial={{ opacity: 0, x: -10 }}
@@ -186,10 +226,15 @@ export default function Layout() {
               className="fixed left-0 top-0 bottom-0 z-[60] w-64 dark:bg-dark-card bg-white border-r dark:border-dark-border border-light-border flex flex-col lg:hidden"
             >
               <div className="flex items-center justify-between px-5 py-4 border-b dark:border-dark-border border-light-border flex-shrink-0">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl gradient-blue flex items-center justify-center flex-shrink-0">
-                    <WalletCards size={18} className="text-white" />
-                  </div>
+                <div
+                  className="flex items-center gap-3 cursor-pointer"
+                  onClick={() => { navigate('/'); setMobileDrawerOpen(false); }}
+                >
+                  <img
+                    src="/logo.png"
+                    alt="MoneySuivi Logo"
+                    className="w-9 h-9 rounded-xl object-contain shadow-md shadow-sky-500/20 flex-shrink-0"
+                  />
                   <div>
                     <p className="font-black text-sm dark:text-white text-slate-800 tracking-tight">MoneySuivi</p>
                     <p className="text-[9px] dark:text-gray-500 text-gray-400">Finance Tracker</p>
@@ -274,9 +319,11 @@ export default function Layout() {
 
             {/* Mobile Branding (Visible only on mobile < 768px) */}
             <div className="flex md:hidden items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
-              <div className="w-8 h-8 rounded-xl gradient-blue flex items-center justify-center flex-shrink-0 shadow-md shadow-sky-500/20">
-                <WalletCards size={16} className="text-white" />
-              </div>
+              <img
+                src="/logo.png"
+                alt="MoneySuivi Logo"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg object-contain shadow-md shadow-sky-500/20 flex-shrink-0"
+              />
               <span className="font-black text-sm dark:text-white text-slate-800 tracking-tight">MoneySuivi</span>
             </div>
           </div>
@@ -442,9 +489,11 @@ function InstallBanner() {
 
             <div className="p-3.5 flex items-center gap-3">
               {/* Icon */}
-              <div className="w-10 h-10 rounded-xl gradient-blue flex items-center justify-center flex-shrink-0 shadow-md shadow-sky-500/20">
-                <Smartphone size={18} className="text-white" />
-              </div>
+              <img
+                src="/logo.png"
+                alt="MoneySuivi Logo"
+                className="w-10 h-10 rounded-xl object-contain shadow-md shadow-sky-500/20 flex-shrink-0"
+              />
 
               {/* Text */}
               <div className="flex-1 min-w-0">
@@ -498,7 +547,10 @@ function InstallBanner() {
               <div className="h-1.5 w-full bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500" />
               <div className="p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-bold dark:text-white text-slate-800">Install on iPhone</h3>
+                  <div className="flex items-center gap-2.5">
+                    <img src="/logo.png" alt="MoneySuivi Logo" className="w-6 h-6 rounded-lg object-contain shadow-sm shadow-sky-500/20" />
+                    <h3 className="text-sm font-bold dark:text-white text-slate-800">Install MoneySuivi</h3>
+                  </div>
                   <button
                     onClick={handleDismiss}
                     className="w-7 h-7 rounded-lg dark:bg-dark-border bg-slate-100 flex items-center justify-center dark:text-gray-400 text-gray-500"

@@ -12,6 +12,7 @@ export function EMIProvider({ children }) {
   const { fetchNetWorth } = useNetWorth()
 
   const fetchEMIs = useCallback(async () => {
+    if (!localStorage.getItem('token')) return
     setLoading(true)
     try {
       const res = await api.get('/emis')

@@ -283,6 +283,17 @@ export async function setupApiMocks(page, options = {}) {
     }
 
     // 7. Notifications
+    if (url.includes('/api/notifications/fcm-token')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          message: 'FCM token registered successfully',
+        }),
+      });
+    }
+
     if (url.includes('/api/notifications')) {
       return route.fulfill({
         status: 200,

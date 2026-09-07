@@ -22,6 +22,7 @@ export function NetWorthProvider({ children }) {
   const [loading, setLoading] = useState(false)
 
   const fetchNetWorth = useCallback(async () => {
+    if (!localStorage.getItem('token')) return
     setLoading(true)
     try {
       const res = await api.get('/networth/summary')

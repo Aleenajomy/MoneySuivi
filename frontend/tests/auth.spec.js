@@ -119,4 +119,82 @@ test.describe('Authentication UI & Functions', () => {
     await expect(page).toHaveURL(/#\/?$/);
     await expect(page.locator('text=Total Balance').first()).toBeVisible();
   });
+
+  test('should render mobile dashboard immediately without blank screen even when /auth/me is slow', async ({ page }) => {
+    // Set mobile viewport
+    await page.setViewportSize({ width: 375, height: 667 });
+
+    // Seed logged-in session
+    await page.addInitScript(() => {
+      localStorage.setItem('token', 'mock_jwt_token_for_playwright_tests');
+      localStorage.setItem('user', JSON.stringify({
+        id: 'usr_test_123',
+        name: 'Alex Morgan',
+        email: 'alex.morgan@example.com'
+      }));
+    });
+
+    // Simulate delayed /auth/me (backend cold start / slow network)
+    await page.route('**/api/auth/me', async (route) => {
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          user: {
+            id: 'usr_test_123',
+            name: 'Alex Morgan',
+            email: 'alex.morgan@example.com'
+          }
+        })
+      });
+    });
+
+    await page.goto('/#/');
+
+    // Mobile header branding and dashboard cards must be visible IMMEDIATELY without waiting 3s
+    await expect(page.locator('header').getByText('MoneySuivi')).toBeVisible({ timeout: 1500 });
+    await expect(page.getByRole('heading', { name: /Hello, Alex/i })).toBeVisible({ timeout: 1500 });
+    await expect(page.locator('text=Total Balance').first()).toBeVisible({ timeout: 1500 });
+  });
+
+  test('should preserve user token and not log out when /auth/me has network error or timeout', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('token', 'mock_jwt_token_for_playwright_tests');
+    });
+
+    // Simulate network failure / abort on /auth/me
+    await page.route('**/api/auth/me', async (route) => {
+      return route.abort('failed');
+    });
+
+    await page.goto('/#/');
+
+    // App shell must still be rendered, token preserved in localStorage
+    await expect(page.locator('text=Total Balance').first()).toBeVisible();
+    const tokenInStorage = await page.evaluate(() => localStorage.getItem('token'));
+    expect(tokenInStorage).toBe('mock_jwt_token_for_playwright_tests');
+  });
+
+  test('should redirect to login when /auth/me genuinely returns 401 Unauthorized', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('token', 'expired_token');
+    });
+
+    await page.route('**/api/auth/me', async (route) => {
+      return route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: 'Unauthorized - Token Expired' })
+      });
+    });
+
+    await page.goto('/#/');
+
+    // Should redirect to login page and remove token
+    await expect(page).toHaveURL(/#\/login/);
+    await expect(page.getByRole('heading', { name: 'Sign In' })).toBeVisible();
+    const tokenInStorage = await page.evaluate(() => localStorage.getItem('token'));
+    expect(tokenInStorage).toBeNull();
+  });
 });

@@ -46,6 +46,7 @@ export function BudgetProvider({ children }) {
       return
     }
 
+    if (!localStorage.getItem('token')) return
     setLoading(true)
     try {
       const res = await api.get('/budgets')

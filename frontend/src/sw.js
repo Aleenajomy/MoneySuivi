@@ -14,7 +14,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('push', (event) => {
-  let data = { title: 'MoneySuivi Alert', body: 'You have a new update.' };
+  let data = {};
   if (event.data) {
     try {
       data = event.data.json();
@@ -23,18 +23,23 @@ self.addEventListener('push', (event) => {
     }
   }
 
+  const title = data.notification?.title || data.title || 'MoneySuivi Alert';
+  const body = data.notification?.body || data.body || 'You have a new update.';
+  const targetUrl = data.data?.url || data.url || data.fcmOptions?.link || '/';
+
   const options = {
-    body: data.body,
-    icon: '/icon-192x192.png',
+    body,
+    icon: data.notification?.icon || '/icon-192x192.png',
     badge: '/icon-192x192.png',
     vibrate: [100, 50, 100],
     data: {
-      url: data.url || '/'
-    }
+      url: targetUrl,
+      ...data.data,
+    },
   };
 
   event.waitUntil(
-    self.registration.showNotification(data.title, options)
+    self.registration.showNotification(title, options)
   );
 });
 

@@ -9,6 +9,7 @@ export function NotificationProvider({ children }) {
   const [unreadCount, setUnreadCount] = useState(0)
 
   const fetchNotifications = useCallback(async () => {
+    if (!localStorage.getItem('token')) return
     try {
       const res = await api.get('/notifications')
       setNotifications(res.data.notifications)

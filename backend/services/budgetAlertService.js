@@ -44,22 +44,20 @@ const checkBudgetAlert = async (userId, category) => {
       ? `${category} budget exceeded. Spent Rs. ${roundedSpent} of Rs. ${roundedLimit}.`
       : `${category} budget is ${Math.round(percentage)}% used. Rs. ${Math.max(roundedLimit - roundedSpent, 0)} remaining.`;
 
-    const notification = await prisma.notification.create({
-      data: {
-        userId,
-        category,
-        percentage: Math.round(percentage),
-        message,
-        type,
-      },
+    const title = type === 'critical' ? `🚨 Budget Exceeded: ${category}` : `⚠️ Budget Warning: ${category}`;
+
+    const notificationService = require('./notificationService');
+    const { inAppNotification } = await notificationService.sendToUser(userId, {
+      title,
+      body: message,
+      category: 'Budget Alert',
+      type,
+      percentage: Math.round(percentage),
+      data: { url: '/budgets', category },
+      saveInApp: true,
     });
 
-    sendPushNotification(userId, {
-      title: type === 'critical' ? `🚨 Budget Exceeded: ${category}` : `⚠️ Budget Warning: ${category}`,
-      body: message,
-    }).catch(err => console.error('[PushService] Trigger error:', err));
-
-    return notification;
+    return inAppNotification;
   } catch (error) {
     console.error('[BudgetAlert] Error:', error.message);
     return null;

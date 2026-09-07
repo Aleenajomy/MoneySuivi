@@ -419,18 +419,16 @@ function AnalysisWidget({ analytics, loading, onAction }) {
         <div className="h-[170px] rounded-xl dark:bg-dark-bg bg-light-muted animate-pulse" />
       ) : categoryData.length > 0 ? (
         <div className="flex items-center gap-4">
-          <div className="relative flex-shrink-0">
-            <ResponsiveContainer width={150} height={150}>
-              <PieChart>
-                <Pie data={categoryData} cx="50%" cy="50%"
-                  innerRadius={48} outerRadius={70}
-                  dataKey="value" paddingAngle={3} startAngle={90} endAngle={-270}>
-                  {categoryData.map((entry, i) => (
-                    <Cell key={i} fill={entry.color} stroke="transparent" />
-                  ))}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
+          <div className="relative flex-shrink-0 w-[150px] h-[150px] flex items-center justify-center">
+            <PieChart width={150} height={150}>
+              <Pie data={categoryData} cx="50%" cy="50%"
+                innerRadius={48} outerRadius={70}
+                dataKey="value" paddingAngle={3} startAngle={90} endAngle={-270}>
+                {categoryData.map((entry, i) => (
+                  <Cell key={i} fill={entry.color} stroke="transparent" />
+                ))}
+              </Pie>
+            </PieChart>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <p className="text-[10px] dark:text-gray-500 text-gray-400">Total</p>
               <p className="text-sm font-bold dark:text-white text-slate-800">{formatCurrency(totalSpent)}</p>

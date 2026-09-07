@@ -43,6 +43,16 @@ const processRecurring = async () => {
         where: { id: expense.id },
         data: { nextRunDate: calcNextRunDate(expense.nextRunDate, expense.recurringType) },
       });
+
+      const notificationService = require('./notificationService');
+      notificationService.sendToUser(expense.userId, {
+        title: '🔄 Recurring Transaction',
+        body: `Your scheduled transaction for ${expense.title} (₹${expense.amount}) has been processed.`,
+        category: 'Recurring',
+        type: 'info',
+        data: { url: '/history' },
+        saveInApp: true,
+      }).catch(err => console.error('[Cron] Recurring push trigger error:', err));
     }
 
     if (due.length > 0) console.log(`[Cron] Processed ${due.length} recurring expenses`);
@@ -51,8 +61,43 @@ const processRecurring = async () => {
   }
 };
 
+const checkDueEMIs = async () => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const threeDaysLater = new Date(today);
+    threeDaysLater.setDate(today.getDate() + 3);
+
+    const upcomingEMIs = await prisma.eMI.findMany({
+      where: {
+        active: true,
+        nextDueDate: { gte: today, lte: threeDaysLater },
+      },
+    });
+
+    const notificationService = require('./notificationService');
+    for (const emi of upcomingEMIs) {
+      const amountStr = emi.emiAmount ? ` (₹${Math.round(emi.emiAmount)})` : '';
+      await notificationService.sendToUser(emi.userId, {
+        title: '💳 EMI Reminder',
+        body: `Your EMI payment for ${emi.title}${amountStr} is due soon.`,
+        category: 'EMI',
+        type: 'warning',
+        data: { url: '/emis', emiId: emi.id },
+        saveInApp: true,
+      }).catch(err => console.error('[Cron] EMI reminder push error:', err));
+    }
+    if (upcomingEMIs.length > 0) console.log(`[Cron] Sent ${upcomingEMIs.length} EMI reminders`);
+  } catch (error) {
+    console.error('[Cron] Error checking due EMIs:', error.message);
+  }
+};
+
 // Run every day at midnight
-cron.schedule('0 0 * * *', processRecurring);
+cron.schedule('0 0 * * *', async () => {
+  await processRecurring();
+  await checkDueEMIs();
+});
 
 // Daily spend summary notification at 9 PM IST (21:00 Asia/Kolkata)
 cron.schedule('0 21 * * *', async () => {
@@ -66,6 +111,7 @@ cron.schedule('0 21 * * *', async () => {
     const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
 
     const users = await prisma.user.findMany({ select: { id: true } });
+    const notificationService = require('./notificationService');
 
     for (const user of users) {
       const result = await prisma.expense.aggregate({
@@ -75,19 +121,14 @@ cron.schedule('0 21 * * *', async () => {
       const total = result._sum.amount || 0;
       
       const message = `You spent ₹${total.toFixed(0)} today across all categories.`;
-      await prisma.notification.create({
-        data: {
-          userId: user.id,
-          category: 'Daily Summary',
-          message,
-          type: 'info',
-          percentage: 0,
-        },
-      });
 
-      sendPushNotification(user.id, {
+      await notificationService.sendToUser(user.id, {
         title: '📅 Daily Spending Summary',
         body: message,
+        category: 'Daily Summary',
+        type: 'info',
+        data: { url: '/' },
+        saveInApp: true,
       }).catch(err => console.error('[PushService] Cron push trigger error:', err));
     }
     console.log('[Cron] Daily spend notifications sent');

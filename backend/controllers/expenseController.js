@@ -80,6 +80,30 @@ const createExpense = async (req, res) => {
       },
     });
     const notification = normalizedType === 'expense' && category ? await checkBudgetAlert(req.user.id, category) : null;
+
+    // Dispatch push notification for added transaction
+    const notificationService = require('../services/notificationService');
+    const formattedAmount = `₹${Number(expense.amount).toLocaleString('en-IN')}`;
+    if (normalizedType === 'expense') {
+      notificationService.sendToUser(req.user.id, {
+        title: '💸 Expense Added',
+        body: `${formattedAmount} expense added to ${expense.category}.`,
+        category: 'Expense',
+        type: 'info',
+        data: { url: '/history', expenseId: expense.id },
+        saveInApp: false,
+      }).catch(err => console.error('[ExpenseController] Push error:', err.message));
+    } else if (normalizedType === 'income') {
+      notificationService.sendToUser(req.user.id, {
+        title: '💰 Income Added',
+        body: `${formattedAmount} income was added successfully.`,
+        category: 'Income',
+        type: 'info',
+        data: { url: '/history', expenseId: expense.id },
+        saveInApp: true,
+      }).catch(err => console.error('[ExpenseController] Push error:', err.message));
+    }
+
     res.status(201).json({ success: true, message: 'Expense added successfully', expense: toExpenseResponse(expense), notification });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

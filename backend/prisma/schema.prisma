@@ -22,6 +22,7 @@ model User {
   assets        Asset[]
   liabilities   Liability[]
   pushSubscriptions PushSubscription[]
+  fcmTokens     FcmToken[]
   ledgerContacts LedgerContact[]
   ledgerEntries  LedgerEntry[]
   createdAt     DateTime       @default(now())
@@ -185,6 +186,20 @@ model PushSubscription {
   p256dh    String
   auth      String
   createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model FcmToken {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token      String    @unique
+  device     String?   @db.VarChar(100)
+  platform   String?   @db.VarChar(50)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  lastUsedAt DateTime?
 
   @@index([userId])
 }

@@ -9,7 +9,7 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.js',
-      includeAssets: ['icon-192x192.png', 'icon-512x512.png'],
+      includeAssets: ['icon-192x192.png', 'icon-512x512.png', 'apple-touch-icon.png', 'logo.png', 'favicon.png'],
       manifest: {
         name: 'MoneySuivi',
         short_name: 'MoneySuivi',

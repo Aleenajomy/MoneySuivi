@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { registerFcmToken } from '../../services/firebase'
 import { Eye, EyeOff, TrendingUp, ArrowLeft, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
@@ -53,6 +54,7 @@ export default function Login() {
     setLoading(true)
     try {
       await login(form.email, form.password)
+      registerFcmToken({ isNewLogin: true }).catch(() => {})
       navigate('/')
     } catch (err) {
       const status = err.status
@@ -135,10 +137,12 @@ export default function Login() {
           <div className="absolute -top-12 -left-12 w-64 h-64 rounded-full bg-white/5" />
           <div className="absolute -bottom-24 -right-12 w-80 h-80 rounded-full bg-white/5" />
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center">
-              <TrendingUp size={20} className="text-white" />
-            </div>
-            <span className="font-black text-lg tracking-tight">MoneySuivi</span>
+            <img
+              src="/logo.png"
+              alt="MoneySuivi Logo"
+              className="w-11 h-11 rounded-xl object-contain shadow-lg shadow-sky-500/30 flex-shrink-0"
+            />
+            <span className="font-black text-xl tracking-tight">MoneySuivi</span>
           </div>
           <div className="space-y-4 my-auto pr-8">
             <h2 className="text-4xl font-extrabold leading-tight">Master your money. Elevate your financial future.</h2>
@@ -152,10 +156,12 @@ export default function Login() {
         {/* Right form */}
         <div className="col-span-1 lg:col-span-7 flex flex-col justify-center items-center p-6 sm:p-12 relative">
           <div className="w-full max-w-md flex justify-between items-center mb-8 lg:hidden">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg gradient-blue flex items-center justify-center">
-                <TrendingUp size={16} className="text-white" />
-              </div>
+            <div className="flex items-center gap-2.5">
+              <img
+                src="/logo.png"
+                alt="MoneySuivi Logo"
+                className="w-8 h-8 rounded-lg object-contain shadow-md shadow-sky-500/20 flex-shrink-0"
+              />
               <span className="font-black text-sm tracking-tight dark:text-white text-slate-800">MoneySuivi</span>
             </div>
           </div>
@@ -240,10 +246,12 @@ export default function Login() {
         <div className="absolute -top-12 -left-12 w-64 h-64 rounded-full bg-white/5" />
         <div className="absolute -bottom-24 -right-12 w-80 h-80 rounded-full bg-white/5" />
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center">
-            <TrendingUp size={20} className="text-white" />
-          </div>
-          <span className="font-black text-lg tracking-tight">MoneySuivi</span>
+          <img
+            src="/logo.png"
+            alt="MoneySuivi Logo"
+            className="w-11 h-11 rounded-xl object-contain shadow-lg shadow-sky-500/30 flex-shrink-0"
+          />
+          <span className="font-black text-xl tracking-tight">MoneySuivi</span>
         </div>
         <div className="space-y-4 my-auto pr-8">
           <h2 className="text-4xl font-extrabold leading-tight">Master your money. Elevate your financial future.</h2>
@@ -257,10 +265,12 @@ export default function Login() {
       {/* Right form */}
       <div className="col-span-1 lg:col-span-7 flex flex-col justify-center items-center p-6 sm:p-12 relative">
         <div className="w-full max-w-md flex justify-between items-center mb-8 lg:hidden">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg gradient-blue flex items-center justify-center">
-              <TrendingUp size={16} className="text-white" />
-            </div>
+          <div className="flex items-center gap-2.5">
+            <img
+              src="/logo.png"
+              alt="MoneySuivi Logo"
+              className="w-8 h-8 rounded-lg object-contain shadow-md shadow-sky-500/20 flex-shrink-0"
+            />
             <span className="font-black text-sm tracking-tight dark:text-white text-slate-800">MoneySuivi</span>
           </div>
         </div>

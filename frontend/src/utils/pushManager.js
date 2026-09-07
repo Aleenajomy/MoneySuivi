@@ -36,7 +36,10 @@ export async function subscribeUserToPush() {
       return null;
     }
 
-    const registration = await navigator.serviceWorker.ready;
+    const registration = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Service worker ready timeout')), 8000))
+    ]);
     if (!registration) {
       console.warn('[PushManager] Service worker registration is not ready.');
       return null;
