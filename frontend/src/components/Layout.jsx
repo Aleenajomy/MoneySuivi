@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
-  Home, Clock, WalletCards, CreditCard, Plus,
+  Home, Clock, WalletCards, CreditCard, Plus, BookOpen, TrendingUp,
   BarChart3, WalletIcon, BellIcon, UserCircle, LogOut, Settings,
   Sun, Moon, ChevronLeft, ChevronRight, X, HandCoins, Download, Smartphone, Share2
 } from 'lucide-react'
@@ -16,9 +16,9 @@ import toast from 'react-hot-toast'
 const mobileNavItems = [
   { path: '/', icon: Home, label: 'Home' },
   { path: '/history', icon: Clock, label: 'History' },
-  { path: '/add', icon: Plus, label: 'Add', isFab: true },
-  { path: '/notifications', icon: BellIcon, label: 'Alerts' },
-  { path: '/profile', icon: UserCircle, label: 'Profile' },
+  { path: '/emis', icon: CreditCard, label: 'EMI' },
+  { path: '/ledger', icon: BookOpen, label: 'Ledger' },
+  { path: '/networth', icon: TrendingUp, label: 'Net Worth' },
 ]
 
 const sidebarNavItems = [
@@ -89,6 +89,13 @@ export default function Layout() {
   }
 
   const activeItem = sidebarNavItems.find(item => item.path === location.pathname) || { label: 'Dashboard' }
+
+  const isMobileItemActive = (path) => {
+    if (path === '/') {
+      return location.pathname === '/'
+    }
+    return location.pathname === path || location.pathname.startsWith(path + '/')
+  }
 
   return (
     <div className="flex min-h-screen dark:bg-dark-bg bg-light-bg transition-colors duration-300 overflow-x-hidden w-full">
@@ -271,49 +278,48 @@ export default function Layout() {
         </main>
 
         {/* ── Mobile Bottom Navigation (Hidden on large screens >= 1024px) ─── */}
-        <nav className="bottom-nav bg-white/85 dark:bg-dark-card/85 backdrop-blur-md border-t dark:border-dark-border border-light-border lg:hidden" aria-label="Mobile Bottom Navigation">
-          {mobileNavItems.map(({ path, icon: Icon, label, isFab }) => {
-            const isActive = location.pathname === path
-            if (isFab) {
+        <nav
+          className="bottom-nav bg-white/95 dark:bg-dark-card/95 backdrop-blur-lg border-t border-slate-200/80 dark:border-dark-border shadow-[0_-4px_20px_rgba(0,0,0,0.04)] dark:shadow-[0_-4px_20px_rgba(0,0,0,0.25)] lg:hidden transition-colors duration-200"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+          aria-label="Mobile Bottom Navigation"
+        >
+          <div className="flex items-center justify-between w-full h-[60px] px-1 sm:px-2 max-w-lg mx-auto">
+            {mobileNavItems.map(({ path, icon: Icon, label }) => {
+              const isActive = isMobileItemActive(path)
               return (
                 <button
                   key={path}
                   onClick={() => navigate(path)}
-                  className="flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl active:scale-90 transition-transform -mt-3"
+                  className="flex-1 flex flex-col items-center justify-center py-1.5 px-0.5 rounded-xl transition-all duration-150 select-none outline-none focus:outline-none focus-visible:outline-none focus:ring-0 active:scale-95 group relative border-none bg-transparent"
                   aria-label={label}
+                  aria-current={isActive ? 'page' : undefined}
                 >
-                  <div className="w-11 h-11 rounded-2xl gradient-blue flex items-center justify-center shadow-lg shadow-sky-500/25 border-2 dark:border-dark-card border-white">
-                    <Icon size={20} className="text-white" strokeWidth={2.8} />
+                  <div
+                    className={`relative flex items-center justify-center w-10 h-7 rounded-full transition-all duration-200 ${
+                      isActive
+                        ? 'bg-sky-500/15 dark:bg-sky-500/20 text-sky-500 dark:text-sky-400'
+                        : 'text-slate-400 dark:text-gray-400 group-hover:text-slate-600 dark:group-hover:text-gray-200'
+                    }`}
+                  >
+                    <Icon
+                      size={20}
+                      strokeWidth={isActive ? 2.4 : 1.8}
+                      className="transition-transform duration-200"
+                    />
                   </div>
-                  <span className="text-[10px] font-bold text-sky-500">{label}</span>
+                  <span
+                    className={`text-[10px] min-[360px]:text-[10.5px] min-[390px]:text-[11px] font-medium tracking-tight mt-0.5 whitespace-nowrap transition-colors duration-200 ${
+                      isActive
+                        ? 'text-sky-600 dark:text-sky-400 font-semibold'
+                        : 'text-slate-500 dark:text-gray-400 group-hover:text-slate-700 dark:group-hover:text-gray-200'
+                    }`}
+                  >
+                    {label}
+                  </span>
                 </button>
               )
-            }
-            return (
-              <button
-                key={path}
-                onClick={() => navigate(path)}
-                className="flex flex-col items-center gap-1 px-3 py-1 rounded-xl active:scale-95 transition-transform"
-                aria-label={label}
-              >
-                <div className={`relative w-8 h-8 rounded-xl flex items-center justify-center transition-all ${isActive ? 'bg-sky-500/15' : ''}`}>
-                  <Icon
-                    size={18}
-                    className={isActive ? 'text-sky-500 dark:text-sky-400' : 'dark:text-gray-500 text-gray-400'}
-                    strokeWidth={isActive ? 2.5 : 1.8}
-                  />
-                  {label === 'Alerts' && unreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-3.5 px-0.5 rounded-full bg-danger text-white text-[8px] font-bold flex items-center justify-center">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
-                  )}
-                </div>
-                <span className={`text-[10px] font-medium ${isActive ? 'text-sky-500 dark:text-sky-400 font-bold' : 'dark:text-gray-500 text-gray-400'}`}>
-                  {label}
-                </span>
-              </button>
-            )
-          })}
+            })}
+          </div>
         </nav>
 
       </div>

@@ -356,8 +356,10 @@ export default function Dashboard() {
       {/* Floating Action Button (FAB) on mobile/tablet */}
       <button
         onClick={() => navigate('/add')}
-        className="fixed bottom-24 right-6 z-40 w-14 h-14 rounded-full gradient-blue text-white shadow-lg hover:shadow-xl active:scale-95 transition-all flex items-center justify-center lg:hidden"
+        className="fixed right-5 sm:right-6 z-40 w-14 h-14 rounded-full gradient-blue text-white shadow-lg shadow-sky-500/25 hover:shadow-xl active:scale-95 transition-all flex items-center justify-center lg:hidden outline-none focus:outline-none focus-visible:outline-none focus:ring-0 border-none select-none"
+        style={{ bottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}
         title="Add Transaction"
+        aria-label="Add Transaction"
       >
         <Plus size={24} strokeWidth={2.5} />
       </button>
