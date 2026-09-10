@@ -12,6 +12,7 @@ import { useNotification } from '../context/NotificationContext'
 import { useEMI } from '../context/EMIContext'
 import { useNetWorth } from '../context/NetWorthContext'
 import { CATEGORY_COLORS, formatCurrency, formatShortDate, getLoanDetails } from '../utils/constants'
+import Modal from '../components/common/Modal'
 
 const budgetColor = (pct) => {
   if (pct >= 100) return 'bg-red-500'
@@ -20,13 +21,16 @@ const budgetColor = (pct) => {
   return 'bg-emerald-500'
 }
 
-const getDisplayBalances = (analytics) => {
-  const cash = Number(analytics.cashBalance || 0)
-  const upi = Number(analytics.upiBalance || 0)
-  const creditCard = Number(analytics.creditCardBalance || 0)
-  const debitCard = Number(analytics.debitCardBalance || 0)
-  const netBanking = Number(analytics.netBankingBalance || 0)
-  const total = Number(analytics.totalBalance ?? analytics.balance ?? (cash + upi + creditCard + debitCard + netBanking))
+const getDisplayBalances = (analytics = {}) => {
+  const cash = Number(analytics?.cashBalance || 0)
+  const upi = Number(analytics?.upiBalance || 0)
+  const creditCard = Number(analytics?.creditCardBalance || 0)
+  const debitCard = Number(analytics?.debitCardBalance || 0)
+  const netBanking = Number(analytics?.netBankingBalance || 0)
+  const calculatedTotal = cash + upi + creditCard + debitCard + netBanking
+  const total = analytics?.totalBalance !== undefined && analytics?.totalBalance !== null
+    ? Number(analytics.totalBalance)
+    : (analytics?.balance !== undefined && analytics?.balance !== null ? Number(analytics.balance) : calculatedTotal)
   return { cash, upi, creditCard, debitCard, netBanking, total }
 }
 
@@ -54,18 +58,23 @@ export default function Dashboard() {
 
   // Daily spending alert — show once per calendar day, using only today's expenses
   useEffect(() => {
-    if (loading || expenses.length === 0) return
+    if (loading || !Array.isArray(expenses) || expenses.length === 0) return
     const today = new Date().toISOString().slice(0, 10)
     const lastShown = localStorage.getItem('dailyAlertShownDate')
     if (lastShown === today) return
 
     const todayTotal = expenses
       .filter(e => {
-        if (e.type !== 'expense') return false
-        const d = new Date(e.expenseDate)
-        return d.toISOString().slice(0, 10) === today
+        if (!e || e.type !== 'expense' || !e.expenseDate) return false
+        try {
+          const d = new Date(e.expenseDate)
+          if (isNaN(d.getTime())) return false
+          return d.toISOString().slice(0, 10) === today
+        } catch {
+          return false
+        }
       })
-      .reduce((sum, e) => sum + Number(e.amount), 0)
+      .reduce((sum, e) => sum + Number(e.amount || 0), 0)
 
     if (todayTotal > 0) {
       setTodaySpend(todayTotal)
@@ -74,13 +83,13 @@ export default function Dashboard() {
     }
   }, [loading, expenses])
 
-  const totalIncome = analytics.totalIncome ?? 0
-  const totalExpense = analytics.totalExpense ?? 0
-  const upcomingRecurring = analytics.upcomingRecurring || []
-  const topBudgets = budgets.slice().sort((a, b) => b.percentage - a.percentage).slice(0, 3)
-  const latestAlerts = notifications.slice(0, 2)
-  const upcomingEMIs = emis.filter(e => e.active).slice(0, 3)
-  const netWorth = summary.netWorth ?? 0
+  const totalIncome = analytics?.totalIncome ?? 0
+  const totalExpense = analytics?.totalExpense ?? 0
+  const upcomingRecurring = Array.isArray(analytics?.upcomingRecurring) ? analytics.upcomingRecurring : []
+  const topBudgets = Array.isArray(budgets) ? budgets.slice().sort((a, b) => (b.percentage || 0) - (a.percentage || 0)).slice(0, 3) : []
+  const latestAlerts = Array.isArray(notifications) ? notifications.slice(0, 2) : []
+  const upcomingEMIs = Array.isArray(emis) ? emis.filter(e => e && e.active).slice(0, 3) : []
+  const netWorth = summary?.netWorth ?? 0
   const isPositiveNW = netWorth >= 0
 
   const { cash: cashAmount, upi: upiAmount, creditCard: creditCardAmount, debitCard: debitCardAmount, netBanking: netBankingAmount, total: displayBalance } = getDisplayBalances(analytics)
@@ -152,10 +161,10 @@ export default function Dashboard() {
                 key={p.key}
                 type="button"
                 onClick={() => setPeriod(p.key)}
-                className={`flex-1 py-1.5 rounded-xl text-[10px] font-bold transition-all ${
+                className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all ${
                   period === p.key
                     ? 'gradient-blue text-white shadow-sm'
-                    : 'dark:text-gray-500 text-gray-400 hover:dark:text-gray-300 hover:text-gray-600'
+                    : 'dark:text-gray-400 text-gray-500 hover:dark:text-gray-200 hover:text-gray-700'
                 }`}
               >
                 {p.label}
@@ -268,7 +277,7 @@ export default function Dashboard() {
               ) : expenses.length === 0 ? (
                 <EmptyState />
               ) : (
-                expenses.slice(0, 4).map(e => <ExpenseCard key={e._id} expense={e} />)
+                expenses.slice(0, 4).map((e, index) => <ExpenseCard key={e.id || e._id || index} expense={e} />)
               )}
             </div>
           </div>
@@ -462,24 +471,27 @@ function AnalysisWidget({ analytics, loading, onAction }) {
 
 function BalanceModal({ cashAmount, upiAmount, creditCardAmount, debitCardAmount, netBankingAmount, total, onClose }) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 px-4 flex items-center justify-center" onClick={onClose}>
-      <div className="card p-5 w-full max-w-sm shadow-2xl animate-scaleIn" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-bold dark:text-white text-slate-800">Account Summary</h2>
-          <button type="button" onClick={onClose} className="text-xs font-semibold text-sky-500 px-3 py-1.5 rounded-lg bg-sky-500/10">
-            Close
-          </button>
-        </div>
+    <Modal title="Account Summary" onClose={onClose} maxWidth="max-w-sm">
+      <div className="space-y-1">
         <SummaryRow label="Cash" amount={cashAmount} />
         <SummaryRow label="UPI" amount={upiAmount} />
         <SummaryRow label="Credit Card" amount={creditCardAmount} />
         <SummaryRow label="Debit Card" amount={debitCardAmount} />
         <SummaryRow label="Other" amount={netBankingAmount} />
-        <div className="border-t dark:border-dark-border border-light-border mt-4 pt-4">
+        <div className="border-t dark:border-dark-border border-light-border mt-3.5 pt-3.5">
           <SummaryRow label="Total Balance" amount={total} strong />
         </div>
       </div>
-    </div>
+      <div className="mt-5 pt-3 border-t dark:border-dark-border border-light-border flex justify-end">
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-4 py-2 rounded-xl text-xs font-semibold text-white gradient-blue shadow-sm hover:shadow active:scale-95 transition-all"
+        >
+          Close
+        </button>
+      </div>
+    </Modal>
   )
 }
 

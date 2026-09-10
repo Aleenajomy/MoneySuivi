@@ -5,6 +5,10 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { useNetWorth } from '../context/NetWorthContext'
 import { formatCurrency } from '../utils/constants'
 import ConfirmDialog from '../components/ConfirmDialog'
+import PageHeader from '../components/common/PageHeader'
+import Modal from '../components/common/Modal'
+import EmptyState from '../components/common/EmptyState'
+import StatCard from '../components/common/StatCard'
 
 const ASSET_TYPES = ['Savings', 'Fixed Deposit', 'Gold', 'Stocks', 'Mutual Funds', 'Property', 'Vehicle', 'Other']
 const LIABILITY_TYPES = ['Home Loan', 'Education Loan', 'Personal Loan', 'Credit Card', 'Other']
@@ -83,12 +87,10 @@ export default function NetWorth() {
   return (
     <div className="page pb-24 animate-fadeIn space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between animate-fadeIn pr-12">
-        <div>
-          <h1 className="text-2xl font-black dark:text-white text-slate-800 tracking-tight">Net Worth</h1>
-          <p className="text-xs dark:text-gray-400 text-gray-500 mt-0.5">Track your overall wealth and balance sheet</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Net Worth"
+        subtitle="Track your overall wealth, liquid balance, and liabilities"
+      />
 
       {/* Summary Balance Card */}
       <div className="rounded-3xl p-6 relative overflow-hidden shadow-xl text-white"
@@ -96,57 +98,38 @@ export default function NetWorth() {
         <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-white/5 pointer-events-none" />
         <div className="absolute -bottom-8 -left-4 w-20 h-20 rounded-full bg-white/5 pointer-events-none" />
         <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest mb-1">Final Net Worth</p>
-        <p className="text-4xl font-black text-white mb-2 tracking-tight">{formatCurrency(netWorth)}</p>
+        <p className="text-3xl sm:text-4xl font-black text-white mb-2 tracking-tight tabular-nums">{formatCurrency(netWorth)}</p>
         <p className="text-white/60 text-[10px] font-semibold mt-1">
           Formula: Assets ({formatCurrency(summary.totalAssets)}) + Liquid Balance ({formatCurrency(summary.cashBalance || 0)}) + Receivables ({formatCurrency(summary.ledgerReceivable || 0)}) − Liabilities ({formatCurrency(summary.totalLiabilities)})
         </p>
       </div>
 
-      {/* 4-Column Responsive Grid + Liabilities Spanning All 4 Columns */}
+      {/* 4-Column Responsive Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {/* Assets Card */}
-        <div className="card p-4 flex flex-col justify-between border dark:border-dark-border border-light-border bg-white dark:bg-dark-card shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
-          <div className="flex justify-between items-start">
-            <span className="text-[10px] dark:text-gray-500 text-gray-400 uppercase font-bold tracking-wider">Total Assets</span>
-            <span className="w-7 h-7 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center">
-              <TrendingUp size={14} />
-            </span>
-          </div>
-          <p className="text-base md:text-lg font-black dark:text-white text-slate-800 mt-3">{formatCurrency(summary.totalAssets)}</p>
-        </div>
-
-        {/* Liquid Balance Card */}
-        <div className="card p-4 flex flex-col justify-between border dark:border-dark-border border-light-border bg-white dark:bg-dark-card shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
-          <div className="flex justify-between items-start">
-            <span className="text-[10px] dark:text-gray-500 text-gray-400 uppercase font-bold tracking-wider">Liquid Balance</span>
-            <span className="w-7 h-7 rounded-xl bg-sky-500/10 text-sky-500 flex items-center justify-center">
-              <Wallet size={14} />
-            </span>
-          </div>
-          <p className="text-base md:text-lg font-black dark:text-white text-slate-800 mt-3">{formatCurrency(summary.cashBalance || 0)}</p>
-        </div>
-
-        {/* Outstanding Loans Card */}
-        <div className="card p-4 flex flex-col justify-between border dark:border-dark-border border-light-border bg-white dark:bg-dark-card shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
-          <div className="flex justify-between items-start">
-            <span className="text-[10px] dark:text-gray-500 text-gray-400 uppercase font-bold tracking-wider">Outstanding Loans</span>
-            <span className="w-7 h-7 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
-              <Landmark size={14} />
-            </span>
-          </div>
-          <p className="text-base md:text-lg font-black text-amber-500 dark:text-amber-400 mt-3">{formatCurrency(summary.outstandingLoans || 0)}</p>
-        </div>
-
-        {/* Outstanding EMIs Card */}
-        <div className="card p-4 flex flex-col justify-between border dark:border-dark-border border-light-border bg-white dark:bg-dark-card shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
-          <div className="flex justify-between items-start">
-            <span className="text-[10px] dark:text-gray-500 text-gray-400 uppercase font-bold tracking-wider">Outstanding EMIs</span>
-            <span className="w-7 h-7 rounded-xl bg-red-400/10 text-red-400 flex items-center justify-center">
-              <Calendar size={14} />
-            </span>
-          </div>
-          <p className="text-base md:text-lg font-black text-red-400 mt-3">{formatCurrency(summary.outstandingEMIs || 0)}</p>
-        </div>
+        <StatCard
+          label="Total Assets"
+          amount={summary.totalAssets}
+          icon={TrendingUp}
+          tone="secondary"
+        />
+        <StatCard
+          label="Liquid Balance"
+          amount={summary.cashBalance || 0}
+          icon={Wallet}
+          tone="info"
+        />
+        <StatCard
+          label="Outstanding Loans"
+          amount={summary.outstandingLoans || 0}
+          icon={Landmark}
+          tone="warning"
+        />
+        <StatCard
+          label="Outstanding EMIs"
+          amount={summary.outstandingEMIs || 0}
+          icon={Calendar}
+          tone="danger"
+        />
 
         {/* Ledger Receivable Card */}
         {(summary.ledgerReceivable > 0 || summary.ledgerPayable > 0) && (
@@ -238,49 +221,61 @@ export default function NetWorth() {
             </div>
           )}
 
-          {/* Form */}
+          {/* Form Modal */}
           {form && (
-            <form onSubmit={handleSubmit} className="card p-5 space-y-4 animate-slideDown border dark:border-dark-border border-light-border">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-black dark:text-white text-slate-800">
-                  {form.mode === 'add' ? 'Add' : 'Edit'} {form.kind === 'asset' ? 'Asset' : 'Liability'}
-                </p>
-                <button type="button" onClick={() => setForm(null)} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-border transition-colors">
-                  <X size={16} className="dark:text-gray-400 text-gray-500" />
-                </button>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold dark:text-gray-500 text-gray-400 uppercase tracking-wide">Name</label>
-                  <input className="input text-xs" placeholder="e.g. ICICI Savings" value={form.data.name} onChange={set('name')} required />
+            <Modal
+              title={`${form.mode === 'add' ? 'Add' : 'Edit'} ${form.kind === 'asset' ? 'Asset' : 'Liability'}`}
+              subtitle={form.kind === 'asset' ? 'Record personal asset, savings, or investment' : 'Record personal liability or outstanding balance'}
+              onClose={() => setForm(null)}
+              maxWidth="max-w-md"
+            >
+              <form onSubmit={handleSubmit} className="space-y-4 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">Name</label>
+                    <input className="input text-xs" placeholder="e.g. ICICI Savings" value={form.data.name} onChange={set('name')} required />
+                  </div>
+                  <div>
+                    <label className="label">Type</label>
+                    <select className="input text-xs cursor-pointer" value={form.data.type} onChange={set('type')}>
+                      {(form.kind === 'asset' ? ASSET_TYPES : LIABILITY_TYPES).map(t => <option key={t}>{t}</option>)}
+                    </select>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold dark:text-gray-500 text-gray-400 uppercase tracking-wide">Type</label>
-                  <select className="input text-xs" value={form.data.type} onChange={set('type')}>
-                    {(form.kind === 'asset' ? ASSET_TYPES : LIABILITY_TYPES).map(t => <option key={t}>{t}</option>)}
-                  </select>
+                <div>
+                  <label className="label">Value (₹)</label>
+                  <input className="input text-xs" type="number" min="0" placeholder="e.g. 50000" value={form.data.value} onChange={set('value')} required />
                 </div>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold dark:text-gray-500 text-gray-400 uppercase tracking-wide">Value (₹)</label>
-                <input className="input text-xs" type="number" min="0" placeholder="e.g. 50000" value={form.data.value} onChange={set('value')} required />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold dark:text-gray-500 text-gray-400 uppercase tracking-wide">Note</label>
-                <textarea className="input text-xs resize-none" rows={2} placeholder="Optional details..." value={form.data.note || ''} onChange={set('note')} />
-              </div>
-              <button type="submit" disabled={saving} className="gradient-blue w-full py-2.5 text-xs font-bold text-white rounded-xl shadow-md active:scale-95 transition-all">{saving ? 'Saving...' : 'Save Changes'}</button>
-            </form>
+                <div>
+                  <label className="label">Note <span className="normal-case text-gray-400">(optional)</span></label>
+                  <textarea className="input text-xs resize-none" rows={2} placeholder="Optional details..." value={form.data.note || ''} onChange={set('note')} />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button type="button" onClick={() => setForm(null)} className="btn-secondary py-2.5 text-xs font-semibold">
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={saving} className="btn-primary py-2.5 text-xs font-bold flex items-center justify-center">
+                    {saving ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            </Modal>
           )}
 
           {/* List */}
           {loading ? (
             <div className="space-y-2">{Array(3).fill(0).map((_, i) => <div key={i} className="h-16 rounded-xl dark:bg-dark-card bg-light-card animate-pulse" />)}</div>
+          ) : (tab === 'assets' ? summary.assets : summary.liabilities).length === 0 ? (
+            <EmptyState
+              icon={Coins}
+              title={`No ${tab} added yet`}
+              description="Start by setting your initial balances and tracking your wealth."
+              actionLabel={`Add ${tab === 'assets' ? 'Asset' : 'Liability'}`}
+              onAction={() => openAdd(tab === 'assets' ? 'asset' : 'liability')}
+            />
           ) : (
             <div className="card overflow-hidden border dark:border-dark-border border-light-border">
-              {(tab === 'assets' ? summary.assets : summary.liabilities).length === 0 ? (
-                <p className="text-center py-12 text-xs dark:text-gray-500 text-gray-400">No {tab} added yet. Start by setting your balances.</p>
-              ) : (tab === 'assets' ? summary.assets : summary.liabilities).map(item => (
+              {(tab === 'assets' ? summary.assets : summary.liabilities).map(item => (
                 <div key={item.id} className="flex items-center gap-3 py-3.5 px-4 border-b dark:border-dark-border border-light-border last:border-0 hover:bg-slate-50/50 dark:hover:bg-dark-border/20 transition-colors">
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${tab === 'assets' ? 'bg-secondary/10 text-secondary' : 'bg-danger/10 text-danger'}`}>
                     {tab === 'assets' ? <TrendingUp size={16} /> : <TrendingDown size={16} />}

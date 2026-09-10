@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from 'react'
+import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 import api from '../services/api'
 import toast from 'react-hot-toast'
 import { useAuth } from './AuthContext'
@@ -20,19 +20,23 @@ export function BudgetProvider({ children }) {
   const [loading, setLoading] = useState(false)
   const [useLocalBudgets, setUseLocalBudgets] = useState(false)
 
-  const storageKey = `budgets:${user?.id || user?.email || 'local'}`
+  const userKey = user?.id || user?.email || 'local'
+  const storageKeyRef = useRef(`budgets:${userKey}`)
+  useEffect(() => {
+    storageKeyRef.current = `budgets:${userKey}`
+  }, [userKey])
 
   const readLocalBudgets = useCallback(() => {
     try {
-      return JSON.parse(localStorage.getItem(storageKey) || '[]')
+      return JSON.parse(localStorage.getItem(storageKeyRef.current) || '[]')
     } catch {
       return []
     }
-  }, [storageKey])
+  }, [])
 
   const writeLocalBudgets = useCallback((nextBudgets) => {
-    localStorage.setItem(storageKey, JSON.stringify(nextBudgets))
-  }, [storageKey])
+    localStorage.setItem(storageKeyRef.current, JSON.stringify(nextBudgets))
+  }, [])
 
   const loadLocalBudgets = useCallback(() => {
     const localBudgets = withDefaultTotals(readLocalBudgets())

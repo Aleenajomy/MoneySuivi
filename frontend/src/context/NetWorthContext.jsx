@@ -44,6 +44,7 @@ export function NetWorthProvider({ children }) {
       return { ...prev, assets, totalAssets, netWorth: totalAssets + (prev.cashBalance || 0) + (prev.ledgerReceivable || 0) - prev.totalLiabilities }
     })
     toast.success('Asset added')
+    fetchNetWorth()
   }
 
   const updateAsset = async (id, data) => {
@@ -54,6 +55,7 @@ export function NetWorthProvider({ children }) {
       return { ...prev, assets, totalAssets, netWorth: totalAssets + (prev.cashBalance || 0) + (prev.ledgerReceivable || 0) - prev.totalLiabilities }
     })
     toast.success('Asset updated')
+    fetchNetWorth()
   }
 
   const deleteAsset = async (id) => {
@@ -64,6 +66,7 @@ export function NetWorthProvider({ children }) {
       return { ...prev, assets, totalAssets, netWorth: totalAssets + (prev.cashBalance || 0) + (prev.ledgerReceivable || 0) - prev.totalLiabilities }
     })
     toast.success('Asset deleted')
+    fetchNetWorth()
   }
 
   const addLiability = async (data) => {
@@ -74,6 +77,7 @@ export function NetWorthProvider({ children }) {
       return { ...prev, liabilities, totalLiabilities, netWorth: prev.totalAssets + (prev.cashBalance || 0) + (prev.ledgerReceivable || 0) - totalLiabilities }
     })
     toast.success('Liability added')
+    fetchNetWorth()
   }
 
   const updateLiability = async (id, data) => {
@@ -84,6 +88,7 @@ export function NetWorthProvider({ children }) {
       return { ...prev, liabilities, totalLiabilities, netWorth: prev.totalAssets + (prev.cashBalance || 0) + (prev.ledgerReceivable || 0) - totalLiabilities }
     })
     toast.success('Liability updated')
+    fetchNetWorth()
   }
 
   const deleteLiability = async (id) => {
@@ -94,6 +99,7 @@ export function NetWorthProvider({ children }) {
       return { ...prev, liabilities, totalLiabilities, netWorth: prev.totalAssets + (prev.cashBalance || 0) + (prev.ledgerReceivable || 0) - totalLiabilities }
     })
     toast.success('Liability deleted')
+    fetchNetWorth()
   }
 
   return (

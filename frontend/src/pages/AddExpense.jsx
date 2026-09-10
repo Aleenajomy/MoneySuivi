@@ -15,6 +15,7 @@ import {
   ACCOUNT_TYPES,
   formatCurrency,
 } from '../utils/constants'
+import PageHeader from '../components/common/PageHeader'
 
 const today = new Date().toISOString().split('T')[0]
 
@@ -217,14 +218,11 @@ export default function AddExpense() {
   return (
     <div className="max-w-3xl w-full mx-auto space-y-6">
       {/* Header */}
-      <div className="animate-fadeIn">
-        <h1 className="text-2xl font-black dark:text-white text-slate-800 tracking-tight">
-          {isEditing ? 'Edit Transaction' : 'New Transaction'}
-        </h1>
-        <p className="text-xs dark:text-gray-500 text-gray-400 mt-0.5">
-          {isEditing ? 'Modify transaction logs' : 'Record an expense, income, or internal transfer'}
-        </p>
-      </div>
+      <PageHeader
+        title={isEditing ? 'Edit Transaction' : 'New Transaction'}
+        subtitle={isEditing ? 'Modify transaction details' : 'Record an expense, income, or transfer'}
+        showBack
+      />
 
       {/* Form Panel */}
       <div className="card p-6 sm:p-8 animate-scaleIn">

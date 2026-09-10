@@ -61,6 +61,14 @@ const createExpense = async (req, res) => {
     const isRecurring = Boolean(recurring);
     const normalizedType = type === 'income' ? 'income' : (type === 'transfer' ? 'transfer' : 'expense');
     const normalizedAccountType = normalizeAccountType(accountType || paymentMethod || fromAccountType);
+    let resolvedPaymentMethod = paymentMethod;
+    if (!resolvedPaymentMethod) {
+      if (normalizedType === 'transfer') resolvedPaymentMethod = 'Transfer';
+      else if (normalizedAccountType === 'Cash') resolvedPaymentMethod = 'Cash';
+      else if (normalizedAccountType === 'Credit Card') resolvedPaymentMethod = 'Credit Card';
+      else if (normalizedAccountType === 'Debit Card') resolvedPaymentMethod = 'Debit Card';
+      else resolvedPaymentMethod = 'UPI';
+    }
     const expense = await prisma.expense.create({
       data: {
         title,
@@ -70,7 +78,7 @@ const createExpense = async (req, res) => {
         accountType: normalizedAccountType,
         fromAccountType: fromAccountType || null,
         toAccountType: toAccountType || null,
-        paymentMethod: paymentMethod || (normalizedType === 'transfer' ? 'Transfer' : 'UPI'),
+        paymentMethod: resolvedPaymentMethod,
         note: note || null,
         expenseDate: date,
         userId: req.user.id,
@@ -121,6 +129,19 @@ const updateExpense = async (req, res) => {
       data.type = req.body.type === 'income' ? 'income' : (req.body.type === 'transfer' ? 'transfer' : 'expense');
     }
     if (req.body.accountType !== undefined) data.accountType = normalizeAccountType(req.body.accountType);
+    if (data.accountType === 'Cash' && req.body.paymentMethod === undefined) {
+      data.paymentMethod = 'Cash';
+    } else if (data.paymentMethod === 'Cash' && req.body.accountType === undefined) {
+      data.accountType = 'Cash';
+    } else if (data.accountType === 'Credit Card' && req.body.paymentMethod === undefined) {
+      data.paymentMethod = 'Credit Card';
+    } else if (data.paymentMethod === 'Credit Card' && req.body.accountType === undefined) {
+      data.accountType = 'Credit Card';
+    } else if (data.accountType === 'Debit Card' && req.body.paymentMethod === undefined) {
+      data.paymentMethod = 'Debit Card';
+    } else if (data.paymentMethod === 'Debit Card' && req.body.accountType === undefined) {
+      data.accountType = 'Debit Card';
+    }
     if (req.body.amount !== undefined) data.amount = Number(req.body.amount);
     if (req.body.expenseDate !== undefined) data.expenseDate = new Date(req.body.expenseDate);
     if (req.body.recurring !== undefined) {

@@ -58,23 +58,29 @@ export function ExpenseProvider({ children }) {
       })
       notificationContext?.fetchNotifications?.()
     }
-    fetchExpenses({ page: 1 })
-    fetchAnalytics()
+    await Promise.all([
+      fetchExpenses({ page: 1 }),
+      fetchAnalytics(),
+    ])
   }
 
   const updateExpense = async (id, data) => {
     await api.put(`/expenses/${id}`, data)
     toast.success('Transaction updated')
-    fetchExpenses({ page: 1 })
-    fetchAnalytics()
+    await Promise.all([
+      fetchExpenses({ page: 1 }),
+      fetchAnalytics(),
+    ])
   }
 
   const deleteExpense = async (id) => {
     await api.delete(`/expenses/${id}`)
     setExpenses(prev => prev.filter(e => e._id !== id))
     toast.success('Transaction deleted')
-    fetchAnalytics()
-    fetchExpenses({ page: 1 })
+    await Promise.all([
+      fetchExpenses({ page: 1 }),
+      fetchAnalytics(),
+    ])
   }
 
   const applyFilter = (key, value) => {

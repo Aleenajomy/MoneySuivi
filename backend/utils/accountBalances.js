@@ -30,7 +30,18 @@ const balanceBucketFor = (accountType) => {
   if (raw === 'credit card') return 'Credit Card';
   if (raw === 'debit card') return 'Debit Card';
   if (raw === 'net banking' || raw === 'bank' || raw === 'bank transfer') return 'Net Banking';
-  return 'Cash';
+  return 'Net Banking';
+};
+
+const resolveTransactionBucket = (transaction) => {
+  const acc = String(transaction.accountType || '').trim().toLowerCase();
+  const pm = String(transaction.paymentMethod || '').trim().toLowerCase();
+  if (acc === 'cash' || pm === 'cash') return 'Cash';
+  if (acc === 'credit card' || pm === 'credit card') return 'Credit Card';
+  if (acc === 'debit card' || pm === 'debit card') return 'Debit Card';
+  if (acc === 'upi' || pm === 'upi' || acc === 'wallet' || pm === 'wallet') return 'UPI';
+  if (acc === 'net banking' || pm === 'net banking' || acc === 'bank' || pm === 'bank' || pm === 'bank transfer') return 'Net Banking';
+  return balanceBucketFor(transaction.accountType || transaction.paymentMethod || 'Net Banking');
 };
 
 const inferTransactionAccountType = (transaction) => {
@@ -53,8 +64,7 @@ const addToPaymentBucket = (balances, method, amount) => {
   else if (bucket === 'UPI') balances.upiBalance += amount;
   else if (bucket === 'Credit Card') balances.creditCardBalance += amount;
   else if (bucket === 'Debit Card') balances.debitCardBalance += amount;
-  else if (bucket === 'Net Banking') balances.netBankingBalance += amount;
-  else balances.cashBalance += amount;
+  else balances.netBankingBalance += amount;
 };
 
 const calculateBalances = (transactions = []) => {
@@ -72,9 +82,9 @@ const calculateBalances = (transactions = []) => {
       return;
     }
 
-    const method = transaction.paymentMethod || transaction.accountType || 'Cash';
+    const bucket = resolveTransactionBucket(transaction);
     const delta = transaction.type === 'income' ? amount : -amount;
-    addToPaymentBucket(balances, method, delta);
+    addToPaymentBucket(balances, bucket, delta);
   });
 
   balances.bankBalance =
@@ -108,6 +118,7 @@ module.exports = {
   normalizeAccountType,
   inferTransactionAccountType,
   balanceBucketFor,
+  resolveTransactionBucket,
   calculateBalances,
   buildBalanceAlerts,
 };

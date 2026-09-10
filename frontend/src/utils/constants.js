@@ -39,11 +39,25 @@ export const formatCurrency = (amount) =>
     maximumFractionDigits: 0,
   }).format(amount || 0)
 
-export const formatDate = (date) =>
-  new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+export const formatDate = (date) => {
+  if (!date) return ''
+  try {
+    const d = new Date(date)
+    return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+  } catch {
+    return ''
+  }
+}
 
-export const formatShortDate = (date) =>
-  new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+export const formatShortDate = (date) => {
+  if (!date) return ''
+  try {
+    const d = new Date(date)
+    return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+  } catch {
+    return ''
+  }
+}
 
 export const getLoanDetails = (emi) => {
   const isFixed = emi.type !== 'FLEXIBLE';

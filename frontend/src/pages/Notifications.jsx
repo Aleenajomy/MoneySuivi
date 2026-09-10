@@ -1,7 +1,10 @@
-import { useEffect } from 'react'
-import { AlertTriangle, CheckCheck, Trash2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { AlertTriangle, CheckCheck, Trash2, Bell } from 'lucide-react'
 import { useNotification } from '../context/NotificationContext'
 import { formatDate } from '../utils/constants'
+import PageHeader from '../components/common/PageHeader'
+import EmptyState from '../components/common/EmptyState'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function Notifications() {
   const {
@@ -13,42 +16,47 @@ export default function Notifications() {
     deleteNotification,
   } = useNotification()
 
+  const [deleteTargetId, setDeleteTargetId] = useState(null)
+
   useEffect(() => {
     fetchNotifications()
   }, [fetchNotifications])
 
   return (
-    <div className="page">
+    <div className="page pb-24">
       <div className="max-w-3xl mx-auto space-y-6">
-        <div className="flex items-center justify-between animate-fadeIn pr-12">
-          <div>
-            <h1 className="text-2xl font-black dark:text-white text-slate-800 tracking-tight">Budget Alerts</h1>
-            <p className="text-xs dark:text-gray-500 text-gray-400 mt-0.5">{unreadCount} unread warnings</p>
-          </div>
-          {unreadCount > 0 && (
-            <button
-              type="button"
-              onClick={markAllRead}
-              className="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-500 flex items-center justify-center hover:bg-sky-500/20 active:scale-95 transition-all shadow-sm"
-              title="Mark all as read"
-            >
-              <CheckCheck size={18} />
-            </button>
-          )}
-        </div>
+        <PageHeader
+          title="Budget Alerts"
+          subtitle={`${unreadCount} unread warning${unreadCount === 1 ? '' : 's'}`}
+          action={
+            unreadCount > 0 && (
+              <button
+                type="button"
+                onClick={markAllRead}
+                className="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-500 flex items-center justify-center hover:bg-sky-500/20 active:scale-95 transition-all shadow-sm"
+                title="Mark all as read"
+                aria-label="Mark all alerts as read"
+              >
+                <CheckCheck size={18} />
+              </button>
+            )
+          }
+        />
 
         {notifications.length === 0 ? (
-          <div className="text-center py-16 card p-5 flex flex-col items-center justify-center animate-scaleIn">
-            <p className="dark:text-gray-400 text-gray-500 font-bold text-sm">No alerts yet</p>
-            <p className="dark:text-gray-600 text-gray-400 text-xs mt-1">Budget warnings will appear here</p>
-          </div>
+          <EmptyState
+            icon={Bell}
+            title="No alerts yet"
+            description="Budget warnings and spending thresholds will appear here."
+          />
         ) : (
           <div className="space-y-4">
             {notifications.map(notification => {
+              const id = notification.id || notification._id
               const isCritical = notification.type === 'critical'
               return (
                 <div
-                  key={notification.id}
+                  key={id}
                   className={`card p-4 border-l-4 transition-all hover:shadow-md ${isCritical ? 'border-l-red-500' : 'border-l-yellow-400'
                     } ${notification.read ? 'opacity-60' : ''}`}
                 >
@@ -60,7 +68,7 @@ export default function Notifications() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
                         <p className="font-bold text-sm dark:text-white text-slate-800 truncate">{notification.category}</p>
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${isCritical ? 'bg-red-500/10 text-red-500' : 'bg-yellow-400/10 text-yellow-600'
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full tabular-nums ${isCritical ? 'bg-red-500/10 text-red-500' : 'bg-yellow-400/10 text-yellow-600'
                           }`}>
                           {Math.round(notification.percentage || 0)}%
                         </span>
@@ -72,18 +80,20 @@ export default function Notifications() {
                       {!notification.read && (
                         <button
                           type="button"
-                          onClick={() => markRead(notification.id)}
+                          onClick={() => markRead(id)}
                           className="w-8 h-8 rounded-xl bg-sky-500/10 text-sky-500 flex items-center justify-center hover:bg-sky-500/20 transition-all"
                           title="Mark as read"
+                          aria-label="Mark as read"
                         >
                           <CheckCheck size={14} />
                         </button>
                       )}
                       <button
                         type="button"
-                        onClick={() => { if (window.confirm('Delete alert?')) deleteNotification(notification.id) }}
+                        onClick={() => setDeleteTargetId(id)}
                         className="w-8 h-8 rounded-xl text-gray-400 hover:text-danger hover:bg-danger/10 flex items-center justify-center transition-all"
                         title="Delete"
+                        aria-label="Delete alert"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -94,6 +104,20 @@ export default function Notifications() {
             })}
           </div>
         )}
+
+        <ConfirmDialog
+          open={!!deleteTargetId}
+          variant="delete"
+          title="Delete Alert?"
+          message="This alert will be permanently removed."
+          confirmText="Delete"
+          onConfirm={() => {
+            const target = deleteTargetId
+            setDeleteTargetId(null)
+            deleteNotification(target)
+          }}
+          onCancel={() => setDeleteTargetId(null)}
+        />
       </div>
     </div>
   )

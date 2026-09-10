@@ -38,9 +38,15 @@ export function AuthProvider({ children }) {
     api.get('/auth/me')
       .then(res => {
         if (!isMounted) return
-        setUser(res.data.user)
+        const newUser = res.data.user
+        setUser(prev => {
+          if (prev && prev.id === newUser.id && prev.email === newUser.email && prev.name === newUser.name) {
+            return prev
+          }
+          return newUser
+        })
         try {
-          localStorage.setItem('user', JSON.stringify(res.data.user))
+          localStorage.setItem('user', JSON.stringify(newUser))
         } catch (_) {}
       })
       .catch(err => {

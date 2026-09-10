@@ -27,7 +27,7 @@ export default function ExpenseCard({ expense, showActions = false }) {
 
   return (
     <div
-      onClick={() => navigate(`/edit/${expense._id}`)}
+      onClick={() => navigate(`/edit/${expense.id || expense._id}`)}
       className="flex items-center gap-3 py-3 px-1 border-b dark:border-dark-border border-light-border cursor-pointer hover:dark:bg-white/5 hover:bg-black/5 transition-colors animate-fadeIn"
     >
       <div
@@ -83,7 +83,7 @@ export default function ExpenseCard({ expense, showActions = false }) {
         title="Delete Transaction?"
         message={`"${expense.title}" will be permanently deleted.`}
         confirmText="Delete"
-        onConfirm={() => { setConfirmDelete(false); deleteExpense(expense._id) }}
+        onConfirm={() => { setConfirmDelete(false); deleteExpense(expense.id || expense._id) }}
         onCancel={() => setConfirmDelete(false)}
       />
     </div>

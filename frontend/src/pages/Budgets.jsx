@@ -4,6 +4,9 @@ import { Edit2, Plus, Save, Trash2, X, Utensils, Bus, ShoppingBag, Receipt, Tv, 
 import { useBudget } from '../context/BudgetContext'
 import { CATEGORY_COLORS, EXPENSE_CATEGORIES, formatCurrency } from '../utils/constants'
 import ConfirmDialog from '../components/ConfirmDialog'
+import PageHeader from '../components/common/PageHeader'
+import Modal from '../components/common/Modal'
+import EmptyState from '../components/common/EmptyState'
 
 const ICONS = {
   Food: Utensils, Travel: Bus, Shopping: ShoppingBag, Bills: Receipt,
@@ -70,31 +73,35 @@ export default function Budgets() {
 return (
     <div className="page space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between animate-fadeIn pr-12">
-        <div>
-          <h1 className="text-2xl font-black dark:text-white text-slate-800 tracking-tight">Category Budgets</h1>
-          <p className="text-xs dark:text-gray-400 text-gray-500 mt-0.5">Control your spending by category limits</p>
-        </div>
-        {availableCategories.length > 0 && (
-          <button type="button" onClick={startCreate} className="w-10 h-10 rounded-xl gradient-blue flex items-center justify-center active:scale-95 shadow-md shadow-sky-500/20">
-            <Plus size={20} className="text-white" />
-          </button>
-        )}
-      </div>
+      <PageHeader
+        title="Category Budgets"
+        subtitle="Control your spending by category limits"
+        actions={
+          availableCategories.length > 0 ? (
+            <button
+              type="button"
+              onClick={startCreate}
+              className="w-10 h-10 rounded-xl gradient-blue flex items-center justify-center active:scale-95 shadow-md shadow-sky-500/20"
+              title="Add Budget"
+            >
+              <Plus size={20} className="text-white" />
+            </button>
+          ) : null
+        }
+      />
 
       {showForm && (
-        <div className="card p-5 animate-slideDown border dark:border-dark-border border-light-border">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-black dark:text-white text-slate-800">{editingId ? 'Edit Budget' : 'Set Budget'}</p>
-            <button type="button" onClick={resetForm} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-border">
-              <X size={16} className="dark:text-gray-400 text-gray-500" />
-            </button>
-          </div>
-          <form onSubmit={handleSave} className="space-y-4">
+        <Modal
+          title={editingId ? 'Edit Budget' : 'Set Category Budget'}
+          subtitle={editingId ? 'Adjust monthly spending limit' : 'Choose a category and set maximum limit'}
+          onClose={resetForm}
+          maxWidth="max-w-md"
+        >
+          <form onSubmit={handleSave} className="space-y-4 pt-1">
             <div>
-              <label className="text-[10px] font-bold dark:text-gray-500 text-gray-400 uppercase tracking-wide">Category</label>
+              <label className="label">Category</label>
               <select
-                className="input text-xs"
+                className="input cursor-pointer text-xs"
                 value={form.category}
                 disabled={Boolean(editingId)}
                 onChange={e => setForm(prev => ({ ...prev, category: e.target.value }))}
@@ -103,25 +110,38 @@ return (
               </select>
             </div>
             <div>
-              <label className="text-[10px] font-bold dark:text-gray-500 text-gray-400 uppercase tracking-wide">Monthly Limit (₹)</label>
+              <label className="label">Monthly Limit (₹)</label>
               <input
                 type="number"
                 className="input text-xs"
-                placeholder="e.g. 3000"
+                placeholder="e.g. 5000"
                 min="1"
                 value={form.monthlyLimit}
                 onChange={e => setForm(prev => ({ ...prev, monthlyLimit: e.target.value }))}
                 required
               />
             </div>
-            <button type="submit" disabled={saving} className="gradient-blue w-full py-2.5 text-xs font-bold text-white rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5">
-              {saving
-                ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                : <Save size={14} />}
-              <span>{saving ? 'Saving...' : 'Save Budget'}</span>
-            </button>
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={resetForm}
+                className="btn-secondary py-2.5 text-xs font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="btn-primary py-2.5 text-xs font-bold flex items-center justify-center gap-1.5"
+              >
+                {saving
+                  ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  : <Save size={14} />}
+                <span>{saving ? 'Saving...' : 'Save Budget'}</span>
+              </button>
+            </div>
           </form>
-        </div>
+        </Modal>
       )}
 
       {loading ? (
@@ -129,10 +149,13 @@ return (
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       ) : budgets.length === 0 ? (
-        <div className="text-center py-16 card p-5 flex flex-col items-center justify-center animate-scaleIn">
-          <p className="dark:text-gray-400 text-gray-500 font-bold text-sm">No budgets set yet</p>
-          <p className="dark:text-gray-600 text-gray-400 text-xs mt-1">Tap the plus icon to set category limits</p>
-        </div>
+        <EmptyState
+          icon={Plus}
+          title="No budgets set yet"
+          description="Set monthly spending limits for categories to keep spending on track."
+          actionLabel={availableCategories.length > 0 ? "Set Category Budget" : undefined}
+          onAction={availableCategories.length > 0 ? startCreate : undefined}
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {budgets.map(b => {

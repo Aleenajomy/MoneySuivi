@@ -7,6 +7,7 @@ import { formatDate } from '../utils/constants'
 import toast from 'react-hot-toast'
 import api from '../services/api'
 import ConfirmDialog from '../components/ConfirmDialog'
+import PageHeader from '../components/common/PageHeader'
 
 export default function Profile() {
   const { user, logout, updateProfile } = useAuth()
@@ -74,10 +75,14 @@ export default function Profile() {
   }
 
   return (
-    <div className="page">
+    <div className="page pb-24">
       <div className="max-w-3xl mx-auto space-y-6">
-        
-        {/* Profile Header */}
+        <PageHeader
+          title="Account & Profile"
+          subtitle="Manage your personal profile, security, and preferences"
+        />
+
+        {/* Profile Card */}
         <div className="card p-5 relative overflow-hidden animate-fadeIn border dark:border-dark-border border-light-border bg-white dark:bg-dark-card shadow-sm">
           <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-primary/5 -translate-y-8 translate-x-8 pointer-events-none" />
           <div className="flex items-center gap-4">

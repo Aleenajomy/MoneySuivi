@@ -3,6 +3,8 @@ import { useExpense } from '../context/ExpenseContext'
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from 'recharts'
 import { CATEGORY_COLORS, formatCurrency } from '../utils/constants'
 import { RefreshCw, TrendingUp, Coins, Activity, Wallet } from 'lucide-react'
+import PageHeader from '../components/common/PageHeader'
+import StatCard from '../components/common/StatCard'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const ACCOUNT_COLORS = {
@@ -118,77 +120,65 @@ export default function Analytics() {
     <div className="space-y-6">
 
       {/* Header */}
-      <div className="flex items-center justify-between animate-fadeIn">
-        <div>
-          <h1 className="text-2xl font-black dark:text-white text-slate-800 tracking-tight">Financial Analytics</h1>
-          <p className="text-xs dark:text-gray-400 text-gray-500 mt-0.5">Visualize your income, expenses, and balance trends</p>
-        </div>
-        <button
-          onClick={fetchAnalytics}
-          title="Refresh analytics data"
-          className="w-10 h-10 rounded-xl dark:bg-dark-card bg-light-card dark:border-dark-border border-light-border border flex items-center justify-center transition-all active:scale-90 shadow-md hover:border-sky-500/25"
-        >
-          <RefreshCw size={16} className="dark:text-gray-400 text-gray-500" />
-        </button>
-      </div>
+      <PageHeader
+        title="Financial Analytics"
+        subtitle="Visualize your income, expenses, and balance trends"
+        action={
+          <button
+            onClick={fetchAnalytics}
+            title="Refresh analytics data"
+            className="w-10 h-10 rounded-xl dark:bg-dark-card bg-light-card dark:border-dark-border border-light-border border flex items-center justify-center transition-all active:scale-90 shadow-md hover:border-sky-500/25"
+            aria-label="Refresh analytics data"
+          >
+            <RefreshCw size={16} className="dark:text-gray-400 text-gray-500" />
+          </button>
+        }
+      />
 
       {/* Overview Metric Cards Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-fadeIn">
-        <div className="card p-5 hover:border-emerald-500/25 transition-all">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Total Income</span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
-              <TrendingUp size={16} />
-            </div>
-          </div>
-          <p className="text-2xl font-black dark:text-white text-slate-800">{formatCurrency(analytics.totalIncome || 0)}</p>
-          <p className="text-[10px] text-gray-500 mt-1.5">All-time earnings tracked</p>
-        </div>
+        <StatCard
+          label="Total Income"
+          amount={analytics.totalIncome || 0}
+          icon={TrendingUp}
+          tone="secondary"
+          subtext="All-time earnings tracked"
+        />
 
-        <div className="card p-5 hover:border-red-500/25 transition-all">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Total Expenses</span>
-            <div className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center">
-              <Coins size={16} />
-            </div>
-          </div>
-          <p className="text-2xl font-black dark:text-white text-slate-800">{formatCurrency(analytics.totalExpense || 0)}</p>
-          <p className="text-[10px] text-gray-500 mt-1.5">All-time spending tracked</p>
-        </div>
+        <StatCard
+          label="Total Expenses"
+          amount={analytics.totalExpense || 0}
+          icon={Coins}
+          tone="danger"
+          subtext="All-time spending tracked"
+        />
 
-        <div className="card p-5 hover:border-sky-500/25 transition-all">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Net Savings</span>
-            <div className="w-8 h-8 rounded-lg bg-sky-500/10 text-sky-500 flex items-center justify-center">
-              <Wallet size={16} />
-            </div>
-          </div>
-          <p className="text-2xl font-black dark:text-white text-slate-800">
-            {formatCurrency((analytics.totalIncome || 0) - (analytics.totalExpense || 0))}
-          </p>
-          <p className="text-[10px] text-gray-500 mt-1.5">Net cash retained</p>
-        </div>
+        <StatCard
+          label="Net Savings"
+          amount={(analytics.totalIncome || 0) - (analytics.totalExpense || 0)}
+          icon={Wallet}
+          tone="info"
+          subtext="Net cash retained"
+        />
 
-        <div className="card p-5 hover:border-indigo-500/25 transition-all">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Investments</span>
-            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
-              <Activity size={16} />
-            </div>
-          </div>
-          <p className="text-2xl font-black dark:text-white text-slate-800">{formatCurrency(analytics.investmentBalance || 0)}</p>
-          <p className="text-[10px] text-gray-500 mt-1.5">Transactions + Assets (Stocks, MF, FD, Gold)</p>
+        <StatCard
+          label="Investments"
+          amount={analytics.investmentBalance || 0}
+          icon={Activity}
+          tone="warning"
+          subtext="Transactions + Assets (Stocks, MF, FD, Gold)"
+        >
           {analytics.investmentBreakdown && Object.keys(analytics.investmentBreakdown).length > 0 && (
             <div className="mt-3 space-y-1 border-t dark:border-dark-border border-light-border pt-3">
               {Object.entries(analytics.investmentBreakdown).map(([type, val]) => (
                 <div key={type} className="flex justify-between text-[10px]">
                   <span className="dark:text-gray-500 text-gray-400">{type}</span>
-                  <span className="font-bold dark:text-gray-300 text-slate-700">{formatCurrency(val)}</span>
+                  <span className="font-bold dark:text-gray-300 text-slate-700 tabular-nums">{formatCurrency(val)}</span>
                 </div>
               ))}
             </div>
           )}
-        </div>
+        </StatCard>
       </div>
 
       {/* Main Grid */}

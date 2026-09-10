@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Users, Plus, ArrowLeft, Trash2, Pencil, X, ChevronRight,
+  Users, Plus, Trash2, Pencil, ChevronRight,
   TrendingUp, TrendingDown, ArrowDownLeft, ArrowUpRight,
   Phone, StickyNote, BarChart3, CheckCircle2, Clock, HandCoins
 } from 'lucide-react'
@@ -11,6 +11,9 @@ import {
 import { useLedger } from '../context/LedgerContext'
 import { formatCurrency, formatDate } from '../utils/constants'
 import ConfirmDialog from '../components/ConfirmDialog'
+import PageHeader from '../components/common/PageHeader'
+import EmptyState from '../components/common/EmptyState'
+import Modal from '../components/common/Modal'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -49,41 +52,31 @@ function ContactModal({ initial, onSave, onClose, saving }) {
   const set = k => e => setForm(p => ({ ...p, [k]: e.target.value }))
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <motion.div
-        initial={{ opacity: 0, y: 40 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 40 }}
-        className="w-full max-w-md rounded-3xl dark:bg-dark-card bg-white border dark:border-dark-border border-light-border shadow-2xl p-6"
-      >
-        <div className="flex items-center justify-between mb-5">
-          <p className="text-sm font-black dark:text-white text-slate-800">
-            {initial?.id ? 'Edit Contact' : 'Add Person'}
-          </p>
-          <button onClick={onClose} className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-dark-border transition-colors">
-            <X size={16} className="text-gray-400" />
-          </button>
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title={initial?.id ? 'Edit Contact' : 'Add Person'}
+      size="sm"
+    >
+      <form onSubmit={e => { e.preventDefault(); onSave(form) }} className="space-y-4">
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold dark:text-gray-500 text-gray-400 uppercase tracking-wide">Name *</label>
+          <input className="input text-sm" placeholder="e.g. Rahul Kumar" value={form.name} onChange={set('name')} required autoFocus />
         </div>
-        <form onSubmit={e => { e.preventDefault(); onSave(form) }} className="space-y-4">
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold dark:text-gray-500 text-gray-400 uppercase tracking-wide">Name *</label>
-            <input className="input text-sm" placeholder="e.g. Rahul Kumar" value={form.name} onChange={set('name')} required autoFocus />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold dark:text-gray-500 text-gray-400 uppercase tracking-wide">Phone (optional)</label>
-            <input className="input text-sm" placeholder="+91 98765 43210" value={form.phone} onChange={set('phone')} />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold dark:text-gray-500 text-gray-400 uppercase tracking-wide">Note (optional)</label>
-            <textarea className="input text-sm resize-none" rows={2} placeholder="College friend, neighbour…" value={form.note} onChange={set('note')} />
-          </div>
-          <button type="submit" disabled={saving || !form.name.trim()}
-            className="gradient-blue w-full py-3 text-sm font-bold text-white rounded-2xl shadow-md active:scale-95 transition-all disabled:opacity-50">
-            {saving ? 'Saving…' : 'Save'}
-          </button>
-        </form>
-      </motion.div>
-    </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold dark:text-gray-500 text-gray-400 uppercase tracking-wide">Phone (optional)</label>
+          <input className="input text-sm" placeholder="+91 98765 43210" value={form.phone} onChange={set('phone')} />
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold dark:text-gray-500 text-gray-400 uppercase tracking-wide">Note (optional)</label>
+          <textarea className="input text-sm resize-none" rows={2} placeholder="College friend, neighbour…" value={form.note} onChange={set('note')} />
+        </div>
+        <button type="submit" disabled={saving || !form.name.trim()}
+          className="gradient-blue w-full py-3 text-sm font-bold text-white rounded-2xl shadow-md active:scale-95 transition-all disabled:opacity-50">
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+      </form>
+    </Modal>
   )
 }
 
@@ -97,68 +90,55 @@ function EntryModal({ contactName, initial, onSave, onClose, saving }) {
   const set = k => e => setForm(p => ({ ...p, [k]: e.target.value }))
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <motion.div
-        initial={{ opacity: 0, y: 40 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 40 }}
-        className="w-full max-w-md rounded-3xl dark:bg-dark-card bg-white border dark:border-dark-border border-light-border shadow-2xl p-6"
-      >
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <p className="text-sm font-black dark:text-white text-slate-800">
-              {initial?.id ? 'Edit Entry' : 'Add Transaction'}
-            </p>
-            <p className="text-[10px] dark:text-gray-500 text-gray-400 mt-0.5">with {contactName}</p>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-dark-border transition-colors">
-            <X size={16} className="text-gray-400" />
-          </button>
-        </div>
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title={initial?.id ? 'Edit Entry' : 'Add Transaction'}
+      subtitle={`with ${contactName}`}
+      size="sm"
+    >
+      {/* Type selector */}
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        {Object.entries(TYPE_META).map(([key, meta]) => {
+          const Icon = meta.icon
+          const active = form.type === key
+          return (
+            <button key={key} type="button" onClick={() => setForm(p => ({ ...p, type: key }))}
+              className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-left transition-all ${
+                active
+                  ? 'border-sky-500 bg-sky-500/10 text-sky-600 dark:text-sky-400'
+                  : 'dark:border-dark-border border-light-border dark:text-gray-400 text-gray-500 hover:border-sky-400'
+              }`}>
+              <span className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 ${active ? 'bg-sky-500 text-white' : meta.bg + ' ' + meta.color}`}>
+                <Icon size={12} />
+              </span>
+              <span className="text-[10px] font-bold leading-tight">{meta.label}</span>
+            </button>
+          )
+        })}
+      </div>
 
-        {/* Type selector */}
-        <div className="grid grid-cols-2 gap-2 mb-4">
-          {Object.entries(TYPE_META).map(([key, meta]) => {
-            const Icon = meta.icon
-            const active = form.type === key
-            return (
-              <button key={key} type="button" onClick={() => setForm(p => ({ ...p, type: key }))}
-                className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-left transition-all ${
-                  active
-                    ? 'border-sky-500 bg-sky-500/10 text-sky-600 dark:text-sky-400'
-                    : 'dark:border-dark-border border-light-border dark:text-gray-400 text-gray-500 hover:border-sky-400'
-                }`}>
-                <span className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 ${active ? 'bg-sky-500 text-white' : meta.bg + ' ' + meta.color}`}>
-                  <Icon size={12} />
-                </span>
-                <span className="text-[10px] font-bold leading-tight">{meta.label}</span>
-              </button>
-            )
-          })}
-        </div>
-
-        <form onSubmit={e => { e.preventDefault(); onSave(form) }} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold dark:text-gray-500 text-gray-400 uppercase tracking-wide">Amount (₹) *</label>
-              <input className="input text-sm" type="number" min="1" step="1" placeholder="0" value={form.amount} onChange={set('amount')} required />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold dark:text-gray-500 text-gray-400 uppercase tracking-wide">Date *</label>
-              <input className="input text-sm" type="date" value={form.date} onChange={set('date')} required />
-            </div>
+      <form onSubmit={e => { e.preventDefault(); onSave(form) }} className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold dark:text-gray-500 text-gray-400 uppercase tracking-wide">Amount (₹) *</label>
+            <input className="input text-sm" type="number" min="1" step="1" placeholder="0" value={form.amount} onChange={set('amount')} required />
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-bold dark:text-gray-500 text-gray-400 uppercase tracking-wide">Note (optional)</label>
-            <input className="input text-sm" placeholder="What's this for?" value={form.note} onChange={set('note')} />
+            <label className="text-[10px] font-bold dark:text-gray-500 text-gray-400 uppercase tracking-wide">Date *</label>
+            <input className="input text-sm" type="date" value={form.date} onChange={set('date')} required />
           </div>
-          <button type="submit" disabled={saving || !form.amount}
-            className="gradient-blue w-full py-3 text-sm font-bold text-white rounded-2xl shadow-md active:scale-95 transition-all disabled:opacity-50">
-            {saving ? 'Saving…' : 'Add Entry'}
-          </button>
-        </form>
-      </motion.div>
-    </div>
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold dark:text-gray-500 text-gray-400 uppercase tracking-wide">Note (optional)</label>
+          <input className="input text-sm" placeholder="What's this for?" value={form.note} onChange={set('note')} />
+        </div>
+        <button type="submit" disabled={saving || !form.amount}
+          className="gradient-blue w-full py-3 text-sm font-bold text-white rounded-2xl shadow-md active:scale-95 transition-all disabled:opacity-50">
+          {saving ? 'Saving…' : 'Add Entry'}
+        </button>
+      </form>
+    </Modal>
   )
 }
 
@@ -195,13 +175,13 @@ function PeopleView({ contacts, loading, onSelectContact, onAddContact }) {
           {Array(4).fill(0).map((_, i) => <div key={i} className="h-20 rounded-2xl dark:bg-dark-card bg-light-card animate-pulse" />)}
         </div>
       ) : contacts.length === 0 ? (
-        <div className="text-center py-20">
-          <div className="w-16 h-16 mx-auto rounded-2xl gradient-blue flex items-center justify-center mb-4 opacity-60">
-            <HandCoins size={28} className="text-white" />
-          </div>
-          <p className="text-sm font-bold dark:text-gray-300 text-slate-700">No contacts yet</p>
-          <p className="text-xs dark:text-gray-500 text-gray-400 mt-1">Add people you've lent to or borrowed from</p>
-        </div>
+        <EmptyState
+          icon={HandCoins}
+          title="No contacts yet"
+          description="Add people you've lent to or borrowed from to keep track of balances."
+          actionLabel="Add Person"
+          onAction={onAddContact}
+        />
       ) : (
         <div className="card overflow-hidden border dark:border-dark-border border-light-border divide-y dark:divide-dark-border divide-light-border">
           {contacts.map(contact => (
@@ -302,27 +282,26 @@ function PersonLedgerView({ contact, onBack, onRefreshContacts }) {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <button onClick={onBack} className="w-9 h-9 rounded-xl dark:bg-dark-card bg-white border dark:border-dark-border border-light-border flex items-center justify-center dark:text-gray-400 text-gray-500 hover:text-sky-500 transition-colors">
-          <ArrowLeft size={16} />
-        </button>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-black dark:text-white text-slate-800 truncate">{contact.name}</p>
-          {contact.phone && (
-            <p className="text-[10px] dark:text-gray-500 text-gray-400 flex items-center gap-1 mt-0.5">
-              <Phone size={9} /> {contact.phone}
-            </p>
-          )}
-        </div>
-        <button onClick={() => setEditContactModal(true)}
-          className="w-8 h-8 rounded-xl dark:bg-dark-card bg-white border dark:border-dark-border border-light-border flex items-center justify-center dark:text-gray-400 text-gray-500 hover:text-sky-500 transition-colors">
-          <Pencil size={13} />
-        </button>
-        <button onClick={handleDeleteContact}
-          className="w-8 h-8 rounded-xl dark:bg-dark-card bg-white border dark:border-dark-border border-light-border flex items-center justify-center dark:text-gray-400 text-gray-500 hover:text-rose-500 transition-colors">
-          <Trash2 size={13} />
-        </button>
-      </div>
+      <PageHeader
+        title={contact.name}
+        subtitle={contact.phone ? `Phone: ${contact.phone}` : undefined}
+        showBack={true}
+        onBack={onBack}
+        action={
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => setEditContactModal(true)}
+              className="w-8 h-8 rounded-xl dark:bg-dark-card bg-white border dark:border-dark-border border-light-border flex items-center justify-center dark:text-gray-400 text-gray-500 hover:text-sky-500 transition-colors"
+              aria-label="Edit contact">
+              <Pencil size={13} />
+            </button>
+            <button onClick={handleDeleteContact}
+              className="w-8 h-8 rounded-xl dark:bg-dark-card bg-white border dark:border-dark-border border-light-border flex items-center justify-center dark:text-gray-400 text-gray-500 hover:text-rose-500 transition-colors"
+              aria-label="Delete contact">
+              <Trash2 size={13} />
+            </button>
+          </div>
+        }
+      />
 
       {/* Balance Card */}
       <div className={`rounded-2xl p-5 text-white relative overflow-hidden`}
@@ -331,7 +310,7 @@ function PersonLedgerView({ contact, onBack, onRefreshContacts }) {
         <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest mb-1">
           {Math.abs(balance) < 1 ? 'Fully Settled' : balance > 0 ? `${contact.name} Owes You` : `You Owe ${contact.name}`}
         </p>
-        <p className="text-3xl font-black">{formatCurrency(Math.abs(balance))}</p>
+        <p className="text-3xl font-black tabular-nums">{formatCurrency(Math.abs(balance))}</p>
         {contact.note && <p className="text-white/60 text-[10px] mt-2 italic">"{contact.note}"</p>}
       </div>
 
@@ -345,10 +324,13 @@ function PersonLedgerView({ contact, onBack, onRefreshContacts }) {
       {loading ? (
         <div className="space-y-2">{Array(3).fill(0).map((_, i) => <div key={i} className="h-16 rounded-xl dark:bg-dark-card bg-light-card animate-pulse" />)}</div>
       ) : entries.length === 0 ? (
-        <div className="text-center py-12">
-          <StickyNote size={32} className="mx-auto text-gray-300 dark:text-gray-600 mb-2" />
-          <p className="text-xs dark:text-gray-500 text-gray-400">No transactions yet. Add the first one.</p>
-        </div>
+        <EmptyState
+          icon={StickyNote}
+          title="No transactions yet"
+          description="Record lending or borrowing entries with this contact."
+          actionLabel="Add Transaction"
+          onAction={() => setEntryModal({})}
+        />
       ) : (
         <div className="card overflow-hidden border dark:border-dark-border border-light-border divide-y dark:divide-dark-border divide-light-border">
           {[...entries].reverse().map(entry => {
@@ -582,12 +564,10 @@ export default function Ledger() {
   return (
     <div className="page pb-24 animate-fadeIn space-y-5">
       {/* Page Header */}
-      <div className="flex items-center justify-between pr-12">
-        <div>
-          <h1 className="text-2xl font-black dark:text-white text-slate-800 tracking-tight">Borrow & Lend</h1>
-          <p className="text-xs dark:text-gray-400 text-gray-500 mt-0.5">Personal ledger — track who owes what</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Borrow & Lend"
+        subtitle="Personal ledger — track who owes what"
+      />
 
       {/* Tab Bar */}
       <div className="card p-1.5 flex gap-1">

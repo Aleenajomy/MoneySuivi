@@ -6,6 +6,8 @@ import { ExpenseCardSkeleton } from '../components/Skeleton'
 import { useExpense } from '../context/ExpenseContext'
 import api from '../services/api'
 import { CATEGORIES, formatCurrency } from '../utils/constants'
+import PageHeader from '../components/common/PageHeader'
+import EmptyState from '../components/common/EmptyState'
 
 const downloadBlob = (blob, filename) => {
   const url = window.URL.createObjectURL(blob)
@@ -297,30 +299,31 @@ export default function History() {
   return (
     <div className="space-y-6">
       {/* Title Header */}
-      <div className="flex items-center justify-between animate-fadeIn">
-        <div>
-          <h1 className="text-2xl font-black dark:text-white text-slate-800 tracking-tight">Transaction History</h1>
-          <p className="text-xs dark:text-gray-400 text-gray-500 mt-0.5">View, filter, and export your transaction logs</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowFilters(prev => !prev)}
-          className={`lg:hidden w-10 h-10 rounded-xl border flex items-center justify-center transition-all active:scale-90 shadow-md ${
-            showFilters || activeFilterCount
-              ? 'bg-primary/10 border-primary/20 text-primary'
-              : 'dark:bg-dark-card bg-light-card dark:border-dark-border border-light-border dark:text-gray-400 text-gray-500'
-          }`}
-          aria-pressed={showFilters}
-          title="Filters"
-        >
-          <SlidersHorizontal size={16} />
-          {activeFilterCount > 0 && (
-            <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-danger text-white text-[9px] font-bold leading-4 flex items-center justify-center">
-              {activeFilterCount}
-            </span>
-          )}
-        </button>
-      </div>
+      <PageHeader
+        title="Transaction History"
+        subtitle="View, filter, and export your transaction logs"
+        badge={activeFilterCount > 0 ? `${activeFilterCount} Active` : undefined}
+        actions={
+          <button
+            type="button"
+            onClick={() => setShowFilters(prev => !prev)}
+            className={`lg:hidden relative w-10 h-10 rounded-xl border flex items-center justify-center transition-all active:scale-95 shadow-sm ${
+              showFilters || activeFilterCount
+                ? 'bg-primary/10 border-primary/20 text-primary'
+                : 'dark:bg-dark-card bg-light-card dark:border-dark-border border-light-border dark:text-gray-400 text-gray-500'
+            }`}
+            aria-pressed={showFilters}
+            title="Filters"
+          >
+            <SlidersHorizontal size={16} />
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-danger text-white text-[9px] font-bold leading-4 flex items-center justify-center">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+        }
+      />
 
       {/* Main Layout Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
@@ -354,18 +357,13 @@ export default function History() {
           {loading && expenses.length === 0 ? (
             Array(5).fill(0).map((_, i) => <ExpenseCardSkeleton key={i} />)
           ) : expenses.length === 0 ? (
-            <div className="card p-12 text-center border border-dashed dark:border-dark-border border-light-border bg-slate-50/50 dark:bg-dark-bg/20 animate-fadeIn">
-              <p className="dark:text-gray-300 text-slate-800 font-extrabold text-sm">No transactions found</p>
-              <p className="dark:text-gray-500 text-gray-400 text-xs mt-1">Try adjusting your active filters or range</p>
-              {activeFilterCount > 0 && (
-                <button
-                  onClick={clearFilters}
-                  className="mt-4 px-4 py-2 bg-primary/10 border border-primary/20 hover:border-primary/40 text-primary text-xs font-bold rounded-xl transition-all"
-                >
-                  Reset Filters
-                </button>
-              )}
-            </div>
+            <EmptyState
+              icon={FileText}
+              title="No transactions found"
+              description="Try adjusting your active filters or range."
+              actionLabel={activeFilterCount > 0 ? "Reset Filters" : undefined}
+              onAction={activeFilterCount > 0 ? clearFilters : undefined}
+            />
           ) : (
             <div className="space-y-6">
               {groupedTransactions.map(group => (
@@ -388,7 +386,7 @@ export default function History() {
                   {/* Transactions of this day */}
                   <div className="card overflow-hidden divide-y dark:divide-dark-border divide-light-border px-1">
                     {group.items.map(e => (
-                      <ExpenseCard key={e._id} expense={e} showActions />
+                      <ExpenseCard key={e.id || e._id} expense={e} showActions />
                     ))}
                   </div>
                 </div>

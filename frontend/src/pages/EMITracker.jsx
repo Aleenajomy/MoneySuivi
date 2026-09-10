@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
-import { CheckCircle, ChevronDown, ChevronUp, Pencil, Plus, Trash2, X, Calendar, Landmark, Percent, Wallet, Info, Coins } from 'lucide-react'
+import { CheckCircle, ChevronDown, ChevronUp, Pencil, Plus, Trash2, Calendar, Landmark, Coins, Landmark as LoanIcon, Info } from 'lucide-react'
 import { useEMI } from '../context/EMIContext'
 import { formatCurrency, formatShortDate, getLoanDetails } from '../utils/constants'
-import { FaTag } from "react-icons/fa";
 import ConfirmDialog from '../components/ConfirmDialog'
+import PageHeader from '../components/common/PageHeader'
+import EmptyState from '../components/common/EmptyState'
+import Modal from '../components/common/Modal'
 
 const todayStr = new Date().toISOString().split('T')[0]
 const empty = { title: '', totalAmount: '', emiAmount: '', totalInstallments: '', startDate: todayStr, paidInstallments: '0', note: '', type: 'FIXED', nextDueDate: '', paidAmount: '0', interestRate: '' }
@@ -140,17 +142,19 @@ export default function EMITracker() {
   return (
     <div className="page pb-24">
       {/* Header section */}
-      <div className="flex items-center justify-between mb-5 pr-12">
-        <div>
-          <h1 className="text-2xl font-black dark:text-white text-slate-800 tracking-tight">Loans & EMIs</h1>
-          <p className="text-xs dark:text-gray-400 text-gray-500 mt-0.5">Manage your debts and flexible repayments</p>
-        </div>
-        <button
-          onClick={openAdd}
-          className="w-10 h-10 rounded-xl bg-sky-500 hover:bg-sky-600 text-white flex items-center justify-center transition-colors active:scale-95 shadow-md shadow-sky-500/20">
-          <Plus size={20} />
-        </button>
-      </div>
+      <PageHeader
+        title="Loans & EMIs"
+        subtitle="Manage your debts and flexible repayments"
+        action={
+          <button
+            onClick={openAdd}
+            className="w-10 h-10 rounded-xl bg-sky-500 hover:bg-sky-600 text-white flex items-center justify-center transition-all active:scale-95 shadow-md shadow-sky-500/20"
+            aria-label="Add Loan"
+          >
+            <Plus size={20} />
+          </button>
+        }
+      />
 
       {/* Live Aggregate Summary Card */}
       {activeLoans.length > 0 && (
@@ -162,7 +166,7 @@ export default function EMITracker() {
           <div className="flex justify-between items-start mb-4">
             <div>
               <p className="text-[10px] uppercase font-bold text-cyan-100 tracking-wider">Total Outstanding Debt</p>
-              <h2 className="text-3xl font-black mt-1">{formatCurrency(totalOutstanding)}</h2>
+              <h2 className="text-3xl font-black mt-1 tabular-nums">{formatCurrency(totalOutstanding)}</h2>
             </div>
             <Coins className="w-7 h-7 text-cyan-100" />
           </div>
@@ -174,11 +178,11 @@ export default function EMITracker() {
           <div className="grid grid-cols-3 gap-2.5 pt-2 border-t border-white/10 text-xs">
             <div>
               <p className="text-cyan-100 text-[10px]">Total Borrowed</p>
-              <p className="font-extrabold mt-0.5">{formatCurrency(totalBorrowed)}</p>
+              <p className="font-extrabold mt-0.5 tabular-nums">{formatCurrency(totalBorrowed)}</p>
             </div>
             <div>
-              <p className="text-cyan-1 00 text-[10px]">Paid Back</p>
-              <p className="font-extrabold mt-0.5">{formatCurrency(totalPaid)}</p>
+              <p className="text-cyan-100 text-[10px]">Paid Back</p>
+              <p className="font-extrabold mt-0.5 tabular-nums">{formatCurrency(totalPaid)}</p>
             </div>
             <div>
               <p className="text-cyan-100 text-[10px]">Next Due</p>
@@ -210,20 +214,17 @@ export default function EMITracker() {
       ) : (
         <>
           {displayedLoans.length === 0 ? (
-            <div className="text-center py-16 card p-5 flex flex-col items-center justify-center">
-              <span className="text-4xl mb-3"><FaTag /></span>
-              <p className="dark:text-gray-400 text-slate-600 font-bold text-sm">No {activeTab} loans found</p>
-              <p className="dark:text-gray-600 text-gray-400 text-xs mt-1">
-                {activeTab === 'active' ? 'Add a loan to track repayments and progress.' : 'Completed loans will be listed here.'}
-              </p>
-              {activeTab === 'active' && (
-                <button onClick={openAdd} className="btn-primary mt-4 px-4 py-2 text-xs">Add First Loan</button>
-              )}
-            </div>
+            <EmptyState
+              icon={LoanIcon}
+              title={`No ${activeTab} loans found`}
+              description={activeTab === 'active' ? 'Add a loan to track repayments and progress.' : 'Completed loans will appear here once settled.'}
+              actionLabel={activeTab === 'active' ? 'Add First Loan' : undefined}
+              onAction={activeTab === 'active' ? openAdd : undefined}
+            />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {displayedLoans.map(emi => (
-                <EMICard key={emi.id} emi={emi} onPay={payInstallment} onDelete={deleteEMI} onEdit={openEdit} onDeletePayment={deletePayment} />
+                <EMICard key={emi.id || emi._id} emi={emi} onPay={payInstallment} onDelete={deleteEMI} onEdit={openEdit} onDeletePayment={deletePayment} />
               ))}
             </div>
           )
@@ -232,204 +233,196 @@ export default function EMITracker() {
       )}
 
       {/* Popup modal for Add/Edit Loan */}
-      {showModal && (
-        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm px-4 flex items-center justify-center animate-fadeIn" onClick={closeModal}>
-          <div className="card p-0 w-full max-w-sm max-h-[90vh] flex flex-col bg-white dark:bg-dark-card shadow-2xl animate-scaleIn overflow-hidden" onClick={e => e.stopPropagation()}>
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-5 pb-3 border-b dark:border-dark-border border-slate-100 flex-shrink-0">
-              <h2 className="text-lg font-black dark:text-white text-slate-800">{editId ? 'Edit Loan' : 'New Loan'}</h2>
-              <button onClick={closeModal} className="w-7 h-7 rounded-lg dark:hover:bg-dark-border hover:bg-slate-100 flex items-center justify-center text-gray-500 dark:text-gray-400">
-                <X size={16} />
-              </button>
-            </div>
+      <Modal
+        isOpen={showModal}
+        onClose={closeModal}
+        title={editId ? 'Edit Loan' : 'New Loan'}
+        size="md"
+      >
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          {/* Scrollable Form Fields container */}
+          <div className="space-y-4 overflow-y-auto flex-1 scrollbar-none pr-1">
+            <input className="input" placeholder="Title (e.g. Gold Loan, Car Loan)" value={form.title} onChange={set('title')} required />
 
-            {/* Modal Form */}
-            <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-              {/* Scrollable Form Fields container */}
-              <div className="p-5 space-y-4 overflow-y-auto flex-1 scrollbar-none">
-                <input className="input" placeholder="Title (e.g. Gold Loan, Car Loan)" value={form.title} onChange={set('title')} required />
-
-                {/* Selectable Cards for Repayment Type */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase dark:text-gray-400 text-gray-500 tracking-wider">Repayment Mode</label>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <button
-                      type="button"
-                      onClick={setType('FIXED')}
-                      className={`p-3 rounded-2xl border text-left flex flex-col transition-all active:scale-[0.98] ${form.type === 'FIXED' ? 'border-sky-500 bg-sky-500/5 ring-1 ring-sky-500' : 'border-light-border dark:border-dark-border bg-slate-50 dark:bg-dark-card opacity-70'}`}>
-                      <Calendar size={16} className={form.type === 'FIXED' ? 'text-sky-500' : 'dark:text-gray-400 text-gray-500'} />
-                      <span className="font-bold text-[11px] mt-2 block dark:text-white text-slate-800">Fixed EMI</span>
-                      <span className="text-[9px] dark:text-gray-500 text-gray-400 mt-0.5 leading-tight">Fixed monthly payment</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={setType('FLEXIBLE')}
-                      className={`p-3 rounded-2xl border text-left flex flex-col transition-all active:scale-[0.98] ${form.type === 'FLEXIBLE' ? 'border-sky-500 bg-sky-500/5 ring-1 ring-sky-500' : 'border-light-border dark:border-dark-border bg-slate-50 dark:bg-dark-card opacity-70'}`}>
-                      <Landmark size={16} className={form.type === 'FLEXIBLE' ? 'text-sky-500' : 'dark:text-gray-400 text-gray-500'} />
-                      <span className="font-bold text-[11px] mt-2 block dark:text-white text-slate-800">Flexible</span>
-                      <span className="text-[9px] dark:text-gray-500 text-gray-400 mt-0.5 leading-tight">Pay any amount, any time</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Interest Tracking Toggle Checkbox */}
-                <div className="flex items-center gap-2 py-1">
-                  <input
-                    type="checkbox"
-                    id="trackInterest"
-                    checked={trackInterest}
-                    onChange={e => {
-                      setTrackInterest(e.target.checked)
-                      if (!e.target.checked) {
-                        setForm(prev => ({ ...prev, interestRate: '' }))
-                      }
-                    }}
-                    className="w-4 h-4 rounded text-sky-500 border-light-border dark:border-dark-border focus:ring-sky-500 cursor-pointer"
-                  />
-                  <label htmlFor="trackInterest" className="text-xs font-semibold dark:text-gray-300 text-slate-700 cursor-pointer select-none">
-                    Enable Interest Tracking
-                  </label>
-                </div>
-
-                {/* Common main inputs */}
-                {trackInterest ? (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="label">Total Loan Amount</label>
-                      <input className="input" type="number" min="1" placeholder="₹" value={form.totalAmount} onChange={set('totalAmount')} required />
-                    </div>
-                    <div>
-                      <label className="label">Interest Rate (% p.a.)</label>
-                      <input className="input" type="number" step="0.01" min="0.01" max="100" placeholder="%" value={form.interestRate} onChange={set('interestRate')} required />
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    <label className="label">Total Loan Amount</label>
-                    <input className="input" type="number" min="1" placeholder="₹" value={form.totalAmount} onChange={set('totalAmount')} required />
-                  </div>
-                )}
-
-                {/* Type-specific inputs */}
-                {form.type === 'FIXED' ? (
-                  <>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="label">EMI / Month</label>
-                        <input className="input" type="number" min="1" placeholder="₹" value={form.emiAmount} onChange={set('emiAmount')} required />
-                      </div>
-                      <div>
-                        <label className="label">Total Months</label>
-                        <input className="input" type="number" min="1" placeholder="12" value={form.totalInstallments} onChange={set('totalInstallments')} required />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="label">Start Date</label>
-                        <input className="input" type="date" value={form.startDate} onChange={set('startDate')} required />
-                      </div>
-                      <div>
-                        <label className="label">Already Paid (months)</label>
-                        <input className="input" type="number" min="0" placeholder="0"
-                          value={form.paidInstallments} onChange={set('paidInstallments')}
-                          max={form.totalInstallments || 999} />
-                      </div>
-                    </div>
-                    <p className="text-[10px] dark:text-gray-500 text-gray-400">EMIs paid prior to tracking</p>
-                  </>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="label">Start Date</label>
-                        <input className="input" type="date" value={form.startDate} onChange={set('startDate')} required />
-                      </div>
-                      <div>
-                        <label className="label">Next Due Date (optional)</label>
-                        <input className="input" type="date" value={form.nextDueDate} onChange={set('nextDueDate')} />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="label">Already Paid (amount)</label>
-                      <input className="input" type="number" min="0" placeholder="₹0"
-                        value={form.paidAmount} onChange={set('paidAmount')}
-                        max={form.totalAmount || 999999} />
-                      <p className="text-[10px] dark:text-gray-500 text-gray-400 mt-1">Amount paid back prior to tracking</p>
-                    </div>
-                  </>
-                )}
-
-                <textarea className="input resize-none" rows={2} placeholder="Note (optional)" value={form.note} onChange={set('note')} />
-
-                {/* Live Preview Summary Card */}
-                {form.totalAmount && (
-                  <div className="p-3.5 rounded-2xl dark:bg-dark-bg bg-slate-50 border dark:border-dark-border border-slate-100 flex flex-col space-y-2">
-                    <div className="flex items-center gap-1 text-[10px] font-bold text-sky-500 uppercase tracking-wider">
-                      <Info size={11} /> Live preview
-                    </div>
-
-                    <div className="flex justify-between items-baseline text-xs mt-1">
-                      <span className="dark:text-gray-400 text-gray-500">Remaining Balance:</span>
-                      <span className="font-extrabold dark:text-white text-slate-800">{formatCurrency(previewRemaining)}</span>
-                    </div>
-
-                    <div className="flex justify-between text-[11px]">
-                      <span className="dark:text-gray-400 text-gray-500">
-                        {trackInterest ? 'Total Paid:' : 'Paid:'}
-                      </span>
-                      <span className="font-semibold text-secondary">
-                        {formatCurrency(previewPaid)} ({previewPct}%)
-                      </span>
-                    </div>
-
-                    {trackInterest && previewDetails.hasInterest && (
-                      <div className="pt-1.5 border-t border-dashed dark:border-dark-border border-slate-200 text-[11px] space-y-1">
-                        <div className="flex justify-between">
-                          <span className="dark:text-gray-400 text-gray-500">Principal Amount:</span>
-                          <span className="font-semibold dark:text-gray-300 text-slate-700">{formatCurrency(previewAmount)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="dark:text-gray-500 text-gray-400">Accrued Interest:</span>
-                          <span className="font-semibold dark:text-gray-300 text-slate-700">{formatCurrency(previewDetails.accruedInterest)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="dark:text-gray-500 text-gray-400">Total Payable:</span>
-                          <span className="font-semibold dark:text-gray-300 text-slate-700">{formatCurrency(previewDetails.totalPayableAmount)}</span>
-                        </div>
-                        <div className="flex justify-between pt-1 border-t dark:border-dark-border border-slate-100">
-                          <span className="dark:text-gray-500 text-gray-400">Principal Paid:</span>
-                          <span className="font-semibold dark:text-gray-300 text-slate-700">{formatCurrency(previewDetails.principalPaid)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="dark:text-gray-500 text-gray-400">Interest Paid:</span>
-                          <span className="font-semibold dark:text-gray-300 text-slate-700">{formatCurrency(previewDetails.interestPaid)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="dark:text-gray-400 text-gray-500">Interest Rate:</span>
-                          <span className="font-semibold dark:text-gray-300 text-slate-700">{form.interestRate}% p.a.</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {previewNextDue && (
-                      <div className="text-[10px] dark:text-gray-500 text-gray-400 pt-1">
-                        Calculated next due: <span className="font-bold dark:text-gray-300 text-slate-700">{formatShortDate(previewNextDue)}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Sticky Footer / Submit Button */}
-              <div className="p-5 pt-3 border-t dark:border-dark-border border-slate-100 flex-shrink-0 bg-white dark:bg-dark-card">
-                <button type="submit" disabled={saving} className="btn-primary w-full py-2.5 text-sm font-bold shadow-md shadow-sky-500/10">
-                  {saving ? 'Saving...' : editId ? 'Update Loan' : 'Add Loan'}
+            {/* Selectable Cards for Repayment Type */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold uppercase dark:text-gray-400 text-gray-500 tracking-wider">Repayment Mode</label>
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={setType('FIXED')}
+                  className={`p-3 rounded-2xl border text-left flex flex-col transition-all active:scale-[0.98] ${form.type === 'FIXED' ? 'border-sky-500 bg-sky-500/5 ring-1 ring-sky-500' : 'border-light-border dark:border-dark-border bg-slate-50 dark:bg-dark-card opacity-70'}`}>
+                  <Calendar size={16} className={form.type === 'FIXED' ? 'text-sky-500' : 'dark:text-gray-400 text-gray-500'} />
+                  <span className="font-bold text-[11px] mt-2 block dark:text-white text-slate-800">Fixed EMI</span>
+                  <span className="text-[9px] dark:text-gray-500 text-gray-400 mt-0.5 leading-tight">Fixed monthly payment</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={setType('FLEXIBLE')}
+                  className={`p-3 rounded-2xl border text-left flex flex-col transition-all active:scale-[0.98] ${form.type === 'FLEXIBLE' ? 'border-sky-500 bg-sky-500/5 ring-1 ring-sky-500' : 'border-light-border dark:border-dark-border bg-slate-50 dark:bg-dark-card opacity-70'}`}>
+                  <Landmark size={16} className={form.type === 'FLEXIBLE' ? 'text-sky-500' : 'dark:text-gray-400 text-gray-500'} />
+                  <span className="font-bold text-[11px] mt-2 block dark:text-white text-slate-800">Flexible</span>
+                  <span className="text-[9px] dark:text-gray-500 text-gray-400 mt-0.5 leading-tight">Pay any amount, any time</span>
                 </button>
               </div>
-            </form>
+            </div>
+
+            {/* Interest Tracking Toggle Checkbox */}
+            <div className="flex items-center gap-2 py-1">
+              <input
+                type="checkbox"
+                id="trackInterest"
+                checked={trackInterest}
+                onChange={e => {
+                  setTrackInterest(e.target.checked)
+                  if (!e.target.checked) {
+                    setForm(prev => ({ ...prev, interestRate: '' }))
+                  }
+                }}
+                className="w-4 h-4 rounded text-sky-500 border-light-border dark:border-dark-border focus:ring-sky-500 cursor-pointer"
+              />
+              <label htmlFor="trackInterest" className="text-xs font-semibold dark:text-gray-300 text-slate-700 cursor-pointer select-none">
+                Enable Interest Tracking
+              </label>
+            </div>
+
+            {/* Common main inputs */}
+            {trackInterest ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Total Loan Amount</label>
+                  <input className="input" type="number" min="1" placeholder="₹" value={form.totalAmount} onChange={set('totalAmount')} required />
+                </div>
+                <div>
+                  <label className="label">Interest Rate (% p.a.)</label>
+                  <input className="input" type="number" step="0.01" min="0.01" max="100" placeholder="%" value={form.interestRate} onChange={set('interestRate')} required />
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label className="label">Total Loan Amount</label>
+                <input className="input" type="number" min="1" placeholder="₹" value={form.totalAmount} onChange={set('totalAmount')} required />
+              </div>
+            )}
+
+            {/* Type-specific inputs */}
+            {form.type === 'FIXED' ? (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">EMI / Month</label>
+                    <input className="input" type="number" min="1" placeholder="₹" value={form.emiAmount} onChange={set('emiAmount')} required />
+                  </div>
+                  <div>
+                    <label className="label">Total Months</label>
+                    <input className="input" type="number" min="1" placeholder="12" value={form.totalInstallments} onChange={set('totalInstallments')} required />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">Start Date</label>
+                    <input className="input" type="date" value={form.startDate} onChange={set('startDate')} required />
+                  </div>
+                  <div>
+                    <label className="label">Already Paid (months)</label>
+                    <input className="input" type="number" min="0" placeholder="0"
+                      value={form.paidInstallments} onChange={set('paidInstallments')}
+                      max={form.totalInstallments || 999} />
+                  </div>
+                </div>
+                <p className="text-[10px] dark:text-gray-500 text-gray-400">EMIs paid prior to tracking</p>
+              </>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">Start Date</label>
+                    <input className="input" type="date" value={form.startDate} onChange={set('startDate')} required />
+                  </div>
+                  <div>
+                    <label className="label">Next Due Date (optional)</label>
+                    <input className="input" type="date" value={form.nextDueDate} onChange={set('nextDueDate')} />
+                  </div>
+                </div>
+                <div>
+                  <label className="label">Already Paid (amount)</label>
+                  <input className="input" type="number" min="0" placeholder="₹0"
+                    value={form.paidAmount} onChange={set('paidAmount')}
+                    max={form.totalAmount || 999999} />
+                  <p className="text-[10px] dark:text-gray-500 text-gray-400 mt-1">Amount paid back prior to tracking</p>
+                </div>
+              </>
+            )}
+
+            <textarea className="input resize-none" rows={2} placeholder="Note (optional)" value={form.note} onChange={set('note')} />
+
+            {/* Live Preview Summary Card */}
+            {form.totalAmount && (
+              <div className="p-3.5 rounded-2xl dark:bg-dark-bg bg-slate-50 border dark:border-dark-border border-slate-100 flex flex-col space-y-2">
+                <div className="flex items-center gap-1 text-[10px] font-bold text-sky-500 uppercase tracking-wider">
+                  <Info size={11} /> Live preview
+                </div>
+
+                <div className="flex justify-between items-baseline text-xs mt-1">
+                  <span className="dark:text-gray-400 text-gray-500">Remaining Balance:</span>
+                  <span className="font-extrabold dark:text-white text-slate-800">{formatCurrency(previewRemaining)}</span>
+                </div>
+
+                <div className="flex justify-between text-[11px]">
+                  <span className="dark:text-gray-400 text-gray-500">
+                    {trackInterest ? 'Total Paid:' : 'Paid:'}
+                  </span>
+                  <span className="font-semibold text-secondary">
+                    {formatCurrency(previewPaid)} ({previewPct}%)
+                  </span>
+                </div>
+
+                {trackInterest && previewDetails.hasInterest && (
+                  <div className="pt-1.5 border-t border-dashed dark:border-dark-border border-slate-200 text-[11px] space-y-1">
+                    <div className="flex justify-between">
+                      <span className="dark:text-gray-400 text-gray-500">Principal Amount:</span>
+                      <span className="font-semibold dark:text-gray-300 text-slate-700">{formatCurrency(previewAmount)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="dark:text-gray-500 text-gray-400">Accrued Interest:</span>
+                      <span className="font-semibold dark:text-gray-300 text-slate-700">{formatCurrency(previewDetails.accruedInterest)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="dark:text-gray-500 text-gray-400">Total Payable:</span>
+                      <span className="font-semibold dark:text-gray-300 text-slate-700">{formatCurrency(previewDetails.totalPayableAmount)}</span>
+                    </div>
+                    <div className="flex justify-between pt-1 border-t dark:border-dark-border border-slate-100">
+                      <span className="dark:text-gray-500 text-gray-400">Principal Paid:</span>
+                      <span className="font-semibold dark:text-gray-300 text-slate-700">{formatCurrency(previewDetails.principalPaid)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="dark:text-gray-500 text-gray-400">Interest Paid:</span>
+                      <span className="font-semibold dark:text-gray-300 text-slate-700">{formatCurrency(previewDetails.interestPaid)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="dark:text-gray-400 text-gray-500">Interest Rate:</span>
+                      <span className="font-semibold dark:text-gray-300 text-slate-700">{form.interestRate}% p.a.</span>
+                    </div>
+                  </div>
+                )}
+
+                {previewNextDue && (
+                  <div className="text-[10px] dark:text-gray-500 text-gray-400 pt-1">
+                    Calculated next due: <span className="font-bold dark:text-gray-300 text-slate-700">{formatShortDate(previewNextDue)}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-        </div>
-      )}
+
+          {/* Sticky Footer / Submit Button */}
+          <div className="pt-3 mt-4 border-t dark:border-dark-border border-slate-100 flex-shrink-0">
+            <button type="submit" disabled={saving} className="btn-primary w-full py-2.5 text-sm font-bold shadow-md shadow-sky-500/10">
+              {saving ? 'Saving...' : editId ? 'Update Loan' : 'Add Loan'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   )
 }
