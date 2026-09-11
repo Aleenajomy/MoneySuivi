@@ -140,12 +140,12 @@ export default function EMITracker() {
     : form.nextDueDate ? new Date(form.nextDueDate) : null
 
   return (
-    <div className="page pb-24">
+    <div className="space-y-6">
       {/* Header section */}
       <PageHeader
         title="Loans & EMIs"
         subtitle="Manage your debts and flexible repayments"
-        action={
+        actions={
           <button
             onClick={openAdd}
             className="w-10 h-10 rounded-xl bg-sky-500 hover:bg-sky-600 text-white flex items-center justify-center transition-all active:scale-95 shadow-md shadow-sky-500/20"
@@ -159,7 +159,7 @@ export default function EMITracker() {
       {/* Live Aggregate Summary Card */}
       {activeLoans.length > 0 && (
         <div className="relative overflow-hidden rounded-3xl p-5 mb-6 shadow-xl text-white tracking-tight"
-          style={{ background: 'linear-gradient(135deg, #06B6D4 0%, #0EA5E9 50%, #38BDF8 100%)' }}>
+          style={{ background: 'linear-gradient(135deg, #0284C7 0%, #0EA5E9 50%, #38BDF8 100%)' }}>
           <div className="absolute -top-10 -right-10 w-36 h-36 rounded-full bg-white/5" />
           <div className="absolute -bottom-12 -left-6 w-28 h-28 rounded-full bg-white/5" />
 
@@ -193,15 +193,15 @@ export default function EMITracker() {
       )}
 
       {/* Tabs segment */}
-      <div className="grid grid-cols-2 p-1 bg-slate-100 dark:bg-dark-card rounded-2xl mb-5 border dark:border-dark-border border-light-border">
+      <div className="segmented-control p-1 gap-1 mb-5">
         <button
           onClick={() => setActiveTab('active')}
-          className={`py-2 text-xs font-bold rounded-xl transition-all ${activeTab === 'active' ? 'bg-white dark:bg-dark-bg text-sky-500 shadow-sm' : 'dark:text-gray-400 text-gray-500'}`}>
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'active' ? 'bg-sky-500 text-white shadow-sm' : 'text-slate-500 dark:text-gray-400'}`}>
           Active ({activeLoans.length})
         </button>
         <button
           onClick={() => setActiveTab('completed')}
-          className={`py-2 text-xs font-bold rounded-xl transition-all ${activeTab === 'completed' ? 'bg-white dark:bg-dark-bg text-sky-500 shadow-sm' : 'dark:text-gray-400 text-gray-500'}`}>
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'completed' ? 'bg-sky-500 text-white shadow-sm' : 'text-slate-500 dark:text-gray-400'}`}>
           Completed ({completedLoans.length})
         </button>
       </div>

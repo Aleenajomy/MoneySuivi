@@ -28,13 +28,13 @@ export default function ExpenseCard({ expense, showActions = false }) {
   return (
     <div
       onClick={() => navigate(`/edit/${expense.id || expense._id}`)}
-      className="flex items-center gap-3 py-3 px-1 border-b dark:border-dark-border border-light-border cursor-pointer hover:dark:bg-white/5 hover:bg-black/5 transition-colors animate-fadeIn"
+      className="flex items-center gap-3 py-3 px-2 rounded-xl border-b dark:border-dark-border/60 border-slate-100/90 cursor-pointer hover:dark:bg-white/5 hover:bg-slate-50 transition-colors animate-fadeIn"
     >
       <div
-        className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+        className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
         style={{ backgroundColor: `${color}18`, color }}
       >
-        <Icon size={20} />
+        <Icon size={18} />
       </div>
 
       <div className="flex-1 min-w-0">
@@ -48,23 +48,23 @@ export default function ExpenseCard({ expense, showActions = false }) {
           )}
         </div>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-xs dark:text-gray-500 text-gray-400">
+          <span className="text-xs dark:text-gray-400 text-slate-500">
             {isTransfer ? `${expense.fromAccountType} to ${expense.toAccountType}` : expense.category}
           </span>
-          <span className="w-1 h-1 rounded-full dark:bg-gray-700 bg-gray-300" />
-          <span className="text-xs dark:text-gray-500 text-gray-400">{formatShortDate(expense.expenseDate)}</span>
+          <span className="w-1 h-1 rounded-full dark:bg-gray-700 bg-slate-300" />
+          <span className="text-xs dark:text-gray-400 text-slate-500">{formatShortDate(expense.expenseDate)}</span>
         </div>
         {expense.recurring && expense.nextRunDate && (
-          <p className="text-[10px] text-sky-500 mt-1">Next: {formatShortDate(expense.nextRunDate)}</p>
+          <p className="text-[10px] text-sky-500 mt-0.5 font-medium">Next: {formatShortDate(expense.nextRunDate)}</p>
         )}
       </div>
 
       <div className="flex items-center gap-2">
         <div className="text-right">
-          <p className={`font-bold text-sm ${isTransfer ? 'text-sky-500' : isIncome ? 'text-secondary' : 'text-danger'}`}>
+          <p className={`font-bold text-sm tabular-nums ${isTransfer ? 'text-sky-500' : isIncome ? 'text-secondary' : 'text-danger'}`}>
             {isTransfer ? '' : isIncome ? '+' : '-'}{formatCurrency(expense.amount)}
           </p>
-          <p className="text-[10px] dark:text-gray-600 text-gray-600 mt-0.5">{isTransfer ? 'Transfer' : expense.accountType || expense.paymentMethod}</p>
+          <p className="text-[10px] dark:text-gray-400 text-slate-400 mt-0.5">{isTransfer ? 'Transfer' : expense.accountType || expense.paymentMethod}</p>
         </div>
         {showActions && (
           <button

@@ -30,7 +30,7 @@ export default function Modal({
       aria-modal="true"
     >
       <div
-        className={`card p-5 sm:p-6 w-full ${maxWidth} shadow-2xl animate-scaleIn dark:bg-dark-card bg-white border dark:border-dark-border border-light-border overflow-hidden`}
+        className={`card p-5 sm:p-6 w-full ${maxWidth} max-h-[90vh] overflow-y-auto shadow-2xl animate-scaleIn dark:bg-dark-card bg-white border dark:border-dark-border border-slate-200/80`}
         onClick={(e) => e.stopPropagation()}
       >
         {(title || showClose) && (

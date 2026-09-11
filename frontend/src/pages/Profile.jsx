@@ -75,61 +75,61 @@ export default function Profile() {
   }
 
   return (
-    <div className="page pb-24">
-      <div className="max-w-3xl mx-auto space-y-6">
-        <PageHeader
-          title="Account & Profile"
-          subtitle="Manage your personal profile, security, and preferences"
-        />
+    <div className="space-y-6 max-w-3xl mx-auto">
+      <PageHeader
+        title="Account & Profile"
+        subtitle="Manage your personal profile, security, and preferences"
+      />
 
-        {/* Profile Card */}
-        <div className="card p-5 relative overflow-hidden animate-fadeIn border dark:border-dark-border border-light-border bg-white dark:bg-dark-card shadow-sm">
-          <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-primary/5 -translate-y-8 translate-x-8 pointer-events-none" />
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl gradient-blue flex items-center justify-center text-2xl font-bold text-white flex-shrink-0 shadow-md shadow-sky-500/15">
-              {user?.name?.[0]?.toUpperCase() || 'U'}
-            </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="font-black text-lg dark:text-gray-100 text-slate-800 truncate">{user?.name}</h2>
-              <p className="text-gray-500 dark:text-gray-500 text-xs truncate mt-0.5">{user?.email}</p>
-              {user?.createdAt && (
-                <p className="text-gray-600 dark:text-gray-700 text-[10px] mt-1.5 font-medium">Joined {formatDate(user.createdAt)}</p>
-              )}
-            </div>
-            <button onClick={() => setEditing(!editing)}
-              className="w-10 h-10 rounded-xl dark:bg-dark-border bg-light-border flex items-center justify-center hover:text-sky-500 hover:dark:bg-dark-border/80 hover:bg-slate-100/60 active:scale-95 transition-all">
-              <User size={16} className="dark:text-gray-400 text-gray-500" />
-            </button>
+      {/* Profile Card */}
+      <div className="card p-5 relative overflow-hidden animate-fadeIn border dark:border-dark-border border-light-border bg-white dark:bg-dark-card shadow-sm">
+        <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-primary/5 -translate-y-8 translate-x-8 pointer-events-none" />
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-2xl gradient-blue flex items-center justify-center text-2xl font-bold text-white flex-shrink-0 shadow-md shadow-sky-500/15">
+            {user?.name?.[0]?.toUpperCase() || 'U'}
           </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="font-black text-lg dark:text-gray-100 text-slate-800 truncate">{user?.name}</h2>
+            <p className="text-gray-500 dark:text-gray-500 text-xs truncate mt-0.5">{user?.email}</p>
+            {user?.createdAt && (
+              <p className="text-gray-600 dark:text-gray-700 text-[10px] mt-1.5 font-medium">Joined {formatDate(user.createdAt)}</p>
+            )}
+          </div>
+          <button onClick={() => setEditing(!editing)}
+            className="w-10 h-10 rounded-xl dark:bg-dark-border bg-light-border flex items-center justify-center hover:text-sky-500 hover:dark:bg-dark-border/80 hover:bg-slate-100/60 active:scale-95 transition-all"
+            aria-label="Edit Profile">
+            <User size={16} className="dark:text-gray-400 text-gray-500" />
+          </button>
         </div>
+      </div>
 
-        {/* Edit Form */}
-        {editing && (
-          <div className="card p-5 animate-slideDown border dark:border-dark-border border-light-border bg-white dark:bg-dark-card">
-            <p className="text-xs font-bold text-gray-500 dark:text-gray-500 uppercase tracking-widest mb-4">Edit Profile</p>
-            <form onSubmit={handleSave} className="space-y-4">
-              <div>
-                <label className="text-[10px] font-bold dark:text-gray-500 text-gray-400 uppercase tracking-wide">Full Name</label>
-                <input className="input text-xs" value={form.name}
-                  onChange={e => setForm(p => ({ ...p, name: e.target.value }))} required />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold dark:text-gray-500 text-gray-400 uppercase tracking-wide">Monthly Budget Limit (₹)</label>
-                <input type="number" className="input text-xs" value={form.budgetLimit}
-                  onChange={e => setForm(p => ({ ...p, budgetLimit: e.target.value }))} required />
-              </div>
-              <div className="flex gap-2 pt-2">
-                <button type="button" onClick={() => setEditing(false)} className="btn-secondary flex-1 py-2.5 text-xs">
-                  Cancel
-                </button>
-                <button type="submit" disabled={loading}
-                  className="flex-1 py-2.5 rounded-xl gradient-blue text-white text-xs font-bold disabled:opacity-50 active:scale-95 shadow-md shadow-sky-500/15">
-                  {loading ? 'Saving...' : 'Save Changes'}
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
+      {/* Edit Form */}
+      {editing && (
+        <div className="card p-5 animate-slideDown border dark:border-dark-border border-light-border bg-white dark:bg-dark-card">
+          <p className="text-xs font-bold text-gray-500 dark:text-gray-500 uppercase tracking-widest mb-4">Edit Profile</p>
+          <form onSubmit={handleSave} className="space-y-4">
+            <div>
+              <label className="text-[10px] font-bold dark:text-gray-500 text-gray-400 uppercase tracking-wide">Full Name</label>
+              <input className="input text-xs" value={form.name}
+                onChange={e => setForm(p => ({ ...p, name: e.target.value }))} required />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold dark:text-gray-500 text-gray-400 uppercase tracking-wide">Monthly Budget Limit (₹)</label>
+              <input type="number" className="input text-xs" value={form.budgetLimit}
+                onChange={e => setForm(p => ({ ...p, budgetLimit: e.target.value }))} required />
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button type="button" onClick={() => setEditing(false)} className="btn-secondary flex-1 py-2.5 text-xs">
+                Cancel
+              </button>
+              <button type="submit" disabled={loading}
+                className="btn-primary flex-1 py-2.5 text-xs font-bold">
+                {loading ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
         {/* Settings */}
         <div>
@@ -187,7 +187,7 @@ export default function Profile() {
             ))}
             <div className="flex gap-2 pt-2">
               <button type="button" onClick={() => setChangingPw(false)} className="btn-secondary flex-1 py-2.5 text-xs">Cancel</button>
-              <button type="submit" disabled={pwLoading} className="flex-1 py-2.5 rounded-xl gradient-blue text-white text-xs font-bold disabled:opacity-50 active:scale-95 shadow-md shadow-sky-500/15">
+              <button type="submit" disabled={pwLoading} className="btn-primary flex-1 py-2.5 text-xs font-bold">
                 {pwLoading ? 'Saving...' : 'Update Password'}
               </button>
             </div>
@@ -221,7 +221,6 @@ export default function Profile() {
           <img src="/logo.png?v=2" alt="MoneySuivi" className="w-8 h-8 rounded-xl object-contain opacity-80" />
           <p className="text-center dark:text-gray-500 text-gray-400 text-xs font-medium">MoneySuivi Finance Tracker v1.0.0</p>
         </div>
-      </div>
 
       {/* Modals */}
       {modal === 'notifications' && <NotificationsModal onClose={() => setModal(null)} />}
@@ -307,7 +306,7 @@ function ToggleRow({ label, description, value, onChange }) {
     <div className="flex items-center justify-between py-3.5 border-b dark:border-dark-border border-light-border last:border-0">
       <div className="flex-1 pr-4">
         <p className="text-sm font-semibold dark:text-gray-200 text-slate-700">{label}</p>
-        {description && <p className="text-xs dark:text-gray-600 text-gray-500 mt-0.5">{description}</p>}
+        {description && <p className="text-xs dark:text-gray-400 text-gray-500 mt-0.5">{description}</p>}
       </div>
       <button
         onClick={() => onChange(!value)}

@@ -17,7 +17,11 @@ export function LedgerProvider({ children }) {
       const res = await api.get('/ledger/contacts')
       setContacts(res.data.contacts || [])
     } catch (err) {
-      if (err.status !== 401) toast.error('Failed to load ledger contacts')
+      if (err.status !== 401) {
+        toast.error(err.isTimeout ? 'Server is waking up. Please wait a moment...' : 'Failed to load ledger contacts', {
+          id: err.isTimeout ? 'server-connection-status' : 'load-ledger-contacts'
+        })
+      }
     } finally {
       setLoading(false)
     }
@@ -29,7 +33,11 @@ export function LedgerProvider({ children }) {
       const res = await api.get('/ledger/summary')
       setSummary(res.data)
     } catch (err) {
-      if (err.status !== 401) toast.error('Failed to load ledger summary')
+      if (err.status !== 401) {
+        toast.error(err.isTimeout ? 'Server is waking up. Please wait a moment...' : 'Failed to load ledger summary', {
+          id: err.isTimeout ? 'server-connection-status' : 'load-ledger-summary'
+        })
+      }
     }
   }, [])
 

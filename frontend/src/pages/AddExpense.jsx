@@ -83,7 +83,9 @@ export default function AddExpense() {
       if ((isInc || isTrf) && (e.title !== e.category || e.category === 'Other')) {
         setCustomizeTitle(true)
       }
-    }).catch(() => toast.error('Failed to load transaction'))
+    }).catch((err) => toast.error(err?.isTimeout ? 'Server is waking up. Please wait a moment...' : 'Failed to load transaction', {
+      id: err?.isTimeout ? 'server-connection-status' : 'load-transaction'
+    }))
   }, [id, isEditing])
 
   useEffect(() => {
@@ -209,7 +211,9 @@ export default function AddExpense() {
       await fetchNetWorth()
       navigate(-1)
     } catch (err) {
-      toast.error(err.message || 'Something went wrong')
+      toast.error(err.message || 'Something went wrong', {
+        id: err.isTimeout ? 'server-connection-status' : undefined
+      })
     } finally {
       setLoading(false)
     }
@@ -225,23 +229,23 @@ export default function AddExpense() {
       />
 
       {/* Form Panel */}
-      <div className="card p-6 sm:p-8 animate-scaleIn">
+      <div className="card p-5 sm:p-7 animate-scaleIn">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Income vs Expense vs Transfer sliding pills */}
-          <div className="card p-1 flex gap-1 bg-slate-100 dark:bg-dark-bg/60 border-none rounded-2xl">
+          <div className="segmented-control p-1 gap-1">
             {[
-              { key: 'expense', label: 'Expense', color: 'bg-red-500' },
-              { key: 'income', label: 'Income', color: 'bg-emerald-500' },
-              { key: 'transfer', label: 'Transfer', color: 'bg-sky-500' },
+              { key: 'expense', label: 'Expense', activeClass: 'bg-rose-500 text-white shadow-sm' },
+              { key: 'income', label: 'Income', activeClass: 'bg-emerald-500 text-white shadow-sm' },
+              { key: 'transfer', label: 'Transfer', activeClass: 'bg-sky-500 text-white shadow-sm' },
             ].map(tab => (
               <button
                 key={tab.key}
                 type="button"
                 onClick={() => handleTypeChange(tab.key)}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                className={`flex-1 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
                   form.type === tab.key
-                    ? `${tab.color} text-white shadow-md`
-                    : 'dark:text-gray-500 text-gray-400 hover:text-slate-700 hover:dark:text-white'
+                    ? tab.activeClass
+                    : 'text-slate-500 dark:text-gray-400 hover:text-slate-800 dark:hover:text-white'
                 }`}
               >
                 {tab.label}
@@ -250,16 +254,17 @@ export default function AddExpense() {
           </div>
 
           {/* Amount Card Container */}
-          <div className="card p-5 bg-slate-50 dark:bg-dark-bg/25 border-light-border dark:border-dark-border text-center flex flex-col items-center justify-center relative transition-all focus-within:border-sky-500/40">
-            <label className="label text-center block mb-2 text-gray-450 dark:text-gray-550 uppercase tracking-widest font-bold">Transaction Amount</label>
+          <div className="card p-5 bg-slate-50/70 dark:bg-dark-bg/40 border-slate-200/80 dark:border-dark-border text-center flex flex-col items-center justify-center relative transition-all focus-within:ring-2 focus-within:ring-sky-500/20 focus-within:border-sky-500">
+            <label className="label text-center block mb-1">Transaction Amount</label>
             <div className="flex items-center justify-center gap-1.5 w-full max-w-[280px]">
-              <span className="text-3xl font-extrabold text-primary flex-shrink-0">₹</span>
+              <span className="text-2xl sm:text-3xl font-extrabold text-primary flex-shrink-0">₹</span>
               <input
                 type="number"
                 step="0.01"
                 min="0.01"
                 required
-                className="text-4xl font-black dark:text-white text-slate-800 bg-transparent outline-none text-center w-full dark:placeholder-gray-700 placeholder-gray-300"
+                autoFocus
+                className="text-3xl sm:text-4xl font-black dark:text-white text-slate-800 bg-transparent outline-none text-center w-full dark:placeholder-gray-700 placeholder-slate-300 tabular-nums"
                 placeholder="0.00"
                 value={form.amount}
                 onChange={set('amount')}
@@ -380,36 +385,36 @@ export default function AddExpense() {
           {/* Category Selector Grid for Expenses & Income */}
           {form.type !== 'transfer' && (
             <div>
-              <label className="label mb-3">Category</label>
-              <div className={`grid ${form.type === 'income' ? 'grid-cols-3 sm:grid-cols-5' : 'grid-cols-4 sm:grid-cols-7'} gap-3 bg-slate-50 dark:bg-dark-bg/25 p-4 rounded-2xl border dark:border-dark-border border-light-border`}>
+              <label className="label mb-2.5">Category</label>
+              <div className={`grid ${form.type === 'income' ? 'grid-cols-3 sm:grid-cols-5' : 'grid-cols-4 sm:grid-cols-6 lg:grid-cols-7'} gap-2 sm:gap-3 bg-slate-50/70 dark:bg-dark-bg/40 p-3 sm:p-4 rounded-2xl border dark:border-dark-border border-slate-200/80`}>
                 {activeCategories.map(cat => {
                   const isSelected = form.category === cat
-                  const color = CATEGORY_COLORS[cat] || '#0066FF'
+                  const color = CATEGORY_COLORS[cat] || '#0EA5E9'
                   const Icon = ICONS[cat] || CircleDot
                   return (
                     <button
                       key={cat}
                       type="button"
                       onClick={() => handleCategorySelect(cat)}
-                      className="flex flex-col items-center justify-center py-1.5 focus:outline-none"
+                      className="flex flex-col items-center justify-center py-2 px-1 rounded-xl transition-all focus:outline-none group active:scale-95"
                     >
                       <div
-                        className={`w-12 h-12 rounded-full flex items-center justify-center mb-1.5 transition-all border ${
+                        className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center mb-1.5 transition-all border ${
                           isSelected
                             ? 'scale-105 border-transparent shadow-md'
-                            : 'dark:border-dark-border border-light-border dark:bg-dark-card bg-light-card dark:text-gray-400 text-gray-500 hover:scale-105'
+                            : 'dark:border-dark-border border-slate-200/80 dark:bg-dark-card bg-white dark:text-gray-400 text-slate-500 group-hover:border-sky-500/30'
                         }`}
                         style={{
-                          backgroundColor: isSelected ? `${color}20` : undefined,
+                          backgroundColor: isSelected ? `${color}22` : undefined,
                           borderColor: isSelected ? color : undefined,
                           color: isSelected ? color : undefined,
-                          boxShadow: isSelected ? `0 0 12px ${color}30` : undefined
+                          boxShadow: isSelected ? `0 4px 12px ${color}35` : undefined
                         }}
                       >
-                        <Icon size={20} />
+                        <Icon size={19} />
                       </div>
-                      <span className={`text-[10px] font-bold tracking-tight truncate max-w-[65px] ${
-                        isSelected ? 'dark:text-white text-slate-800 font-extrabold' : 'dark:text-gray-500 text-gray-400'
+                      <span className={`text-[11px] font-semibold tracking-tight text-center leading-tight truncate w-full ${
+                        isSelected ? 'dark:text-white text-slate-800 font-bold' : 'dark:text-gray-400 text-slate-500'
                       }`}>
                         {cat}
                       </span>
@@ -521,15 +526,13 @@ export default function AddExpense() {
           <button
             type="submit"
             disabled={loading}
-            className={`w-full py-3.5 rounded-xl text-white font-bold text-sm active:scale-[0.98] transition-all hover:opacity-95 shadow-md ${
-              form.type === 'income'
-                ? 'gradient-green'
-                : form.type === 'transfer'
-                  ? 'gradient-blue'
-                  : 'gradient-blue'
+            className={`btn-primary min-h-[48px] text-base font-bold shadow-md hover:shadow-lg active:scale-98 transition-all ${
+              form.type === 'income' ? '!bg-emerald-500 hover:!bg-emerald-600' : ''
             }`}
           >
-            {loading ? 'Saving...' : isEditing ? 'Update Transaction' : 'Save Transaction'}
+            {loading ? (
+              <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : isEditing ? 'Update Transaction' : 'Save Transaction'}
           </button>
         </form>
       </div>

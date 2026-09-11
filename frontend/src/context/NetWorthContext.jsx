@@ -29,7 +29,9 @@ export function NetWorthProvider({ children }) {
       setSummary(res.data)
     } catch (err) {
       if (err.status !== 401) {
-        toast.error('Failed to load net worth')
+        toast.error(err.isTimeout ? 'Server is waking up. Please wait a moment...' : 'Failed to load net worth', {
+          id: err.isTimeout ? 'server-connection-status' : 'load-networth'
+        })
       }
     } finally {
       setLoading(false)

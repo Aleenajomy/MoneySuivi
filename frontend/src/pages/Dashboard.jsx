@@ -13,6 +13,8 @@ import { useEMI } from '../context/EMIContext'
 import { useNetWorth } from '../context/NetWorthContext'
 import { CATEGORY_COLORS, formatCurrency, formatShortDate, getLoanDetails } from '../utils/constants'
 import Modal from '../components/common/Modal'
+import StatCard from '../components/common/StatCard'
+import EmptyState from '../components/common/EmptyState'
 
 const budgetColor = (pct) => {
   if (pct >= 100) return 'bg-red-500'
@@ -138,16 +140,28 @@ export default function Dashboard() {
               {loadingAnalytics ? (
                 <div className="h-10 w-44 bg-white/20 rounded-xl animate-pulse mb-3" />
               ) : (
-                <p className="text-3xl font-black text-white mb-2 tracking-tight">{formatCurrency(displayBalance)}</p>
+                <>
+                  <p className="text-3xl font-black text-white mb-2 tracking-tight tabular-nums">{formatCurrency(displayBalance)}</p>
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    <div className="px-2.5 py-1 rounded-lg bg-white/15 text-white text-[11px] font-medium flex items-center gap-1.5 backdrop-blur-sm">
+                      <span className="opacity-80">Cash:</span>
+                      <span className="font-bold tabular-nums">{formatCurrency(cashAmount)}</span>
+                    </div>
+                    <div className="px-2.5 py-1 rounded-lg bg-white/15 text-white text-[11px] font-medium flex items-center gap-1.5 backdrop-blur-sm">
+                      <span className="opacity-80">UPI:</span>
+                      <span className="font-bold tabular-nums">{formatCurrency(upiAmount)}</span>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
 
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
-              <span className="text-sky-200 dark:text-sky-400 text-xs">Breakdown by Accounts</span>
+            <div className="flex items-center justify-between mt-4 pt-3.5 border-t border-white/15">
+              <span className="text-sky-100 dark:text-sky-300 text-xs font-medium">All Accounts Breakdown</span>
               <button
                 type="button"
                 onClick={() => setShowBalanceBreakdown(true)}
-                className="px-3 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold tracking-wide transition-colors duration-200 flex items-center gap-1 active:scale-95"
+                className="px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-[10px] font-bold tracking-wide transition-all duration-150 flex items-center gap-1 active:scale-95 shadow-sm"
               >
                 <span>View Details</span>
               </button>
@@ -275,7 +289,13 @@ export default function Dashboard() {
               {loading && expenses.length === 0 ? (
                 Array(4).fill(0).map((_, i) => <ExpenseCardSkeleton key={i} />)
               ) : expenses.length === 0 ? (
-                <EmptyState />
+                <EmptyState
+                  icon={Clock}
+                  title="No transactions yet"
+                  description="Your recorded expenses and income will appear here."
+                  actionLabel="Add Transaction"
+                  onAction={() => navigate('/add')}
+                />
               ) : (
                 expenses.slice(0, 4).map((e, index) => <ExpenseCard key={e.id || e._id || index} expense={e} />)
               )}
@@ -373,34 +393,6 @@ export default function Dashboard() {
         <Plus size={24} strokeWidth={2.5} />
       </button>
     </div>
-  )
-}
-
-function StatCard({ label, amount, icon: Icon, tone, onClick, isPercentage }) {
-  const color = tone === 'secondary'
-    ? 'text-secondary bg-secondary/10'
-    : tone === 'danger'
-      ? 'text-danger bg-danger/10'
-      : tone === 'info'
-        ? 'text-sky-500 bg-sky-500/10'
-        : 'text-secondary bg-secondary/10'
-  const Component = onClick ? 'button' : 'div'
-  return (
-    <Component
-      type={onClick ? 'button' : undefined}
-      onClick={onClick}
-      className={`card p-4 text-left ${onClick ? 'active:scale-[0.98] transition-all cursor-pointer hover:border-sky-500/30' : ''}`}
-    >
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-[10px] font-bold dark:text-gray-500 text-gray-600 uppercase tracking-wide">{label}</span>
-        <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${color}`}>
-          <Icon size={16} />
-        </div>
-      </div>
-      <p className="dark:text-gray-100 text-slate-800 font-black text-sm sm:text-base md:text-lg">
-        {isPercentage ? amount : formatCurrency(amount)}
-      </p>
-    </Component>
   )
 }
 
@@ -519,19 +511,6 @@ function Widget({ title, action, onAction, icon: Icon, children }) {
         </button>
       </div>
       {children}
-    </div>
-  )
-}
-
-function EmptyState() {
-  const navigate = useNavigate()
-  return (
-    <div className="text-center py-14 animate-scaleIn">
-      <p className="dark:text-gray-400 text-gray-600 font-medium">No transactions yet</p>
-      <p className="dark:text-gray-600 text-gray-500 text-sm mt-1">Start by adding your first expense</p>
-      <button onClick={() => navigate('/add')} className="mt-4 px-5 py-2.5 rounded-xl bg-sky-500/10 text-sky-500 text-sm font-semibold hover:bg-sky-500/20 transition-all active:scale-95">
-        Add Expense
-      </button>
     </div>
   )
 }

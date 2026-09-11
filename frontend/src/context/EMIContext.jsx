@@ -19,7 +19,9 @@ export function EMIProvider({ children }) {
       setEmis(res.data.emis)
     } catch (err) {
       if (err.status !== 401) {
-        toast.error('Failed to load EMIs')
+        toast.error(err.isTimeout ? 'Server is waking up. Please wait a moment...' : 'Failed to load EMIs', {
+          id: err.isTimeout ? 'server-connection-status' : 'load-emis'
+        })
       }
     } finally {
       setLoading(false)

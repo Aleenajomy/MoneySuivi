@@ -8,9 +8,11 @@ export default function PageHeader({
   showBack = false,
   onBack,
   actions,
+  action,
   className = '',
 }) {
   const navigate = useNavigate()
+  const headerActions = actions || action
 
   const handleBack = () => {
     if (onBack) onBack()
@@ -18,13 +20,13 @@ export default function PageHeader({
   }
 
   return (
-    <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fadeIn ${className}`}>
-      <div className="flex items-center gap-3">
+    <div className={`flex items-center justify-between gap-3 animate-fadeIn ${className}`}>
+      <div className="flex items-center gap-3 min-w-0">
         {showBack && (
           <button
             type="button"
             onClick={handleBack}
-            className="w-9 h-9 rounded-xl border dark:border-dark-border border-light-border dark:bg-dark-card bg-white dark:text-gray-300 text-slate-700 flex items-center justify-center hover:text-sky-500 hover:border-sky-500/30 transition-all active:scale-95 shadow-sm flex-shrink-0"
+            className="w-9 h-9 rounded-xl border dark:border-dark-border border-slate-200 dark:bg-dark-card bg-white dark:text-gray-300 text-slate-700 flex items-center justify-center hover:text-sky-500 hover:border-sky-500/30 transition-all active:scale-95 shadow-sm flex-shrink-0"
             aria-label="Go back"
           >
             <ArrowLeft size={16} />
@@ -42,15 +44,15 @@ export default function PageHeader({
             )}
           </div>
           {subtitle && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-normal truncate">
+            <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5 leading-normal truncate">
               {subtitle}
             </p>
           )}
         </div>
       </div>
-      {actions && (
+      {headerActions && (
         <div className="flex items-center gap-2 flex-shrink-0">
-          {actions}
+          {headerActions}
         </div>
       )}
     </div>

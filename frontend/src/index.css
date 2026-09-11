@@ -38,7 +38,7 @@
 
 @layer components {
   .card {
-    @apply rounded-2xl border transition-all duration-300;
+    @apply rounded-2xl border transition-all duration-200;
   }
 
   .dark .card {
@@ -46,40 +46,40 @@
   }
 
   html:not(.dark) .card {
-    @apply bg-light-card border-light-border shadow-sm;
+    @apply bg-white border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.05)];
   }
 
   /* Premium Glassmorphism styling */
   .glass-card {
-    @apply backdrop-blur-md border rounded-3xl transition-all duration-300;
+    @apply backdrop-blur-md border rounded-2xl transition-all duration-200;
   }
   .dark .glass-card {
-    background: rgba(30, 41, 59, 0.45);
-    border-color: rgba(255, 255, 255, 0.05);
+    background: rgba(30, 41, 59, 0.55);
+    border-color: rgba(255, 255, 255, 0.08);
     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
   }
   html:not(.dark) .glass-card {
-    background: rgba(255, 255, 255, 0.75);
-    border-color: rgba(226, 232, 240, 0.8);
-    box-shadow: 0 8px 32px 0 rgba(148, 163, 184, 0.1);
+    background: rgba(255, 255, 255, 0.85);
+    border-color: rgba(226, 232, 240, 0.9);
+    box-shadow: 0 8px 24px 0 rgba(148, 163, 184, 0.12);
   }
 
   /* Fintech Card with hover state */
   .fintech-card {
-    @apply rounded-3xl border p-6 transition-all duration-300 hover:-translate-y-1.5;
+    @apply rounded-2xl border p-5 sm:p-6 transition-all duration-200 hover:-translate-y-0.5;
   }
   .dark .fintech-card {
-    @apply bg-dark-card border-dark-border hover:border-sky-500/30;
-    box-shadow: 0 10px 30px -15px rgba(0, 0, 0, 0.3);
+    @apply bg-dark-card border-dark-border hover:border-sky-500/40;
+    box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.35);
   }
   .dark .fintech-card:hover {
-    box-shadow: 0 20px 40px -20px rgba(14, 165, 233, 0.15);
+    box-shadow: 0 12px 30px -10px rgba(14, 165, 233, 0.2);
   }
   html:not(.dark) .fintech-card {
-    @apply bg-white border-light-border hover:border-sky-500/20 shadow-sm hover:shadow-xl;
+    @apply bg-white border-slate-200/90 hover:border-sky-500/30 shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-md;
   }
   html:not(.dark) .fintech-card:hover {
-    box-shadow: 0 20px 40px -20px rgba(14, 165, 233, 0.1);
+    box-shadow: 0 12px 28px -8px rgba(14, 165, 233, 0.12);
   }
 
   /* Text gradient helper */
@@ -105,64 +105,97 @@
     background: linear-gradient(135deg, #38BDF8 0%, #0284C7 100%);
   }
 
+  /* Standard Button Tokens */
   .btn-primary {
-    @apply w-full py-3.5 rounded-xl text-white font-semibold text-sm
-           active:scale-95 transition-all duration-200
+    @apply w-full min-h-[44px] py-3 px-4 rounded-xl text-white font-semibold text-sm
+           active:scale-95 transition-all duration-150
            disabled:opacity-50 disabled:cursor-not-allowed
+           flex items-center justify-center gap-2
            shadow-md hover:shadow-lg;
+    background-color: #0EA5E9;
   }
-
+  .btn-primary:hover { background-color: #0284C7; }
   .dark .btn-primary {
-    background-color: #0EA5E9;
-    box-shadow: 0 0 20px rgba(14, 165, 233, 0.3);
+    box-shadow: 0 0 20px rgba(14, 165, 233, 0.25);
   }
-  .dark .btn-primary:hover { background-color: #0284C7; }
-
-  html:not(.dark) .btn-primary {
-    background-color: #0EA5E9;
-  }
-  html:not(.dark) .btn-primary:hover { background-color: #0284C7; }
 
   .btn-secondary {
-    @apply w-full py-3.5 rounded-xl border font-semibold text-sm
-           active:scale-95 transition-all duration-200;
+    @apply w-full min-h-[44px] py-3 px-4 rounded-xl border font-semibold text-sm
+           active:scale-95 transition-all duration-150
+           flex items-center justify-center gap-2;
   }
-
   .dark .btn-secondary {
-    @apply border-dark-border text-gray-300 bg-dark-card hover:bg-dark-muted;
+    @apply border-dark-border text-gray-200 bg-dark-card hover:bg-dark-border;
+  }
+  html:not(.dark) .btn-secondary {
+    @apply border-slate-200 text-slate-700 bg-white hover:bg-slate-50;
   }
 
-  html:not(.dark) .btn-secondary {
-    @apply border-light-border text-slate-700 bg-light-card hover:bg-light-muted;
+  .btn-danger {
+    @apply w-full min-h-[44px] py-3 px-4 rounded-xl font-semibold text-sm
+           text-white bg-rose-500 hover:bg-rose-600
+           active:scale-95 transition-all duration-150
+           flex items-center justify-center gap-2 shadow-sm;
+  }
+
+  .btn-ghost {
+    @apply min-h-[40px] px-3.5 py-2 rounded-xl text-sm font-semibold
+           active:scale-95 transition-all duration-150
+           flex items-center justify-center gap-1.5;
+  }
+  .dark .btn-ghost {
+    @apply text-slate-300 hover:bg-slate-800/60;
+  }
+  html:not(.dark) .btn-ghost {
+    @apply text-slate-700 hover:bg-slate-100;
+  }
+
+  .icon-btn {
+    @apply w-10 h-10 rounded-xl border flex items-center justify-center
+           transition-all duration-150 active:scale-95 flex-shrink-0 shadow-sm;
+  }
+  .dark .icon-btn {
+    @apply border-dark-border bg-dark-card text-gray-300 hover:text-sky-400 hover:border-sky-500/30;
+  }
+  html:not(.dark) .icon-btn {
+    @apply border-slate-200 bg-white text-slate-700 hover:text-sky-600 hover:border-sky-500/30;
+  }
+
+  /* Segmented Controls / Pill Tabs */
+  .segmented-control {
+    @apply flex items-center p-1 rounded-xl border transition-all;
+  }
+  .dark .segmented-control {
+    @apply bg-dark-card border-dark-border;
+  }
+  html:not(.dark) .segmented-control {
+    @apply bg-slate-100 border-slate-200/80;
   }
 
   .input {
-    @apply w-full px-4 py-3.5 rounded-xl border
+    @apply w-full px-4 py-3 rounded-xl border
            text-sm outline-none placeholder-opacity-50
-           focus:ring-2 transition-all duration-200;
+           transition-all duration-150;
   }
 
   .dark .input {
-    @apply border-dark-border bg-dark-bg text-gray-100 placeholder-gray-600;
-    --tw-ring-color: rgba(14, 165, 233, 0.2);
+    @apply border-dark-border bg-dark-bg text-gray-100 placeholder-gray-500;
   }
-  .dark .input:focus { border-color: #0EA5E9; box-shadow: 0 0 0 2px rgba(14,165,233,0.15); }
+  .dark .input:focus {
+    border-color: #0EA5E9;
+    box-shadow: 0 0 0 2px rgba(14,165,233,0.2);
+  }
 
   html:not(.dark) .input {
-    @apply border-light-border bg-white text-slate-700 placeholder-slate-400;
+    @apply border-slate-200 bg-white text-slate-800 placeholder-slate-400;
   }
-  html:not(.dark) .input:focus { border-color: #0EA5E9; box-shadow: 0 0 0 2px rgba(14,165,233,0.15); }
+  html:not(.dark) .input:focus {
+    border-color: #0EA5E9;
+    box-shadow: 0 0 0 2px rgba(14,165,233,0.15);
+  }
 
   .label {
-    @apply block text-xs font-semibold mb-1.5 uppercase tracking-wide;
-  }
-
-  .dark .label {
-    @apply text-gray-500;
-  }
-
-  html:not(.dark) .label {
-    @apply text-slate-600;
+    @apply block text-[11px] font-bold mb-1.5 uppercase tracking-wider text-slate-500 dark:text-gray-400;
   }
 
   /* Bottom nav — mobile & tablet only, hidden on desktop */
@@ -199,17 +232,9 @@
     @apply bg-white/95 border-slate-200/80 shadow-[0_-4px_20px_rgba(0,0,0,0.04)];
   }
 
-  /* Page content — mobile: full pad + bottom space for nav; desktop: no bottom pad */
+  /* Page content container - single source of truth for padding inside Layout */
   .page {
-    @apply pb-28 pt-4 px-3 min-h-screen transition-colors duration-300
-           sm:px-4 sm:pt-5
-           lg:pb-8 lg:pt-8 lg:px-8;
-    padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px));
-  }
-  @media (min-width: 1024px) {
-    .page {
-      padding-bottom: 2rem !important;
-    }
+    @apply w-full space-y-6 transition-colors duration-300;
   }
 
   /* Sidebar — desktop only, strictly hidden on mobile portrait & mobile landscape / side view */

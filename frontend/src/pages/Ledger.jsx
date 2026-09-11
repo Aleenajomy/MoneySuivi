@@ -551,7 +551,7 @@ export default function Ledger() {
   // Person ledger drill-down overrides the tab layout
   if (selectedContact) {
     return (
-      <div className="page pb-24 animate-fadeIn">
+      <div className="space-y-6 animate-fadeIn">
         <PersonLedgerView
           contact={selectedContact}
           onBack={handleBack}
@@ -562,15 +562,26 @@ export default function Ledger() {
   }
 
   return (
-    <div className="page pb-24 animate-fadeIn space-y-5">
+    <div className="space-y-6 animate-fadeIn">
       {/* Page Header */}
       <PageHeader
         title="Borrow & Lend"
         subtitle="Personal ledger — track who owes what"
+        actions={
+          <button
+            type="button"
+            onClick={() => setContactModal(true)}
+            className="w-10 h-10 rounded-xl bg-sky-500 hover:bg-sky-600 text-white flex items-center justify-center transition-all active:scale-95 shadow-md shadow-sky-500/20"
+            title="Add Person"
+            aria-label="Add Person"
+          >
+            <Plus size={20} />
+          </button>
+        }
       />
 
       {/* Tab Bar */}
-      <div className="card p-1.5 flex gap-1">
+      <div className="segmented-control p-1 gap-1">
         {[
           { key: 'people',    label: `People (${contacts.length})`, icon: Users },
           { key: 'analytics', label: 'Analytics',                    icon: BarChart3 },
@@ -578,10 +589,10 @@ export default function Ledger() {
           const Icon = t.icon
           return (
             <button key={t.key} onClick={() => setTab(t.key)}
-              className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                tab === t.key ? 'gradient-blue text-white shadow-md' : 'dark:text-gray-500 text-gray-400 hover:dark:bg-dark-border hover:bg-light-muted'
+              className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                tab === t.key ? 'bg-sky-500 text-white shadow-sm' : 'text-slate-500 dark:text-gray-400 hover:text-slate-800 dark:hover:text-white'
               }`}>
-              <Icon size={13} /> {t.label}
+              <Icon size={14} /> {t.label}
             </button>
           )
         })}

@@ -123,14 +123,14 @@ export default function Analytics() {
       <PageHeader
         title="Financial Analytics"
         subtitle="Visualize your income, expenses, and balance trends"
-        action={
+        actions={
           <button
             onClick={fetchAnalytics}
             title="Refresh analytics data"
-            className="w-10 h-10 rounded-xl dark:bg-dark-card bg-light-card dark:border-dark-border border-light-border border flex items-center justify-center transition-all active:scale-90 shadow-md hover:border-sky-500/25"
+            className="icon-btn"
             aria-label="Refresh analytics data"
           >
-            <RefreshCw size={16} className="dark:text-gray-400 text-gray-500" />
+            <RefreshCw size={18} />
           </button>
         }
       />

@@ -181,7 +181,7 @@ export default function History() {
       {/* Transaction Type Filters */}
       <div>
         <label className="label">Type</label>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="segmented-control p-1 gap-1">
           {[
             { label: 'All', value: 'All' },
             { label: 'Income', value: 'income' },
@@ -193,9 +193,9 @@ export default function History() {
                 key={t.value}
                 type="button"
                 onClick={() => applyFilter('type', t.value)}
-                className={`py-2 text-xs font-bold rounded-xl transition-all border text-center ${isActive
-                  ? 'bg-primary/15 border-primary/30 text-primary'
-                  : 'dark:bg-dark-bg bg-white dark:border-dark-border border-light-border dark:text-gray-400 text-gray-500'
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all text-center ${isActive
+                  ? 'bg-sky-500 text-white shadow-sm'
+                  : 'text-slate-500 dark:text-gray-400 hover:text-slate-800 dark:hover:text-white'
                 }`}
               >
                 {t.label}
@@ -208,15 +208,15 @@ export default function History() {
       {/* Category Pills */}
       <div>
         <label className="label">Categories</label>
-        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+        <div className="flex gap-2 overflow-x-auto pb-1.5 scrollbar-none">
           {['All', ...CATEGORIES].map(cat => (
             <button
               key={cat}
               type="button"
               onClick={() => applyFilter('category', cat)}
-              className={`flex-shrink-0 px-3.5 py-1.5 rounded-xl text-[11px] font-semibold transition-all border ${filters.category === cat
-                ? 'bg-primary border-primary text-white'
-                : 'dark:bg-dark-bg bg-white dark:border-dark-border border-light-border dark:text-gray-400 text-gray-500'
+              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${filters.category === cat
+                ? 'bg-sky-500 border-sky-500 text-white shadow-sm'
+                : 'dark:bg-dark-card bg-white dark:border-dark-border border-slate-200 text-slate-600 dark:text-gray-300 hover:border-sky-500/30'
               }`}
             >
               {cat}
@@ -369,16 +369,16 @@ export default function History() {
               {groupedTransactions.map(group => (
                 <div key={group.dateStr} className="animate-fadeIn">
                   {/* Daily Date Header with Subtotals */}
-                  <div className="flex items-center justify-between px-2 py-1.5 mb-3 border-b dark:border-dark-border border-light-border pb-2">
-                    <span className="text-xs font-black text-slate-800 dark:text-gray-200 uppercase tracking-wide">
+                  <div className="flex items-center justify-between px-3 py-1.5 mb-2 sticky top-[73px] z-10 backdrop-blur-md bg-light-bg/85 dark:bg-dark-bg/85 rounded-xl border border-slate-200/60 dark:border-dark-border/60">
+                    <span className="text-xs font-bold text-slate-800 dark:text-gray-200">
                       {formatGroupHeaderDate(group.dateObj)}
                     </span>
-                    <div className="flex items-center gap-3 text-[10px] font-black uppercase">
+                    <div className="flex items-center gap-2.5 text-[11px] font-bold tabular-nums">
                       {group.dayIncome > 0 && (
-                        <span className="text-secondary">+ {formatCurrency(group.dayIncome)}</span>
+                        <span className="text-emerald-500 font-semibold">+ {formatCurrency(group.dayIncome)}</span>
                       )}
                       {group.dayExpense > 0 && (
-                        <span className="text-danger">- {formatCurrency(group.dayExpense)}</span>
+                        <span className="text-rose-500 font-semibold">- {formatCurrency(group.dayExpense)}</span>
                       )}
                     </div>
                   </div>

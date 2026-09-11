@@ -85,7 +85,7 @@ export default function NetWorth() {
   const totalAllocated = allocationData.reduce((sum, item) => sum + item.value, 0)
 
   return (
-    <div className="page pb-24 animate-fadeIn space-y-6">
+    <div className="space-y-6 animate-fadeIn">
       {/* Header */}
       <PageHeader
         title="Net Worth"
@@ -97,9 +97,9 @@ export default function NetWorth() {
         style={{ background: isPositive ? 'linear-gradient(135deg,#0f766e 0%,#14b8a6 100%)' : 'linear-gradient(135deg,#9f1239 0%,#e11d48 100%)' }}>
         <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-white/5 pointer-events-none" />
         <div className="absolute -bottom-8 -left-4 w-20 h-20 rounded-full bg-white/5 pointer-events-none" />
-        <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest mb-1">Final Net Worth</p>
+        <p className="text-white/75 text-[10px] font-bold uppercase tracking-widest mb-1">Final Net Worth</p>
         <p className="text-3xl sm:text-4xl font-black text-white mb-2 tracking-tight tabular-nums">{formatCurrency(netWorth)}</p>
-        <p className="text-white/60 text-[10px] font-semibold mt-1">
+        <p className="text-white/70 text-[10px] font-semibold mt-1">
           Formula: Assets ({formatCurrency(summary.totalAssets)}) + Liquid Balance ({formatCurrency(summary.cashBalance || 0)}) + Receivables ({formatCurrency(summary.ledgerReceivable || 0)}) − Liabilities ({formatCurrency(summary.totalLiabilities)})
         </p>
       </div>
@@ -134,50 +134,50 @@ export default function NetWorth() {
         {/* Ledger Receivable Card */}
         {(summary.ledgerReceivable > 0 || summary.ledgerPayable > 0) && (
           <>
-            <div className="card p-4 flex flex-col justify-between border dark:border-dark-border border-light-border bg-white dark:bg-dark-card shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+            <div className="card p-4 flex flex-col justify-between border dark:border-dark-border border-slate-200/80 bg-white dark:bg-dark-card shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
               <div className="flex justify-between items-start">
                 <span className="text-[10px] dark:text-gray-500 text-gray-400 uppercase font-bold tracking-wider">Lent Out</span>
                 <span className="w-7 h-7 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
                   <HandCoins size={14} />
                 </span>
               </div>
-              <p className="text-base md:text-lg font-black text-emerald-500 mt-3">{formatCurrency(summary.ledgerReceivable || 0)}</p>
+              <p className="text-base md:text-lg font-black text-emerald-500 mt-3 tabular-nums">{formatCurrency(summary.ledgerReceivable || 0)}</p>
               <p className="text-[9px] dark:text-gray-600 text-gray-400 mt-1">Receivable asset</p>
             </div>
 
-            <div className="card p-4 flex flex-col justify-between border dark:border-dark-border border-light-border bg-white dark:bg-dark-card shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+            <div className="card p-4 flex flex-col justify-between border dark:border-dark-border border-slate-200/80 bg-white dark:bg-dark-card shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
               <div className="flex justify-between items-start">
                 <span className="text-[10px] dark:text-gray-500 text-gray-400 uppercase font-bold tracking-wider">Borrowed</span>
                 <span className="w-7 h-7 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center">
                   <HandCoins size={14} />
                 </span>
               </div>
-              <p className="text-base md:text-lg font-black text-rose-500 mt-3">{formatCurrency(summary.ledgerPayable || 0)}</p>
+              <p className="text-base md:text-lg font-black text-rose-500 mt-3 tabular-nums">{formatCurrency(summary.ledgerPayable || 0)}</p>
               <p className="text-[9px] dark:text-gray-600 text-gray-400 mt-1">Payable liability</p>
             </div>
           </>
         )}
 
         {/* Total Liabilities: Spans all 4 columns on desktop/tablet, 2 columns on mobile */}
-        <div className="card p-4 flex flex-col justify-between border dark:border-dark-border border-light-border bg-white dark:bg-dark-card shadow-sm hover:shadow-md col-span-2 md:col-span-4 transition-all">
+        <div className="card p-4 flex flex-col justify-between border dark:border-dark-border border-slate-200/80 bg-white dark:bg-dark-card shadow-sm hover:shadow-md col-span-2 md:col-span-4 transition-all">
           <div className="flex justify-between items-start">
             <div>
               <span className="text-[10px] dark:text-gray-500 text-gray-400 uppercase font-bold tracking-wider">Total Liabilities</span>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Sum of outstanding loans, EMIs and other debts</p>
+              <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">Sum of outstanding loans, EMIs and other debts</p>
             </div>
             <span className="w-7 h-7 rounded-xl bg-danger/10 text-danger flex items-center justify-center">
               <TrendingDown size={14} />
             </span>
           </div>
-          <p className="text-lg md:text-xl font-black text-danger mt-3">{formatCurrency(summary.totalLiabilities)}</p>
+          <p className="text-lg md:text-xl font-black text-danger mt-3 tabular-nums">{formatCurrency(summary.totalLiabilities)}</p>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="card p-1.5 flex gap-1">
+      <div className="segmented-control p-1 gap-1">
         {['assets', 'liabilities'].map(t => (
           <button key={t} onClick={() => setTab(t)}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all capitalize ${tab === t ? 'gradient-blue text-white shadow-md' : 'dark:text-gray-500 text-gray-400 hover:dark:bg-dark-border hover:bg-light-muted'}`}>
+            className={`flex-1 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all capitalize ${tab === t ? 'bg-sky-500 text-white shadow-sm' : 'text-slate-500 dark:text-gray-400 hover:text-slate-800 dark:hover:text-white'}`}>
             {t} ({t === 'assets' ? summary.assets.length : summary.liabilities.length})
           </button>
         ))}

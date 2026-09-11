@@ -23,25 +23,24 @@ export default function Notifications() {
   }, [fetchNotifications])
 
   return (
-    <div className="page pb-24">
-      <div className="max-w-3xl mx-auto space-y-6">
-        <PageHeader
-          title="Budget Alerts"
-          subtitle={`${unreadCount} unread warning${unreadCount === 1 ? '' : 's'}`}
-          action={
-            unreadCount > 0 && (
-              <button
-                type="button"
-                onClick={markAllRead}
-                className="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-500 flex items-center justify-center hover:bg-sky-500/20 active:scale-95 transition-all shadow-sm"
-                title="Mark all as read"
-                aria-label="Mark all alerts as read"
-              >
-                <CheckCheck size={18} />
-              </button>
-            )
-          }
-        />
+    <div className="space-y-6 max-w-3xl mx-auto">
+      <PageHeader
+        title="Budget Alerts"
+        subtitle={`${unreadCount} unread warning${unreadCount === 1 ? '' : 's'}`}
+        actions={
+          unreadCount > 0 && (
+            <button
+              type="button"
+              onClick={markAllRead}
+              className="icon-btn text-sky-500 bg-sky-500/10 hover:bg-sky-500/20 border-sky-500/20"
+              title="Mark all as read"
+              aria-label="Mark all alerts as read"
+            >
+              <CheckCheck size={18} />
+            </button>
+          )
+        }
+      />
 
         {notifications.length === 0 ? (
           <EmptyState
@@ -119,6 +118,5 @@ export default function Notifications() {
           onCancel={() => setDeleteTargetId(null)}
         />
       </div>
-    </div>
   )
 }

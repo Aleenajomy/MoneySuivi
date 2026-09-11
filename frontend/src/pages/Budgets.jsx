@@ -71,7 +71,7 @@ export default function Budgets() {
   }
 
 return (
-    <div className="page space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <PageHeader
         title="Category Budgets"
@@ -164,23 +164,23 @@ return (
             const isExceeded = b.percentage >= 100
             
             return (
-              <div key={b.id} className="card p-5 flex flex-col justify-between border dark:border-dark-border border-light-border bg-white dark:bg-dark-card shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+              <div key={b.id} className="card p-5 flex flex-col justify-between border dark:border-dark-border border-slate-200/80 bg-white dark:bg-dark-card shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
                 <div>
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-2.5">
-                      <span className="w-9 h-9 rounded-xl bg-sky-500/10 flex items-center justify-center flex-shrink-0" style={{ color: CATEGORY_COLORS[b.category] || '#0066FF' }}>
+                      <span className="w-9 h-9 rounded-xl bg-sky-500/10 flex items-center justify-center flex-shrink-0" style={{ color: CATEGORY_COLORS[b.category] || '#0EA5E9' }}>
                         {(() => { const I = ICONS[b.category] || CircleDot; return <I size={18} /> })()}
                       </span>
                       <div>
                         <p className="font-bold text-xs dark:text-white text-slate-800">{b.category}</p>
-                        <p className="text-[10px] dark:text-gray-500 text-gray-400 mt-0.5">Category budget</p>
+                        <p className="text-[10px] dark:text-gray-400 text-slate-500 mt-0.5">Category budget</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
                         onClick={() => startEdit(b)}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center dark:text-gray-500 text-gray-400 hover:text-sky-500 dark:hover:text-sky-400 transition-colors"
+                        className="w-7 h-7 rounded-lg flex items-center justify-center dark:text-gray-400 text-slate-400 hover:text-sky-500 dark:hover:text-sky-400 transition-colors"
                         title="Edit Limit"
                       >
                         <Edit2 size={13} />
@@ -188,7 +188,7 @@ return (
                       <button
                         type="button"
                         onClick={() => setConfirmDelete(b.id)}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center dark:text-gray-500 text-gray-400 hover:text-danger transition-colors"
+                        className="w-7 h-7 rounded-lg flex items-center justify-center dark:text-gray-400 text-slate-400 hover:text-danger transition-colors"
                         title="Delete Budget"
                       >
                         <Trash2 size={13} />
@@ -198,10 +198,10 @@ return (
 
                   <div className="mb-4">
                     <div className="flex items-baseline justify-between mb-2">
-                      <span className="text-sm font-black dark:text-white text-slate-800">
-                        {formatCurrency(b.spent)} <span className="text-gray-400 font-semibold text-[10px]">/ {formatCurrency(b.monthlyLimit)}</span>
+                      <span className="text-sm font-black dark:text-white text-slate-800 tabular-nums">
+                        {formatCurrency(b.spent)} <span className="text-slate-400 dark:text-gray-500 font-semibold text-[10px]">/ {formatCurrency(b.monthlyLimit)}</span>
                       </span>
-                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${isExceeded ? 'bg-red-500/10 text-red-500'
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full tabular-nums ${isExceeded ? 'bg-red-500/10 text-red-500'
                           : b.percentage >= 70 ? 'bg-yellow-400/10 text-yellow-500'
                             : 'bg-emerald-500/10 text-emerald-500'
                         }`}>
@@ -214,8 +214,8 @@ return (
                   </div>
                 </div>
 
-                <div className="flex justify-between items-center mt-2 pt-2 border-t dark:border-dark-border border-light-border text-[10px]">
-                  <span className={`font-bold ${isExceeded ? 'text-red-500' : 'dark:text-gray-500 text-gray-500'}`}>
+                <div className="flex justify-between items-center mt-2 pt-2 border-t dark:border-dark-border/60 border-slate-100 text-[11px]">
+                  <span className={`font-bold tabular-nums ${isExceeded ? 'text-red-500' : 'dark:text-gray-400 text-slate-600'}`}>
                     {isExceeded ? 'Limit Exceeded' : `${formatCurrency(b.remaining)} left`}
                   </span>
                   <span className="dark:text-gray-500 text-gray-400 font-semibold">

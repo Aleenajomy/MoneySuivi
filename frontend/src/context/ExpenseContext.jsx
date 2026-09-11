@@ -29,7 +29,9 @@ export function ExpenseProvider({ children }) {
       setPagination({ page: data.currentPage, totalPages: data.totalPages })
     } catch (err) {
       if (err.status !== 401) {
-        toast.error('Failed to load transactions')
+        toast.error(err.isTimeout ? 'Server is waking up. Please wait a moment...' : 'Failed to load transactions', {
+          id: err.isTimeout ? 'server-connection-status' : 'load-transactions'
+        })
       }
     } finally {
       setLoading(false)
