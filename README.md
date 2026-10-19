@@ -91,9 +91,9 @@
 - Read / unread management
 
 ### 🔐 Authentication
-- Secure **JWT-based** register & login
-- Field-level validation with targeted error messages (email not found vs. wrong password)
-- **Forgot password** / reset flow
+- Secure **JWT-based** register & login with rate limiting and a single generic error for bad credentials
+- **Forgot password** via an emailed, single-use link that expires in 30 minutes
+- Changing or resetting the password signs out every other session
 - Profile management with password change
 
 ### ✉️ Help & Support
@@ -120,7 +120,7 @@
 | **HTTP Client** | Axios (with JWT interceptor) |
 | **PWA** | vite-plugin-pwa, Web App Manifest, Service Worker |
 | **Backend** | Node.js, Express.js |
-| **Auth** | JSON Web Token (JWT), bcryptjs (salt rounds: 12) |
+| **Auth** | JSON Web Token (JWT, HS256), bcrypt (cost 12) |
 | **Database** | PostgreSQL (NeonDB) |
 | **ORM** | Prisma 6 |
 | **Background Jobs** | node-cron |
@@ -248,9 +248,10 @@ MoneySuivi/
 | `POST` | `/api/auth/register` | Create account |
 | `POST` | `/api/auth/login` | Login (returns JWT) |
 | `GET` | `/api/auth/me` | Get current user |
-| `PUT` | `/api/auth/profile` | Update name / password |
-| `POST` | `/api/auth/forgot-password` | Reset password |
-| `DELETE` | `/api/auth/reset` | Wipe all user data |
+| `PUT` | `/api/auth/profile` | Update name / password (password change returns a new token) |
+| `POST` | `/api/auth/forgot-password` | Email a reset link (`{ email }`; same response whether or not the account exists) |
+| `POST` | `/api/auth/reset-password` | Set a new password with the emailed token (`{ token, password }`) |
+| `DELETE` | `/api/auth/reset` | Wipe all financial data (`{ password }` required) |
 
 ### Transactions
 | Method | Endpoint | Description |
@@ -340,24 +341,25 @@ Create `backend/.env`:
 PORT=5000
 DATABASE_URL="postgresql://<user>:<password>@<host>/<db>?sslmode=require"
 DIRECT_URL="postgresql://<user>:<password>@<host>/<db>?sslmode=require"
-JWT_SECRET=your_super_secret_jwt_key
+JWT_SECRET=<at least 32 random characters, e.g. openssl rand -hex 32>
 JWT_EXPIRE=7d
 NODE_ENV=development
+APP_URL=http://localhost:3000            # base of password reset links
 VAPID_PUBLIC_KEY="your_vapid_public_key"
 VAPID_PRIVATE_KEY="your_vapid_private_key"
 EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
-EMAIL_USER=aleenallu34@gmail.com
+EMAIL_USER=you@example.com
 EMAIL_PASS=your_gmail_app_password
-EMAIL_TO=aleenallu34@gmail.com
+SUPPORT_EMAIL_TO=support@example.com     # where support tickets are sent
 ```
 
 > Generate VAPID keys: `npx web-push generate-vapid-keys`
 
 ```bash
 npx prisma generate
-npx prisma migrate dev   # or: npx prisma db push
-npm run dev              # starts on http://localhost:5000
+npx prisma migrate deploy   # apply migrations (never use db push against shared databases)
+npm run dev                 # starts on http://localhost:5000
 ```
 
 ### 3. Frontend
@@ -377,7 +379,22 @@ VITE_API_URL=http://localhost:5000/api
 npm run dev              # starts on http://localhost:3000
 ```
 
-### 4. Build for Production (PWA)
+### 4. Tests
+
+Backend tests need a disposable local Postgres (the suite truncates tables and refuses any
+non-local or non-`test` database):
+
+```bash
+docker run -d --name moneysuivi-testdb -e POSTGRES_USER=test -e POSTGRES_PASSWORD=test \
+  -e POSTGRES_DB=moneysuivi_test -p 55432:5432 postgres:16-alpine
+cd backend
+export TEST_DATABASE_URL=postgresql://test:test@localhost:55432/moneysuivi_test
+DATABASE_URL=$TEST_DATABASE_URL DIRECT_URL=$TEST_DATABASE_URL npx prisma migrate deploy
+npm test                 # unit + integration
+cd ../frontend && npx playwright test
+```
+
+### 5. Build for Production (PWA)
 
 ```bash
 cd frontend
@@ -419,6 +436,10 @@ Both services are deployed on **Render**:
 | Backend (Web Service) | `https://smartexpencetracker.onrender.com` |
 
 Database hosted on **NeonDB** (serverless PostgreSQL).
+
+Environment variables, migration, rollback, backup and capacity notes are in
+[docs/PRODUCTION.md](docs/PRODUCTION.md). The security and correctness audit is in
+[docs/AUDIT.md](docs/AUDIT.md).
 
 ---
 
