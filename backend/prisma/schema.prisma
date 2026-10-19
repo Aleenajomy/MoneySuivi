@@ -15,6 +15,7 @@ model User {
   password      String
   budgetLimit   Float          @default(0)
   currency      String         @default("INR")
+  tokenVersion  Int            @default(0)
   expenses      Expense[]
   budgets       Budget[]
   notifications Notification[]
@@ -25,8 +26,21 @@ model User {
   fcmTokens     FcmToken[]
   ledgerContacts LedgerContact[]
   ledgerEntries  LedgerEntry[]
+  passwordResetTokens PasswordResetToken[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 model LedgerContact {
