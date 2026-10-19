@@ -103,11 +103,11 @@ test('budget alerts fire once per threshold per month (regression: repeated on e
   const user = await createUser();
   await request(app).post('/api/budgets').set(auth(user)).send({ category: 'Food', monthlyLimit: 1000 });
   const today = new Date().toISOString().slice(0, 10);
-  for (let i = 0; i < 4; i++) {
-    await tx(user, { title: `Meal ${i}`, amount: 300, type: 'expense', category: 'Food', accountType: 'Cash', paymentMethod: 'Cash', expenseDate: today });
+  // Running totals 850, 900 (both >= 80%) then 1200, 1300 (both >= 100%): each threshold is hit twice.
+  for (const [i, amount] of [850, 50, 300, 100].entries()) {
+    await tx(user, { title: `Meal ${i}`, amount, type: 'expense', category: 'Food', accountType: 'Cash', paymentMethod: 'Cash', expenseDate: today });
   }
   const alerts = await prisma.notification.findMany({ where: { userId: user.id, category: 'Budget Alert' } });
-  // 900 crosses 80% (warning), 1200 crosses 100% (critical): exactly two alerts.
   assert.deepEqual(alerts.map(a => a.type).sort(), ['critical', 'warning']);
 });
 
