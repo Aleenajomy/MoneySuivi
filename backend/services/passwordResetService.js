@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
 const prisma = require('../lib/prisma');
 const { config } = require('../config/env');
 const mailService = require('./mailService');

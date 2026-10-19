@@ -1,4 +1,4 @@
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
 const prisma = require('../lib/prisma');
 const { signToken } = require('../middleware/auth');
 const passwordResetService = require('../services/passwordResetService');
