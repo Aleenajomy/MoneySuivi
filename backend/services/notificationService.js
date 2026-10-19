@@ -1,4 +1,5 @@
 const prisma = require('../lib/prisma');
+const logger = require('../utils/logger');
 const firebaseAdmin = require('./firebaseAdmin');
 const { sendPushNotification: sendLegacyWebPush } = require('./pushService');
 
@@ -30,7 +31,7 @@ class NotificationService {
     saveInApp = true,
   }) {
     if (!userId || !title || !body) {
-      console.warn('[NotificationService] Missing required fields for sendToUser');
+      logger.warn('[NotificationService] Missing required fields for sendToUser');
       return null;
     }
 
@@ -49,7 +50,7 @@ class NotificationService {
           },
         });
       } catch (err) {
-        console.error('[NotificationService] Failed to create in-app notification:', err.message);
+        logger.error('[NotificationService] Failed to create in-app notification:', err.message);
       }
     }
 
@@ -77,22 +78,22 @@ class NotificationService {
 
         // Safe token pruning for unregistered/invalid tokens
         if (fcmResults.invalidTokens && fcmResults.invalidTokens.length > 0) {
-          console.log(`[NotificationService] Pruning ${fcmResults.invalidTokens.length} invalid FCM tokens for user ${userId}`);
+          logger.info(`[NotificationService] Pruning ${fcmResults.invalidTokens.length} invalid FCM tokens for user ${userId}`);
           await prisma.fcmToken.deleteMany({
             where: {
               token: { in: fcmResults.invalidTokens },
             },
-          }).catch(err => console.error('[NotificationService] Error pruning invalid tokens:', err.message));
+          }).catch(err => logger.error('[NotificationService] Error pruning invalid tokens:', err.message));
         }
       }
     } catch (err) {
-      console.error('[NotificationService] Error sending FCM push:', err.message);
+      logger.error('[NotificationService] Error sending FCM push:', err.message);
     }
 
     // 3. Legacy Web Push (VAPID) fallback
     try {
       sendLegacyWebPush(userId, { title, body }).catch(err => {
-        console.error('[NotificationService] Legacy push fallback error:', err.message);
+        logger.error('[NotificationService] Legacy push fallback error:', err.message);
       });
     } catch (err) {
       // Non-critical fallback
@@ -139,7 +140,7 @@ class NotificationService {
         type: 'info',
         data: { url: '/' },
         saveInApp: true,
-      }).catch(err => console.error('[NotificationService] Failed to send login push notification:', err.message));
+      }).catch(err => logger.error('[NotificationService] Failed to send login push notification:', err.message));
     }
 
     return fcmRecord;

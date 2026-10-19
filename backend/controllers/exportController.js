@@ -1,4 +1,6 @@
 const prisma = require('../lib/prisma');
+const { handleError } = require('../utils/http');
+const { roundMoney, sumMoney } = require('../utils/money');
 const PDFDocument = require('pdfkit');
 
 const buildDateFilter = (startDate, endDate) => {
@@ -27,6 +29,14 @@ const getExportData = async (userId, query = {}) => {
   return prisma.expense.findMany({ where, orderBy: { expenseDate: 'desc' } });
 };
 
+// Spreadsheet apps execute cells starting with these characters as formulas, so user-supplied
+// text such as "=HYPERLINK(...)" is prefixed with a quote to keep it inert.
+const csvCell = (value) => {
+  let text = String(value ?? '');
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+  return `"${text.replace(/"/g, '""')}"`;
+};
+
 const formatDate = (date) => new Date(date).toLocaleDateString('en-IN');
 const formatAmount = (amount) => `Rs. ${Number(amount).toLocaleString('en-IN')}`;
 
@@ -46,8 +56,8 @@ const exportPDF = async (req, res) => {
     }
     const { startDate, endDate } = req.query;
     const expenses = await getExportData(req.user.id, req.query);
-    const totalIncome = expenses.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
-    const totalExpense = expenses.filter(e => e.type === 'expense').reduce((sum, e) => sum + e.amount, 0);
+    const totalIncome = sumMoney(expenses.filter(e => e.type === 'income').map(e => e.amount));
+    const totalExpense = sumMoney(expenses.filter(e => e.type === 'expense').map(e => e.amount));
 
     const doc = new PDFDocument({ margin: 40, size: 'A4', bufferPages: true });
     res.setHeader('Content-Type', 'application/pdf');
@@ -64,7 +74,7 @@ const exportPDF = async (req, res) => {
     doc.moveDown(0.4);
     doc.fontSize(10).fillColor('#047857').text(`Total Income: ${formatAmount(totalIncome)}`);
     doc.fillColor('#dc2626').text(`Total Expense: ${formatAmount(totalExpense)}`);
-    doc.fillColor('#4f46e5').text(`Balance: ${formatAmount(totalIncome - totalExpense)}`);
+    doc.fillColor('#4f46e5').text(`Balance: ${formatAmount(roundMoney(totalIncome - totalExpense))}`);
     doc.moveDown();
 
     const columns = [
@@ -113,7 +123,7 @@ const exportPDF = async (req, res) => {
 
     doc.end();
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    handleError(res, error, 'export.exportPDF');
   }
 };
 
@@ -126,12 +136,12 @@ const exportCSV = async (req, res) => {
     const headers = ['Date', 'Title', 'Category', 'Type', 'Account/Payment', 'Amount', 'Note'];
     const rows = expenses.map(e => [
       e.expenseDate ? e.expenseDate.toISOString().slice(0, 10) : '',
-      `"${(e.title || '').replace(/"/g, '""')}"`,
-      `"${(e.category || '').replace(/"/g, '""')}"`,
+      csvCell(e.title),
+      csvCell(e.category),
       e.type,
-      `"${(e.accountType || e.paymentMethod || '').replace(/"/g, '""')}"`,
-      e.amount,
-      `"${(e.note || '').replace(/"/g, '""')}"`,
+      csvCell(e.accountType || e.paymentMethod),
+      roundMoney(e.amount),
+      csvCell(e.note),
     ]);
 
     const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -139,7 +149,7 @@ const exportCSV = async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="transactions-${Date.now()}.csv"`);
     res.send(csvContent);
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    handleError(res, error, 'export.exportCSV');
   }
 };
 

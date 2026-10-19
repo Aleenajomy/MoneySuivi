@@ -1,5 +1,7 @@
 const prisma = require('../lib/prisma');
-const { sendPushNotification } = require('./pushService');
+const logger = require('../utils/logger');
+
+const ALERT_CATEGORY = 'Budget Alert';
 
 const getCurrentMonthRange = () => {
   const now = new Date();
@@ -28,11 +30,14 @@ const checkBudgetAlert = async (userId, category) => {
     if (!threshold) return null;
 
     const type = threshold === 100 ? 'critical' : 'warning';
+    // Alerts are stored under ALERT_CATEGORY with a message that starts with the budget's
+    // category; matching on that is what limits each threshold to one alert per month.
     const existing = await prisma.notification.findFirst({
       where: {
         userId,
-        category,
+        category: ALERT_CATEGORY,
         type,
+        message: { startsWith: `${category} budget ` },
         createdAt: { gte: range.gte },
       },
     });
@@ -50,7 +55,7 @@ const checkBudgetAlert = async (userId, category) => {
     const { inAppNotification } = await notificationService.sendToUser(userId, {
       title,
       body: message,
-      category: 'Budget Alert',
+      category: ALERT_CATEGORY,
       type,
       percentage: Math.round(percentage),
       data: { url: '/budgets', category },
@@ -59,7 +64,7 @@ const checkBudgetAlert = async (userId, category) => {
 
     return inAppNotification;
   } catch (error) {
-    console.error('[BudgetAlert] Error:', error.message);
+    logger.error('[BudgetAlert] Failed', { error: error.message });
     return null;
   }
 };

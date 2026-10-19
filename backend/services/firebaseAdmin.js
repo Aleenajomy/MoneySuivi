@@ -1,4 +1,5 @@
 const admin = require('firebase-admin');
+const logger = require('../utils/logger');
 
 let isInitialized = false;
 let messagingInstance = null;
@@ -32,17 +33,17 @@ const initializeFirebaseAdmin = () => {
     }
 
     if (!credential) {
-      console.warn('[FirebaseAdmin] Warning: Firebase Admin credentials not found in environment. FCM push notifications disabled.');
+      logger.warn('[FirebaseAdmin] Warning: Firebase Admin credentials not found in environment. FCM push notifications disabled.');
       return null;
     }
 
     admin.initializeApp({ credential });
     isInitialized = true;
     messagingInstance = admin.messaging();
-    console.log('[FirebaseAdmin] Firebase Admin SDK initialized successfully');
+    logger.info('[FirebaseAdmin] Firebase Admin SDK initialized successfully');
     return messagingInstance;
   } catch (error) {
-    console.error('[FirebaseAdmin] Failed to initialize Firebase Admin SDK:', error.message);
+    logger.error('[FirebaseAdmin] Failed to initialize Firebase Admin SDK:', error.message);
     return null;
   }
 };
@@ -118,7 +119,7 @@ const sendMulticast = async ({ tokens, notification, data = {} }) => {
         ) {
           invalidTokens.push(tokens[index]);
         } else {
-          console.warn(`[FirebaseAdmin] FCM delivery error for token [${tokens[index].slice(0, 10)}...]:`, res.error.message);
+          logger.warn(`[FirebaseAdmin] FCM delivery error for token [${tokens[index].slice(0, 10)}...]:`, res.error.message);
         }
       }
     });
@@ -129,7 +130,7 @@ const sendMulticast = async ({ tokens, notification, data = {} }) => {
       invalidTokens,
     };
   } catch (error) {
-    console.error('[FirebaseAdmin] sendMulticast error:', error.message);
+    logger.error('[FirebaseAdmin] sendMulticast error:', error.message);
     return { successCount: 0, failureCount: tokens.length, invalidTokens: [] };
   }
 };

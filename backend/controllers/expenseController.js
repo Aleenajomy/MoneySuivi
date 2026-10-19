@@ -1,10 +1,12 @@
 const prisma = require('../lib/prisma');
 const { checkBudgetAlert } = require('../services/budgetAlertService');
-const {
-  calculateBalances,
-  buildBalanceAlerts,
-  normalizeAccountType,
-} = require('../utils/accountBalances');
+const notificationService = require('../services/notificationService');
+const { getAccountBalances } = require('../services/balanceService');
+const { buildBalanceAlerts, normalizeAccountType } = require('../utils/accountBalances');
+const { roundMoney, roundMoneyFields } = require('../utils/money');
+const { firstRunDate } = require('../utils/recurrence');
+const { handleError } = require('../utils/http');
+const logger = require('../utils/logger');
 
 const toExpenseResponse = (e) => ({ ...e, _id: e.id });
 
@@ -22,17 +24,10 @@ const buildFilter = (userId, query) => {
   return where;
 };
 
-const calcNextRunDate = (from, type) => {
-  const d = new Date(from);
-  if (type === 'monthly') d.setMonth(d.getMonth() + 1);
-  else d.setDate(d.getDate() + 7);
-  return d;
-};
-
 const getExpenses = async (req, res) => {
   try {
-    const page = Number(req.query.page || 1);
-    const limit = Number(req.query.limit || 20);
+    const page = req.query.page || 1;
+    const limit = req.query.limit || 20;
     const where = buildFilter(req.user.id, req.query);
     const [total, expenses] = await Promise.all([
       prisma.expense.count({ where }),
@@ -40,7 +35,7 @@ const getExpenses = async (req, res) => {
     ]);
     res.json({ success: true, count: expenses.length, total, totalPages: Math.ceil(total / limit), currentPage: page, expenses: expenses.map(toExpenseResponse) });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    handleError(res, error, 'expense.getExpenses');
   }
 };
 
@@ -50,7 +45,7 @@ const getExpense = async (req, res) => {
     if (!expense) return res.status(404).json({ success: false, message: 'Expense not found' });
     res.json({ success: true, expense: toExpenseResponse(expense) });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    handleError(res, error, 'expense.getExpense');
   }
 };
 
@@ -73,24 +68,22 @@ const createExpense = async (req, res) => {
       data: {
         title,
         category: category || (normalizedType === 'transfer' ? 'Transfer' : 'Other'),
-        amount: Number(amount),
+        amount: roundMoney(amount),
         type: normalizedType,
         accountType: normalizedAccountType,
-        fromAccountType: fromAccountType || null,
-        toAccountType: toAccountType || null,
+        fromAccountType: normalizedType === 'transfer' ? fromAccountType : null,
+        toAccountType: normalizedType === 'transfer' ? toAccountType : null,
         paymentMethod: resolvedPaymentMethod,
         note: note || null,
         expenseDate: date,
         userId: req.user.id,
         recurring: isRecurring,
         recurringType: isRecurring ? recurringType : null,
-        nextRunDate: isRecurring ? calcNextRunDate(date, recurringType) : null,
+        nextRunDate: isRecurring ? firstRunDate(date, recurringType) : null,
       },
     });
     const notification = normalizedType === 'expense' && category ? await checkBudgetAlert(req.user.id, category) : null;
 
-    // Dispatch push notification for added transaction
-    const notificationService = require('../services/notificationService');
     const formattedAmount = `₹${Number(expense.amount).toLocaleString('en-IN')}`;
     if (normalizedType === 'expense') {
       notificationService.sendToUser(req.user.id, {
@@ -100,7 +93,7 @@ const createExpense = async (req, res) => {
         type: 'info',
         data: { url: '/history', expenseId: expense.id },
         saveInApp: false,
-      }).catch(err => console.error('[ExpenseController] Push error:', err.message));
+      }).catch(err => logger.error('[Expense] Push error', { error: err.message }));
     } else if (normalizedType === 'income') {
       notificationService.sendToUser(req.user.id, {
         title: '💰 Income Added',
@@ -109,12 +102,12 @@ const createExpense = async (req, res) => {
         type: 'info',
         data: { url: '/history', expenseId: expense.id },
         saveInApp: true,
-      }).catch(err => console.error('[ExpenseController] Push error:', err.message));
+      }).catch(err => logger.error('[Expense] Push error', { error: err.message }));
     }
 
     res.status(201).json({ success: true, message: 'Expense added successfully', expense: toExpenseResponse(expense), notification });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    handleError(res, error, 'expense.createExpense');
   }
 };
 
@@ -142,16 +135,16 @@ const updateExpense = async (req, res) => {
     } else if (data.paymentMethod === 'Debit Card' && req.body.accountType === undefined) {
       data.accountType = 'Debit Card';
     }
-    if (req.body.amount !== undefined) data.amount = Number(req.body.amount);
+    if (req.body.amount !== undefined) data.amount = roundMoney(req.body.amount);
     if (req.body.expenseDate !== undefined) data.expenseDate = new Date(req.body.expenseDate);
     if (req.body.recurring !== undefined) {
       data.recurring = Boolean(req.body.recurring);
       data.recurringType = req.body.recurring ? req.body.recurringType : null;
-      data.nextRunDate = req.body.recurring ? calcNextRunDate(data.expenseDate || existing.expenseDate, req.body.recurringType) : null;
+      data.nextRunDate = req.body.recurring ? firstRunDate(data.expenseDate || existing.expenseDate, req.body.recurringType) : null;
     } else if (existing.recurring && (req.body.expenseDate !== undefined || req.body.recurringType !== undefined)) {
       const nextType = req.body.recurringType || existing.recurringType;
       data.recurringType = nextType;
-      data.nextRunDate = calcNextRunDate(data.expenseDate || existing.expenseDate, nextType);
+      data.nextRunDate = firstRunDate(data.expenseDate || existing.expenseDate, nextType);
     }
     const expense = await prisma.expense.update({ where: { id: existing.id }, data });
     if ((data.type || existing.type) === 'expense' && (data.amount !== undefined || data.category || data.type)) {
@@ -159,7 +152,7 @@ const updateExpense = async (req, res) => {
     }
     res.json({ success: true, message: 'Expense updated successfully', expense: toExpenseResponse(expense) });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    handleError(res, error, 'expense.updateExpense');
   }
 };
 
@@ -170,7 +163,7 @@ const deleteExpense = async (req, res) => {
     await prisma.expense.delete({ where: { id: existing.id } });
     res.json({ success: true, message: 'Expense deleted successfully' });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    handleError(res, error, 'expense.deleteExpense');
   }
 };
 
@@ -195,7 +188,7 @@ const getAnalytics = async (req, res) => {
     const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
     const next30Days = new Date(now); next30Days.setDate(now.getDate() + 30);
 
-    const [monthlyTotals, categoryTotals, monthlyTrendRows, balanceGrowthRows, upcomingRecurring, accountTotals, investmentTotals, categoryAllTime, allTransactions, investmentAssets] = await Promise.all([
+    const [monthlyTotals, categoryTotals, monthlyTrendRows, balanceGrowthRows, upcomingRecurring, accountTotals, investmentTotals, categoryAllTime, balances, investmentAssets] = await Promise.all([
       prisma.expense.groupBy({ by: ['type'], where: { userId: req.user.id, type: { in: ['expense', 'income'] }, expenseDate: { gte: startOfMonth, lte: endOfMonth } }, _sum: { amount: true } }),
       prisma.expense.groupBy({ by: ['category'], where: { userId: req.user.id, type: 'expense', expenseDate: { gte: startOfMonth, lte: endOfMonth } }, _sum: { amount: true }, orderBy: { _sum: { amount: 'desc' } } }),
       prisma.$queryRaw`
@@ -215,7 +208,7 @@ const getAnalytics = async (req, res) => {
       prisma.expense.groupBy({ by: ['accountType', 'type'], where: { userId: req.user.id, type: { in: ['expense', 'income'] } }, _sum: { amount: true } }),
       prisma.expense.groupBy({ by: ['type'], where: { userId: req.user.id, category: 'Investment' }, _sum: { amount: true } }),
       prisma.expense.groupBy({ by: ['category', 'type'], where: { userId: req.user.id, type: { in: ['expense', 'income'] } }, _sum: { amount: true } }),
-      prisma.expense.findMany({ where: { userId: req.user.id }, select: { amount: true, type: true, accountType: true, paymentMethod: true, fromAccountType: true, toAccountType: true } }),
+      getAccountBalances(req.user.id),
       prisma.asset.findMany({ where: { userId: req.user.id, type: { in: ['Stocks', 'Mutual Funds', 'Fixed Deposit', 'Gold'] } }, select: { type: true, value: true } }),
     ]);
 
@@ -231,8 +224,6 @@ const getAnalytics = async (req, res) => {
     const expensesByAccountType = Object.entries(accountBreakdownMap).map(([accountType, totals]) => ({ accountType, total: totals.expense }));
     const incomeByAccountType = Object.entries(accountBreakdownMap).map(([accountType, totals]) => ({ accountType, total: totals.income }));
 
-    // Calculate absolute all-time net balance
-    const balances = calculateBalances(allTransactions);
     const balanceAlerts = buildBalanceAlerts(balances);
 
     const txInvestment = (investmentTotals.find(i => i.type === 'income')?._sum.amount || 0) - (investmentTotals.find(i => i.type === 'expense')?._sum.amount || 0)
@@ -251,75 +242,40 @@ const getAnalytics = async (req, res) => {
         categoryBalancesMap[cat] = (categoryBalancesMap[cat] || 0) + delta
       })
     }
-    const categoryBalances = Object.entries(categoryBalancesMap).map(([category, balance]) => ({ category, balance }))
+    const categoryBalances = Object.entries(categoryBalancesMap).map(([category, balance]) => ({ category, balance: roundMoney(balance) }))
 
     res.json({
       success: true,
       analytics: {
-        totalIncome, totalExpense,
-        balance: balances.totalBalance,
-        ...balances,
+        totalIncome: roundMoney(totalIncome),
+        totalExpense: roundMoney(totalExpense),
+        balance: roundMoney(balances.totalBalance),
+        ...roundMoneyFields(balances),
         balanceAlerts,
-        categorySpending: categoryTotals.map(i => ({ _id: i.category, total: i._sum.amount || 0 })),
-        monthlyTrend: monthlyTrendRows.map(i => ({ _id: { year: i.year, month: i.month }, total: i.total || 0 })),
-        monthlyBalanceGrowth: balanceGrowthRows.map(i => ({ _id: { year: i.year, month: i.month }, total: i.total || 0 })),
+        categorySpending: categoryTotals.map(i => ({ _id: i.category, total: roundMoney(i._sum.amount) })),
+        monthlyTrend: monthlyTrendRows.map(i => ({ _id: { year: i.year, month: i.month }, total: roundMoney(i.total) })),
+        monthlyBalanceGrowth: balanceGrowthRows.map(i => ({ _id: { year: i.year, month: i.month }, total: roundMoney(i.total) })),
         upcomingRecurring: upcomingRecurring.map(toExpenseResponse),
-        accountBreakdown: Object.entries(accountBreakdownMap).map(([accountType, totals]) => ({ accountType, ...totals, net: totals.income - totals.expense })),
+        accountBreakdown: Object.entries(accountBreakdownMap).map(([accountType, totals]) => ({ accountType, ...roundMoneyFields(totals), net: roundMoney(totals.income - totals.expense) })),
         expensesByAccountType,
         incomeByAccountType,
-        investmentBalance,
-        investmentBreakdown,
+        investmentBalance: roundMoney(investmentBalance),
+        investmentBreakdown: roundMoneyFields(investmentBreakdown),
         categoryBalances,
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    handleError(res, error, 'expense.getAnalytics');
   }
 };
 
 const getBalances = async (req, res) => {
   try {
-    const transactions = await prisma.expense.findMany({
-      where: { userId: req.user.id },
-      select: { amount: true, type: true, accountType: true, paymentMethod: true, fromAccountType: true, toAccountType: true },
-    });
-    const balances = calculateBalances(transactions);
+    const balances = roundMoneyFields(await getAccountBalances(req.user.id));
     res.json({ success: true, balances, alerts: buildBalanceAlerts(balances) });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    handleError(res, error, 'expense.getBalances');
   }
 };
 
 module.exports = { getExpenses, getExpense, createExpense, updateExpense, deleteExpense, getAnalytics, getBalances };
-// Non-destructive debug endpoint to inspect analytics internals
-const getAnalyticsDebug = async (req, res) => {
-  try {
-    const paymentTotals = await prisma.expense.groupBy({ by: ['accountType', 'paymentMethod', 'type'], where: { userId: req.user.id }, _sum: { amount: true } })
-    const recent = await prisma.expense.findMany({ where: { userId: req.user.id }, orderBy: { expenseDate: 'desc' }, take: 20 })
-
-    const paymentBreakdownMap = {}
-    paymentTotals.forEach(item => {
-      const key = item.paymentMethod || 'Other'
-      const delta = (item.type === 'income' ? 1 : -1) * (item._sum.amount || 0)
-      paymentBreakdownMap[key] = (paymentBreakdownMap[key] || 0) + delta
-    })
-
-    const normalizedPaymentMap = {}
-    Object.entries(paymentBreakdownMap).forEach(([k, v]) => {
-      const key = (k || 'other').toString().toLowerCase()
-      normalizedPaymentMap[key] = (normalizedPaymentMap[key] || 0) + v
-    })
-
-    const cashKeys = ['cash']
-    const bankKeys = ['upi', 'credit card', 'debit card', 'net banking', 'bank', 'bank transfer']
-
-    const cashBalance = cashKeys.reduce((s, k) => s + (normalizedPaymentMap[k] || 0), 0)
-    const bankBalance = bankKeys.reduce((s, k) => s + (normalizedPaymentMap[k] || 0), 0)
-
-    res.json({ success: true, paymentTotals, paymentBreakdownMap, normalizedPaymentMap, cashBalance, bankBalance, recent })
-  } catch (e) {
-    res.status(500).json({ success: false, message: e.message })
-  }
-}
-
-module.exports.getAnalyticsDebug = getAnalyticsDebug
