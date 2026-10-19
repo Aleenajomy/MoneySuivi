@@ -1,6 +1,16 @@
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const prisma = require('../lib/prisma');
+const { signToken } = require('../middleware/auth');
+const passwordResetService = require('../services/passwordResetService');
+const { BCRYPT_ROUNDS } = passwordResetService;
+const { handleError } = require('../utils/http');
+const logger = require('../utils/logger');
+
+// Compared against when no account exists so login takes the same time either way.
+const DUMMY_HASH = bcrypt.hashSync('timing-equaliser-not-a-real-password', BCRYPT_ROUNDS);
+
+const INVALID_CREDENTIALS = { success: false, code: 'INVALID_CREDENTIALS', message: 'Invalid email or password.' };
+const RESET_REQUESTED_MESSAGE = 'If an account exists for that email, a password reset link has been sent.';
 
 const toUserResponse = (user) => ({
   id: user.id,
@@ -11,170 +21,125 @@ const toUserResponse = (user) => ({
   createdAt: user.createdAt,
 });
 
-// Generate JWT Token
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRE });
-};
-
-// @desc    Register user
-// @route   POST /api/auth/register
-// @access  Public
 const register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const existingUser = await prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } });
     if (existingUser) {
-      // 409 Conflict — email already taken
       return res.status(409).json({ success: false, code: 'EMAIL_EXISTS', message: 'An account with this email already exists.' });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
-    const user = await prisma.user.create({
-      data: { name, email, password: hashedPassword },
-    });
-    const token = generateToken(user.id);
+    const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
+    const user = await prisma.user.create({ data: { name, email, password: hashedPassword } });
 
     res.status(201).json({
       success: true,
       message: 'Account created successfully.',
-      token,
+      token: signToken(user),
       user: { id: user.id, name: user.name, email: user.email },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Registration failed. Please try again.' });
+    if (error?.code === 'P2002') {
+      return res.status(409).json({ success: false, code: 'EMAIL_EXISTS', message: 'An account with this email already exists.' });
+    }
+    handleError(res, error, 'auth.register');
   }
 };
 
-// @desc    Login user
-// @route   POST /api/auth/login
-// @access  Public
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const cleanEmail = email ? email.trim().toLowerCase() : '';
+    const user = await prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } });
 
-    // Step 1: check if the account exists (case-insensitive for mobile keyboards)
-    const user = await prisma.user.findFirst({
-      where: {
-        email: {
-          equals: cleanEmail,
-          mode: 'insensitive',
-        },
-      },
-    });
-
-    if (!user) {
-      // 404 — no account with that email
-      return res.status(404).json({
-        success: false,
-        code: 'USER_NOT_FOUND',
-        message: 'No account found with this email address. Please create an account first.',
-      });
-    }
-
-    // Step 2: verify the password
-    let isMatch = false;
-    try {
-      isMatch = await bcrypt.compare(password, user.password);
-    } catch (bcryptErr) {
-      console.warn('[Auth Login] bcrypt comparison error:', bcryptErr.message);
-    }
-
-    if (!isMatch) {
-      // 401 — account exists but password is wrong
-      return res.status(401).json({
-        success: false,
-        code: 'WRONG_PASSWORD',
-        message: 'Incorrect password. Please try again.',
-      });
-    }
-
-    const token = generateToken(user.id);
+    const isMatch = await bcrypt.compare(password, user?.password || DUMMY_HASH).catch(() => false);
+    if (!user || !isMatch) return res.status(401).json(INVALID_CREDENTIALS);
 
     return res.json({
       success: true,
       message: 'Login successful',
-      token,
+      token: signToken(user),
       user: { id: user.id, name: user.name, email: user.email },
     });
   } catch (error) {
-    console.error('[Auth Login Error]:', error);
-    return res.status(500).json({ success: false, message: error.message || 'Login failed. Please try again.' });
+    handleError(res, error, 'auth.login');
   }
 };
 
-// @desc    Get current user profile
-// @route   GET /api/auth/me
-// @access  Private
 const getMe = async (req, res) => {
-  try {
-    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
-    res.json({
-      success: true,
-      user: toUserResponse(user),
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
+  res.json({ success: true, user: toUserResponse(req.user) });
 };
 
-// @desc    Update user profile
-// @route   PUT /api/auth/profile
-// @access  Private
 const updateProfile = async (req, res) => {
   try {
     const { name, budgetLimit, currency, currentPassword, password } = req.body;
     const data = {};
     if (name !== undefined) data.name = name;
-    if (budgetLimit !== undefined) data.budgetLimit = Number(budgetLimit);
+    if (budgetLimit !== undefined) data.budgetLimit = budgetLimit;
     if (currency !== undefined) data.currency = currency;
 
     if (password) {
-      const user = await prisma.user.findUnique({ where: { id: req.user.id } });
       if (!currentPassword) return res.status(400).json({ success: false, message: 'Current password is required' });
-      const isMatch = await bcrypt.compare(currentPassword, user.password);
+      const isMatch = await bcrypt.compare(currentPassword, req.user.password);
       if (!isMatch) return res.status(400).json({ success: false, message: 'Current password is incorrect' });
-      data.password = await bcrypt.hash(password, 12);
+      data.password = await bcrypt.hash(password, BCRYPT_ROUNDS);
+      data.tokenVersion = { increment: 1 };
     }
 
     const user = await prisma.user.update({ where: { id: req.user.id }, data });
-    res.json({ success: true, message: 'Profile updated', user: toUserResponse(user) });
+    // A password change revokes old sessions, so hand this device a fresh token.
+    res.json({ success: true, message: 'Profile updated', user: toUserResponse(user), ...(password && { token: signToken(user) }) });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    handleError(res, error, 'auth.updateProfile');
   }
 };
 
+// Deletes the user's financial data but keeps the account, its sessions and device registrations.
 const resetAllData = async (req, res) => {
   try {
+    const isMatch = await bcrypt.compare(req.body.password, req.user.password);
+    if (!isMatch) return res.status(400).json({ success: false, message: 'Password is incorrect' });
+
     const userId = req.user.id;
-    await Promise.all([
+    await prisma.$transaction([
+      prisma.ledgerEntry.deleteMany({ where: { userId } }),
+      prisma.ledgerContact.deleteMany({ where: { userId } }),
+      prisma.eMIPayment.deleteMany({ where: { emi: { userId } } }),
+      prisma.eMI.deleteMany({ where: { userId } }),
       prisma.expense.deleteMany({ where: { userId } }),
       prisma.budget.deleteMany({ where: { userId } }),
-      prisma.eMI.deleteMany({ where: { userId } }),
       prisma.asset.deleteMany({ where: { userId } }),
       prisma.liability.deleteMany({ where: { userId } }),
       prisma.notification.deleteMany({ where: { userId } }),
+      prisma.user.update({ where: { id: userId }, data: { budgetLimit: 0 } }),
     ]);
     res.json({ success: true, message: 'All data reset successfully' });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    handleError(res, error, 'auth.resetAllData');
   }
 };
 
 const forgotPassword = async (req, res) => {
   try {
-    const { email, newPassword } = req.body;
-    if (!email || !newPassword) return res.status(400).json({ success: false, message: 'Email and new password are required' });
-    if (newPassword.length < 6) return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return res.status(404).json({ success: false, message: 'No account found with this email' });
-    const hashed = await bcrypt.hash(newPassword, 12);
-    await prisma.user.update({ where: { email }, data: { password: hashed } });
-    res.json({ success: true, message: 'Password reset successfully' });
+    // Not awaited: the response must not take longer when the account exists.
+    passwordResetService.requestReset(req.body.email)
+      .catch(err => logger.error('[PasswordReset] Request failed', { error: err.message }));
+    res.json({ success: true, message: RESET_REQUESTED_MESSAGE });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    handleError(res, error, 'auth.forgotPassword');
   }
 };
 
-module.exports = { register, login, getMe, updateProfile, resetAllData, forgotPassword };
+const resetPassword = async (req, res) => {
+  try {
+    const ok = await passwordResetService.resetPassword(req.body.token, req.body.password);
+    if (!ok) {
+      return res.status(400).json({ success: false, code: 'INVALID_RESET_TOKEN', message: 'This reset link is invalid or has expired. Please request a new one.' });
+    }
+    res.json({ success: true, message: 'Password reset successfully. Please sign in.' });
+  } catch (error) {
+    handleError(res, error, 'auth.resetPassword');
+  }
+};
+
+module.exports = { register, login, getMe, updateProfile, resetAllData, forgotPassword, resetPassword };

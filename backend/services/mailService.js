@@ -1,57 +1,44 @@
 const nodemailer = require('nodemailer');
+const { sanitizeHeader } = require('../utils/html');
+const logger = require('../utils/logger');
 
-const sendEmail = async ({ to, replyTo, subject, text, html }) => {
+let transporter;
+const getTransporter = () => {
+  if (transporter) return transporter;
+  const user = process.env.EMAIL_USER?.trim();
+  const pass = process.env.EMAIL_PASS?.trim();
+  if (!user || !pass) return null;
+
   const host = (process.env.EMAIL_HOST || 'smtp.gmail.com').trim();
   const port = parseInt(String(process.env.EMAIL_PORT || '587').trim(), 10);
-  const user = process.env.EMAIL_USER ? process.env.EMAIL_USER.trim() : undefined;
-  const pass = process.env.EMAIL_PASS ? process.env.EMAIL_PASS.trim() : undefined;
+  transporter = host.includes('gmail.com')
+    ? nodemailer.createTransport({ service: 'gmail', auth: { user, pass } })
+    : nodemailer.createTransport({ host, port, secure: port === 465, auth: { user, pass } });
+  return transporter;
+};
 
-  if (!user || !pass) {
-    console.warn('⚠️ SMTP credentials (EMAIL_USER / EMAIL_PASS) not configured in .env. Email was not sent.');
-    return { success: false, error: 'SMTP credentials not configured' };
+/**
+ * Sends an email. Resolves { success: false } when SMTP is not configured so callers can decide
+ * how to degrade; throws on delivery errors. A recipient is always required: there is no fallback.
+ */
+const sendEmail = async ({ to, replyTo, subject, text, html }) => {
+  if (!to) throw new Error('Email recipient is required');
+  const transport = getTransporter();
+  if (!transport) {
+    logger.warn('[Mail] SMTP credentials not configured; email not sent');
+    return { success: false, error: 'SMTP not configured' };
   }
 
-  let transporter;
-  if (host.includes('gmail.com')) {
-    transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user,
-        pass,
-      },
-    });
-  } else {
-    transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465, // true for 465, false for other ports
-      auth: {
-        user,
-        pass,
-      },
-      tls: {
-        rejectUnauthorized: false
-      }
-    });
-  }
-
-  const mailOptions = {
-    from: `"SmartExpense Support" <${user}>`,
-    to: to || process.env.EMAIL_TO || 'aleenallu34@gmail.com',
-    replyTo: replyTo || user,
-    subject,
+  const info = await transport.sendMail({
+    from: `"MoneySuivi" <${process.env.EMAIL_FROM || process.env.EMAIL_USER.trim()}>`,
+    to: sanitizeHeader(to),
+    ...(replyTo && { replyTo: sanitizeHeader(replyTo) }),
+    subject: sanitizeHeader(subject),
     text,
     html,
-  };
-
-  try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log('✉️ Email sent successfully:', info.messageId);
-    return { success: true, messageId: info.messageId };
-  } catch (error) {
-    console.error('❌ Error sending email via Nodemailer:', error.message);
-    throw error;
-  }
+  });
+  logger.info('[Mail] Email sent', { messageId: info.messageId });
+  return { success: true, messageId: info.messageId };
 };
 
 module.exports = { sendEmail };
