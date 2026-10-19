@@ -167,11 +167,17 @@ test('login is rate limited per account', async () => {
   }
 });
 
-test('forgot-password is rate limited', async () => {
+test('forgot-password is rate limited per IP and per email', async () => {
   config.rateLimitEnabled = true;
   try {
+    const perEmail = [];
+    for (let i = 0; i < 4; i++) {
+      perEmail.push((await request(app).post('/api/auth/forgot-password').send({ email: 'same@example.test' })).status);
+    }
+    assert.deepEqual(perEmail, [200, 200, 200, 429]);
+
     const statuses = [];
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 11; i++) {
       statuses.push((await request(app).post('/api/auth/forgot-password').send({ email: `r${i}@example.test` })).status);
     }
     assert.equal(statuses.at(-1), 429);
