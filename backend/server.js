@@ -1,93 +1,56 @@
 require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
+const { config, validateEnv } = require('./config/env');
+
+try {
+  validateEnv();
+} catch (err) {
+  console.error(err.message);
+  process.exit(1);
+}
+
+const app = require('./app');
 const prisma = require('./lib/prisma');
-
-const app = express();
-
-const allowedOrigins = [
-  'https://smartexpencetracker-frontend.onrender.com',
-  'https://smartexpencetracker.onrender.com',
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'http://localhost:4173',
-];
-
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, Postman, same-origin proxy)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    // Return 403-style rejection without throwing — avoids 500 from error handler
-    return callback(null, false);
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
-app.options('*', cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Routes
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/expenses', require('./routes/expenses'));
-app.use('/api/transactions', require('./routes/expenses'));
-app.use('/api/budgets', require('./routes/budgets'));
-app.use('/budgets', require('./routes/budgets'));
-app.use('/api/notifications', require('./routes/notifications'));
-app.use('/api/export', require('./routes/export'));
-app.use('/api/emis', require('./routes/emis'));
-app.use('/api/networth', require('./routes/networth'));
-app.use('/api/ledger', require('./routes/ledger'));
-app.use('/api/support', require('./routes/support'));
-
-app.get('/api/health', (req, res) => res.json({ success: true, message: 'MoneySuivi API is running' }));
-
-app.use((req, res) => res.status(404).json({ success: false, message: 'Route not found' }));
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ success: false, message: 'Internal server error' });
-});
-
-const PORT = process.env.PORT || 5000;
+const logger = require('./utils/logger');
 
 const connectWithRetry = async (retries = 5, delay = 2000) => {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       await prisma.$connect();
-      console.log('✅ PostgreSQL connected via Prisma');
-      require('./services/cronJob');
+      logger.info('PostgreSQL connected via Prisma');
       return true;
     } catch (error) {
-      console.warn(`⚠️ Database Connection attempt ${attempt}/${retries} failed: ${error.message}`);
-      if (attempt < retries) {
-        console.log(`Retrying in ${delay / 1000}s...`);
-        await new Promise((res) => setTimeout(res, delay));
-      } else {
-        console.error('❌ Max database connection attempts reached. Database queries will retry automatically on incoming requests.');
-      }
+      logger.warn(`Database connection attempt ${attempt}/${retries} failed: ${error.message}`);
+      if (attempt < retries) await new Promise((res) => setTimeout(res, delay));
     }
   }
+  logger.error('Max database connection attempts reached; queries will retry on incoming requests');
   return false;
 };
 
-const startServer = async () => {
-  const server = app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+const server = app.listen(config.port, () => logger.info(`Server running on port ${config.port}`));
 
-  server.on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-      console.error(`❌  Port ${PORT} is already in use. Kill the process using it and restart.`);
-      process.exit(1);
-    } else {
-      console.error('Server error:', err.message);
-      process.exit(1);
-    }
+server.on('error', (err) => {
+  logger.error(err.code === 'EADDRINUSE' ? `Port ${config.port} is already in use` : `Server error: ${err.message}`);
+  process.exit(1);
+});
+
+let cron;
+connectWithRetry().then(() => {
+  if (!config.cronEnabled) return logger.info('[Cron] Disabled via CRON_ENABLED=false');
+  cron = require('./services/cronJob');
+  cron.start();
+});
+
+// Render sends SIGTERM on deploy; finish in-flight requests and release DB connections first.
+const shutdown = (signal) => {
+  logger.info(`${signal} received, shutting down`);
+  cron?.stop?.();
+  server.close(async () => {
+    await prisma.$disconnect().catch(() => {});
+    process.exit(0);
   });
-
-  // Connect to database in the background with auto-retry
-  await connectWithRetry();
+  setTimeout(() => process.exit(1), 10000).unref();
 };
-
-startServer();
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('unhandledRejection', (reason) => logger.error(`Unhandled promise rejection: ${reason?.message || reason}`, { stack: reason?.stack }));

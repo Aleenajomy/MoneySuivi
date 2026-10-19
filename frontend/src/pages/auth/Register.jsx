@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { Eye, EyeOff, ArrowLeft, TrendingUp, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { PASSWORD_MIN, PASSWORD_MAX } from '../../utils/constants'
 
 // Reusable field error hint
 function FieldError({ msg }) {
@@ -35,8 +36,8 @@ export default function Register() {
     }
     if (!form.password) {
       e.password = 'Please enter a password.'
-    } else if (form.password.length < 6) {
-      e.password = 'Password must be at least 6 characters long.'
+    } else if (form.password.length < PASSWORD_MIN || form.password.length > PASSWORD_MAX) {
+      e.password = `Password must be ${PASSWORD_MIN}-${PASSWORD_MAX} characters long.`
     }
     if (!form.confirm) {
       e.confirm = 'Please confirm your password.'
@@ -167,7 +168,7 @@ export default function Register() {
                     id="reg-password"
                     type={showPass ? 'text' : 'password'}
                     className={`${inputClass('password')} pr-12`}
-                    placeholder="Min. 6 characters"
+                    placeholder={`Min. ${PASSWORD_MIN} characters`}
                     value={form.password}
                     onChange={set('password')}
                   />

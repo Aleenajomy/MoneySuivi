@@ -1,4 +1,5 @@
 const prisma = require('../lib/prisma');
+const { handleError } = require('../utils/http');
 
 const getNotifications = async (req, res) => {
   try {
@@ -10,7 +11,7 @@ const getNotifications = async (req, res) => {
     const unreadCount = notifications.filter(n => !n.read).length;
     res.json({ success: true, notifications, unreadCount });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    handleError(res, error, 'notification.getNotifications');
   }
 };
 
@@ -22,7 +23,7 @@ const markAllRead = async (req, res) => {
     });
     res.json({ success: true, message: 'All marked as read' });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    handleError(res, error, 'notification.markAllRead');
   }
 };
 
@@ -34,7 +35,7 @@ const markRead = async (req, res) => {
     });
     res.json({ success: true });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    handleError(res, error, 'notification.markRead');
   }
 };
 
@@ -43,7 +44,7 @@ const deleteNotification = async (req, res) => {
     await prisma.notification.deleteMany({ where: { id: req.params.id, userId: req.user.id } });
     res.json({ success: true });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    handleError(res, error, 'notification.deleteNotification');
   }
 };
 
@@ -71,7 +72,7 @@ const subscribePush = async (req, res) => {
 
     res.status(201).json({ success: true, message: 'Subscribed to push notifications successfully' });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    handleError(res, error, 'notification.subscribePush');
   }
 };
 
@@ -92,7 +93,7 @@ const registerFcmToken = async (req, res) => {
 
     res.status(200).json({ success: true, message: 'FCM token registered successfully', record });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    handleError(res, error, 'notification.registerFcmToken');
   }
 };
 
@@ -108,7 +109,7 @@ const unregisterFcmToken = async (req, res) => {
 
     res.status(200).json({ success: true, message: 'FCM token unregistered successfully' });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    handleError(res, error, 'notification.unregisterFcmToken');
   }
 };
 

@@ -69,7 +69,8 @@ test.describe('Cash Balance & Startup Stability Tests', () => {
     // Open Account Summary modal to verify initial Cash
     await page.getByRole('button', { name: /view details/i }).click();
     await expect(page.getByText('Account Summary')).toBeVisible();
-    await expect(page.locator('div').filter({ hasText: /^Cash/ }).getByText('₹5,000')).toBeVisible();
+    // The modal and its row container both match the Cash filter.
+    await expect(page.locator('div').filter({ hasText: /^Cash/ }).getByText('₹5,000').first()).toBeVisible();
     await page.getByRole('button', { name: 'Close', exact: true }).click();
 
     // 2. Add Cash Income of 2,000

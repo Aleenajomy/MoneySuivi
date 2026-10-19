@@ -1,26 +1,44 @@
 const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
-const { register, login, getMe, updateProfile, resetAllData, forgotPassword } = require('../controllers/authController');
+const { register, login, getMe, updateProfile, resetAllData, forgotPassword, resetPassword } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
+const limits = require('../middleware/rateLimit');
+const v = require('../validators/common');
 
 const registerRules = [
-  body('name').trim().notEmpty().withMessage('Name is required'),
-  body('email').isEmail().withMessage('Valid email is required'),
-  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  v.text('name', { max: 50, required: true }),
+  v.email(),
+  v.password('password'),
 ];
 
 const loginRules = [
-  body('email').isEmail().withMessage('Valid email is required'),
-  body('password').notEmpty().withMessage('Password is required'),
+  v.email(),
+  // No length policy here: accounts created under the old 6-character rule must still sign in.
+  body('password').isString().notEmpty().withMessage('Password is required').isLength({ max: 1024 }),
 ];
 
-router.post('/register', registerRules, validate, register);
-router.post('/login', loginRules, validate, login);
+const profileRules = [
+  v.text('name', { max: 50 }).notEmpty().withMessage('Name cannot be empty'),
+  v.amount('budgetLimit', { optional: true, allowZero: true }),
+  body('currency').optional().isString().matches(/^[A-Z]{3}$/).withMessage('Currency must be a 3-letter ISO code'),
+  body('currentPassword').optional().isString().isLength({ max: 1024 }),
+  body('password').optional({ values: 'falsy' }).isString().isLength({ min: v.PASSWORD_MIN, max: v.PASSWORD_MAX })
+    .withMessage(`Password must be ${v.PASSWORD_MIN}-${v.PASSWORD_MAX} characters`),
+];
+
+const resetPasswordRules = [
+  body('token').isString().isLength({ min: 20, max: 200 }).withMessage('Invalid reset token'),
+  v.password('password'),
+];
+
+router.post('/register', limits.registerLimiter, registerRules, validate, register);
+router.post('/login', limits.loginLimiter, loginRules, validate, limits.loginAccountLimiter, login);
 router.get('/me', protect, getMe);
-router.put('/profile', protect, updateProfile);
-router.post('/forgot-password', forgotPassword);
-router.delete('/reset', protect, resetAllData);
+router.put('/profile', protect, profileRules, validate, updateProfile);
+router.post('/forgot-password', limits.forgotPasswordLimiter, [v.email()], validate, limits.forgotPasswordAccountLimiter, forgotPassword);
+router.post('/reset-password', limits.resetPasswordLimiter, resetPasswordRules, validate, resetPassword);
+router.delete('/reset', protect, [body('password').isString().notEmpty().withMessage('Password is required to reset data')], validate, resetAllData);
 
 module.exports = router;

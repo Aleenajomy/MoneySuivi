@@ -3,14 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { LogOut, ChevronRight, User, Bell, Shield, HelpCircle, X, Mail, Lock, Eye, EyeOff, Sun, Moon, HandCoins } from 'lucide-react'
-import { formatDate } from '../utils/constants'
+import { formatDate, PASSWORD_MIN, PASSWORD_MAX } from '../utils/constants'
 import toast from 'react-hot-toast'
 import api from '../services/api'
 import ConfirmDialog from '../components/ConfirmDialog'
 import PageHeader from '../components/common/PageHeader'
 
 export default function Profile() {
-  const { user, logout, updateProfile } = useAuth()
+  const { user, logout, updateProfile, changePassword } = useAuth()
   const navigate = useNavigate()
   const { mode, toggle } = useTheme()
   const [editing, setEditing] = useState(false)
@@ -22,6 +22,7 @@ export default function Profile() {
   const [loading, setLoading] = useState(false)
   const [pwLoading, setPwLoading] = useState(false)
   const [confirm, setConfirm] = useState(null) // { type: 'logout' | 'reset' }
+  const [resetPassword, setResetPassword] = useState('')
 
   const handleSave = async (e) => {
     e.preventDefault()
@@ -39,11 +40,13 @@ export default function Profile() {
   const handleChangePassword = async (e) => {
     e.preventDefault()
     if (pwForm.newPw !== pwForm.confirm) return toast.error('Passwords do not match')
-    if (pwForm.newPw.length < 6) return toast.error('Min. 6 characters')
+    if (pwForm.newPw.length < PASSWORD_MIN || pwForm.newPw.length > PASSWORD_MAX) {
+      return toast.error(`Password must be ${PASSWORD_MIN}-${PASSWORD_MAX} characters`)
+    }
     setPwLoading(true)
     try {
-      await api.put('/auth/profile', { currentPassword: pwForm.current, password: pwForm.newPw })
-      toast.success('Password changed!')
+      await changePassword(pwForm.current, pwForm.newPw)
+      toast.success('Password changed! Other devices have been signed out.')
       setPwForm({ current: '', newPw: '', confirm: '' })
       setChangingPw(false)
     } catch (err) {
@@ -64,9 +67,11 @@ export default function Profile() {
     } else if (confirm === 'reset1') {
       setConfirm('reset2')
     } else if (confirm === 'reset2') {
-      setConfirm(null)
+      if (!resetPassword) return toast.error('Enter your password to confirm')
       try {
-        await api.delete('/auth/reset')
+        await api.delete('/auth/reset', { data: { password: resetPassword } })
+        setConfirm(null)
+        setResetPassword('')
         toast.success('All data has been reset')
       } catch (e) {
         toast.error(e.message || 'Reset failed')
@@ -163,7 +168,7 @@ export default function Profile() {
             <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Change Password</p>
             {[
               { key: 'current', label: 'Current Password', placeholder: 'Enter current password' },
-              { key: 'newPw', label: 'New Password', placeholder: 'Min. 6 characters' },
+              { key: 'newPw', label: 'New Password', placeholder: `Min. ${PASSWORD_MIN} characters` },
               { key: 'confirm', label: 'Confirm Password', placeholder: 'Re-enter new password' },
             ].map(({ key, label, placeholder }) => (
               <div key={key} className="space-y-1">
@@ -239,7 +244,7 @@ export default function Profile() {
         open={confirm === 'reset1'}
         variant="warning"
         title="Reset All Data?"
-        message="This will permanently delete all transactions, budgets, EMIs, assets and liabilities. This cannot be undone."
+        message="This will permanently delete all transactions, budgets, EMIs, assets, liabilities and ledger entries. This cannot be undone."
         confirmText="Yes, Continue"
         onConfirm={handleConfirm}
         onCancel={() => setConfirm(null)}
@@ -248,11 +253,21 @@ export default function Profile() {
         open={confirm === 'reset2'}
         variant="critical"
         title="Are You Absolutely Sure?"
-        message="All your financial data will be permanently deleted with no way to recover it."
+        message="All your financial data, including ledger entries, will be permanently deleted with no way to recover it. Enter your password to confirm."
         confirmText="Delete Everything"
         onConfirm={handleConfirm}
-        onCancel={() => setConfirm(null)}
-      />
+        onCancel={() => { setConfirm(null); setResetPassword('') }}
+      >
+        <input
+          type="password"
+          autoComplete="current-password"
+          aria-label="Your password"
+          className="input mt-4"
+          placeholder="Your password"
+          value={resetPassword}
+          onChange={e => setResetPassword(e.target.value)}
+        />
+      </ConfirmDialog>
     </div>
   )
 }

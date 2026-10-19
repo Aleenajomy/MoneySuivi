@@ -8,7 +8,7 @@ const VARIANTS = {
   critical: { icon: ShieldAlert,  color: 'text-red-600',    bg: 'bg-red-600/10',    btn: 'bg-red-600 hover:bg-red-700' },
 }
 
-export default function ConfirmDialog({ open, title, message, confirmText = 'Confirm', cancelText = 'Cancel', variant = 'delete', onConfirm, onCancel }) {
+export default function ConfirmDialog({ open, title, message, confirmText = 'Confirm', cancelText = 'Cancel', variant = 'delete', onConfirm, onCancel, children }) {
   useEffect(() => {
     if (open) document.body.style.overflow = 'hidden'
     else document.body.style.overflow = ''
@@ -36,6 +36,7 @@ export default function ConfirmDialog({ open, title, message, confirmText = 'Con
         {/* Text */}
         <h3 className="text-base font-black text-center dark:text-white text-slate-800 mb-1">{title}</h3>
         {message && <p className="text-xs text-center dark:text-gray-400 text-gray-500 leading-relaxed">{message}</p>}
+        {children}
 
         {/* Buttons */}
         <div className="flex gap-3 mt-6">

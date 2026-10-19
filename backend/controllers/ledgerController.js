@@ -1,36 +1,7 @@
 const prisma = require('../lib/prisma');
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-/**
- * Compute the net balance for a contact from their entries.
- * Positive  → user is owed money (lent out more than received back)
- * Negative  → user owes money   (borrowed more than paid back)
- */
-function computeBalance(entries) {
-  let balance = 0;
-  for (const e of entries) {
-    const amt = Number(e.amount);
-    if (e.type === 'LENT')               balance += amt;  // money went out
-    if (e.type === 'REPAYMENT_RECEIVED') balance -= amt;  // money came back
-    if (e.type === 'BORROWED')           balance -= amt;  // money came in
-    if (e.type === 'REPAYMENT_MADE')     balance += amt;  // money went out
-  }
-  return balance;
-}
-
-/** Add running balance to an ordered list of entries */
-function withRunningBalance(entries) {
-  let running = 0;
-  return entries.map(e => {
-    const amt = Number(e.amount);
-    if (e.type === 'LENT')               running += amt;
-    if (e.type === 'REPAYMENT_RECEIVED') running -= amt;
-    if (e.type === 'BORROWED')           running -= amt;
-    if (e.type === 'REPAYMENT_MADE')     running += amt;
-    return { ...e, runningBalance: running };
-  });
-}
+const { computeContactBalance: computeBalance, withRunningBalance } = require('../utils/ledger');
+const { roundMoney } = require('../utils/money');
+const { handleError } = require('../utils/http');
 
 // ─── Contacts ───────────────────────────────────────────────────────────────
 
@@ -55,22 +26,19 @@ const getContacts = async (req, res) => {
 
     res.json({ success: true, contacts: result });
   } catch (e) {
-    res.status(500).json({ success: false, message: e.message });
+    handleError(res, e, 'ledger.getContacts');
   }
 };
 
 const createContact = async (req, res) => {
   try {
     const { name, phone, note } = req.body;
-    if (!name || !name.trim()) {
-      return res.status(400).json({ success: false, message: 'Name is required' });
-    }
     const contact = await prisma.ledgerContact.create({
       data: { name: name.trim(), phone: phone?.trim() || null, note: note?.trim() || null, userId: req.user.id },
     });
     res.status(201).json({ success: true, contact: { ...contact, balance: 0, entryCount: 0 } });
   } catch (e) {
-    res.status(500).json({ success: false, message: e.message });
+    handleError(res, e, 'ledger.createContact');
   }
 };
 
@@ -85,14 +53,14 @@ const updateContact = async (req, res) => {
     const contact = await prisma.ledgerContact.update({
       where: { id: existing.id },
       data: {
-        name: name?.trim() || existing.name,
-        phone: phone?.trim() || null,
-        note: note?.trim() || null,
+        name: name || existing.name,
+        ...(phone !== undefined && { phone: phone || null }),
+        ...(note !== undefined && { note: note || null }),
       },
     });
     res.json({ success: true, contact });
   } catch (e) {
-    res.status(500).json({ success: false, message: e.message });
+    handleError(res, e, 'ledger.updateContact');
   }
 };
 
@@ -105,7 +73,7 @@ const deleteContact = async (req, res) => {
     await prisma.ledgerContact.delete({ where: { id: existing.id } });
     res.json({ success: true });
   } catch (e) {
-    res.status(500).json({ success: false, message: e.message });
+    handleError(res, e, 'ledger.deleteContact');
   }
 };
 
@@ -129,7 +97,7 @@ const getEntries = async (req, res) => {
 
     res.json({ success: true, contact, entries: enriched, balance });
   } catch (e) {
-    res.status(500).json({ success: false, message: e.message });
+    handleError(res, e, 'ledger.getEntries');
   }
 };
 
@@ -141,18 +109,11 @@ const createEntry = async (req, res) => {
     if (!contact) return res.status(404).json({ success: false, message: 'Contact not found' });
 
     const { type, amount, date, note } = req.body;
-    const validTypes = ['LENT', 'BORROWED', 'REPAYMENT_RECEIVED', 'REPAYMENT_MADE'];
-    if (!validTypes.includes(type)) {
-      return res.status(400).json({ success: false, message: 'Invalid entry type' });
-    }
-    if (!amount || Number(amount) <= 0) {
-      return res.status(400).json({ success: false, message: 'Amount must be positive' });
-    }
 
     const entry = await prisma.ledgerEntry.create({
       data: {
         type,
-        amount: Number(amount),
+        amount: roundMoney(amount),
         date: date ? new Date(date) : new Date(),
         note: note?.trim() || null,
         settled: false,
@@ -162,7 +123,7 @@ const createEntry = async (req, res) => {
     });
     res.status(201).json({ success: true, entry });
   } catch (e) {
-    res.status(500).json({ success: false, message: e.message });
+    handleError(res, e, 'ledger.createEntry');
   }
 };
 
@@ -178,7 +139,7 @@ const updateEntry = async (req, res) => {
       where: { id: existing.id },
       data: {
         ...(type && { type }),
-        ...(amount && { amount: Number(amount) }),
+        ...(amount !== undefined && { amount: roundMoney(amount) }),
         ...(date && { date: new Date(date) }),
         ...(note !== undefined && { note: note?.trim() || null }),
         ...(settled !== undefined && { settled: Boolean(settled) }),
@@ -186,7 +147,7 @@ const updateEntry = async (req, res) => {
     });
     res.json({ success: true, entry });
   } catch (e) {
-    res.status(500).json({ success: false, message: e.message });
+    handleError(res, e, 'ledger.updateEntry');
   }
 };
 
@@ -199,7 +160,7 @@ const deleteEntry = async (req, res) => {
     await prisma.ledgerEntry.delete({ where: { id: existing.id } });
     res.json({ success: true });
   } catch (e) {
-    res.status(500).json({ success: false, message: e.message });
+    handleError(res, e, 'ledger.deleteEntry');
   }
 };
 
@@ -221,9 +182,9 @@ const getLedgerSummary = async (req, res) => {
       else         totalBorrowed += Math.abs(bal);
     }
 
-    res.json({ success: true, totalLentOut, totalBorrowed, netBalance: totalLentOut - totalBorrowed });
+    res.json({ success: true, totalLentOut: roundMoney(totalLentOut), totalBorrowed: roundMoney(totalBorrowed), netBalance: roundMoney(totalLentOut - totalBorrowed) });
   } catch (e) {
-    res.status(500).json({ success: false, message: e.message });
+    handleError(res, e, 'ledger.getLedgerSummary');
   }
 };
 

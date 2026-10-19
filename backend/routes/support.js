@@ -1,78 +1,53 @@
 const express = require('express');
 const router = express.Router();
-const { sendEmail } = require('../services/mailService');
+const mailService = require('../services/mailService');
 const { protect } = require('../middleware/auth');
+const { validate } = require('../middleware/validate');
+const { supportLimiter } = require('../middleware/rateLimit');
+const { config } = require('../config/env');
+const { escapeHtml, sanitizeHeader } = require('../utils/html');
+const logger = require('../utils/logger');
+const v = require('../validators/common');
 
-router.post('/ticket', protect, async (req, res) => {
+const ticketRules = [
+  v.text('subject', { max: 150, required: true }),
+  v.text('message', { max: 5000, required: true }),
+];
+
+router.post('/ticket', protect, supportLimiter, ticketRules, validate, async (req, res) => {
+  if (!config.supportEmailTo) {
+    return res.status(503).json({ success: false, message: 'Support is temporarily unavailable. Please try again later.' });
+  }
+
+  const subject = sanitizeHeader(req.body.subject);
+  const { message } = req.body;
+  const { name, email } = req.user;
+
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+      <h2 style="color: #4f46e5; margin-top: 0;">New Support Ticket</h2>
+      <p><strong>From:</strong> ${escapeHtml(name)}</p>
+      <p><strong>Email:</strong> ${escapeHtml(email)}</p>
+      <p><strong>Subject:</strong> ${escapeHtml(subject)}</p>
+      <div style="background-color: #f8fafc; padding: 15px; border-left: 4px solid #4f46e5; white-space: pre-wrap;">${escapeHtml(message)}</div>
+    </div>`;
+  const text = `Support Ticket\nFrom: ${name} (${email})\nSubject: ${subject}\n\n${message}`;
+
   try {
-    const { subject, message } = req.body;
-    const userName = req.user.name || 'Anonymous User';
-    const userEmail = req.user.email || 'No email provided';
-
-    if (!subject || !message) {
-      return res.status(400).json({ success: false, message: 'Subject and message are required' });
+    const result = await mailService.sendEmail({
+      to: config.supportEmailTo,
+      replyTo: email,
+      subject: `[Support Ticket] ${subject}`,
+      text,
+      html,
+    });
+    if (!result?.success) {
+      return res.status(503).json({ success: false, message: 'Support is temporarily unavailable. Please try again later.' });
     }
-
-    const emailSubject = `[Support Ticket] ${subject}`;
-    const emailBody = `
-      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
-        <h2 style="color: #4f46e5; border-bottom: 2px solid #eef2f6; padding-bottom: 10px; margin-top: 0;">New Support Ticket</h2>
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-          <tr>
-            <td style="padding: 6px 0; font-weight: bold; width: 100px; color: #475569;">From:</td>
-            <td style="padding: 6px 0; color: #1e293b;">${userName}</td>
-          </tr>
-          <tr>
-            <td style="padding: 6px 0; font-weight: bold; color: #475569;">Email:</td>
-            <td style="padding: 6px 0; color: #1e293b;"><a href="mailto:${userEmail}" style="color: #4f46e5; text-decoration: none;">${userEmail}</a></td>
-          </tr>
-          <tr>
-            <td style="padding: 6px 0; font-weight: bold; color: #475569;">Subject:</td>
-            <td style="padding: 6px 0; color: #1e293b; font-style: italic;">${subject}</td>
-          </tr>
-        </table>
-        <div style="background-color: #f8fafc; padding: 15px; border-radius: 6px; border-left: 4px solid #4f46e5; margin-bottom: 20px;">
-          <p style="margin: 0; white-space: pre-wrap; color: #334155; line-height: 1.5;">${message}</p>
-        </div>
-        <hr style="border: 0; border-top: 1px solid #eef2f6; margin-bottom: 15px;" />
-        <p style="font-size: 11px; color: #94a3b8; margin: 0; text-align: center;">This ticket was submitted from SmartExpense Tracker.</p>
-      </div>
-    `;
-
-    const textBody = `Support Ticket:\nFrom: ${userName} (${userEmail})\nSubject: ${subject}\n\nMessage:\n${message}`;
-
-    let emailSent = true;
-    let emailErrorMsg = null;
-    try {
-      await sendEmail({
-        to: process.env.EMAIL_TO || 'aleenallu34@gmail.com',
-        replyTo: userEmail,
-        subject: emailSubject,
-        text: textBody,
-        html: emailBody
-      });
-    } catch (emailError) {
-      emailSent = false;
-      emailErrorMsg = emailError.message;
-      console.error('Failed to send support email via SMTP:', emailError);
-      console.log('--- FALLBACK LOGGING FOR SUPPORT TICKET ---');
-      console.log(`From: ${userName} (${userEmail})`);
-      console.log(`Subject: ${subject}`);
-      console.log(`Message: ${message}`);
-      console.log('------------------------------------------');
-    }
-
-    if (emailSent) {
-      res.json({ success: true, message: 'Support ticket sent successfully' });
-    } else {
-      res.json({ 
-        success: true, 
-        message: `Support ticket submitted, but email dispatch failed: ${emailErrorMsg}` 
-      });
-    }
+    res.json({ success: true, message: 'Support ticket sent successfully' });
   } catch (error) {
-    console.error('Unexpected error in support route:', error);
-    res.status(500).json({ success: false, message: 'An unexpected error occurred' });
+    logger.error('[Support] Failed to send ticket email', { userId: req.user.id, error: error.message });
+    res.status(502).json({ success: false, message: 'We could not send your ticket right now. Please try again later.' });
   }
 });
 

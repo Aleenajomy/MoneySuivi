@@ -1,4 +1,6 @@
 const prisma = require('../lib/prisma');
+const { handleError } = require('../utils/http');
+const { roundMoney } = require('../utils/money');
 
 const getMonthRange = () => {
   const now = new Date();
@@ -26,15 +28,15 @@ const getBudgets = async (req, res) => {
       const percentage = b.monthlyLimit > 0 ? (spent / b.monthlyLimit) * 100 : 0;
       return {
         ...b,
-        spent,
-        remaining: Math.max(b.monthlyLimit - spent, 0),
+        spent: roundMoney(spent),
+        remaining: roundMoney(Math.max(b.monthlyLimit - spent, 0)),
         percentage: Math.round(percentage),
       };
     });
 
     res.json({ success: true, budgets: result });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    handleError(res, error, 'budget.getBudgets');
   }
 };
 
@@ -43,12 +45,12 @@ const createBudget = async (req, res) => {
     const { category, monthlyLimit } = req.body;
     const budget = await prisma.budget.upsert({
       where: { userId_category: { userId: req.user.id, category } },
-      update: { monthlyLimit: Number(monthlyLimit) },
-      create: { userId: req.user.id, category, monthlyLimit: Number(monthlyLimit) },
+      update: { monthlyLimit: roundMoney(monthlyLimit) },
+      create: { userId: req.user.id, category, monthlyLimit: roundMoney(monthlyLimit) },
     });
     res.status(201).json({ success: true, budget });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    handleError(res, error, 'budget.createBudget');
   }
 };
 
@@ -58,11 +60,11 @@ const updateBudget = async (req, res) => {
     if (!budget) return res.status(404).json({ success: false, message: 'Budget not found' });
     const updated = await prisma.budget.update({
       where: { id: req.params.id },
-      data: { monthlyLimit: Number(req.body.monthlyLimit) },
+      data: { monthlyLimit: roundMoney(req.body.monthlyLimit) },
     });
     res.json({ success: true, budget: updated });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    handleError(res, error, 'budget.updateBudget');
   }
 };
 
@@ -73,7 +75,7 @@ const deleteBudget = async (req, res) => {
     await prisma.budget.delete({ where: { id: req.params.id } });
     res.json({ success: true, message: 'Budget deleted' });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    handleError(res, error, 'budget.deleteBudget');
   }
 };
 
