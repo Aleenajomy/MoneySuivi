@@ -112,6 +112,20 @@ export function AuthProvider({ children }) {
     toast.success('Logged out successfully')
   }
 
+  // The server revokes all existing sessions on a password change and returns a fresh token
+  // for this device; without storing it the next request would sign the user out.
+  const changePassword = async (currentPassword, password) => {
+    const res = await api.put('/auth/profile', { currentPassword, password })
+    const nextToken = res?.data?.token
+    if (nextToken) {
+      try {
+        localStorage.setItem('token', nextToken)
+      } catch (_) {}
+      setToken(nextToken)
+    }
+    return res.data
+  }
+
   const updateProfile = async (data) => {
     const res = await api.put('/auth/profile', data)
     setUser(prev => {
@@ -126,7 +140,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, updateProfile }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, logout, updateProfile, changePassword }}>
       {children}
     </AuthContext.Provider>
   )

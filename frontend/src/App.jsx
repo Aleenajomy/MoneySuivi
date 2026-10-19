@@ -10,6 +10,7 @@ import { NetWorthProvider } from './context/NetWorthContext'
 import { LedgerProvider } from './context/LedgerContext'
 import Login from './pages/auth/Login'
 import Register from './pages/auth/Register'
+import ResetPassword from './pages/auth/ResetPassword'
 import Dashboard from './pages/Dashboard'
 import History from './pages/History'
 import Analytics from './pages/Analytics'
@@ -53,6 +54,7 @@ export default function App() {
                 <Routes>
                   <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
                   <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
                     <Route index element={<Dashboard />} />
                     <Route path="history" element={<History />} />

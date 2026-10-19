@@ -2,6 +2,10 @@ export const CATEGORIES = ['Food', 'Travel', 'Shopping', 'Bills', 'Entertainment
 export const INCOME_CATEGORIES = ['Salary', 'Freelance', 'Investment', 'Gift', 'Other']
 export const EXPENSE_CATEGORIES = ['Food', 'Travel', 'Shopping', 'Bills', 'Entertainment', 'Healthcare', 'Other']
 export const PAYMENT_METHODS = ['UPI', 'Cash', 'Credit Card', 'Debit Card', 'Net Banking', 'Other']
+// Mirrors backend/validators/common.js; bcrypt ignores bytes past 72.
+export const PASSWORD_MIN = 8
+export const PASSWORD_MAX = 72
+
 export const ACCOUNT_TYPES = ['Bank', 'UPI', 'Cash', 'Credit Card', 'Debit Card', 'Net Banking']
 
 export const CATEGORY_ICONS = {
