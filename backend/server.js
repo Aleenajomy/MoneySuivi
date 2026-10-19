@@ -1,7 +1,12 @@
 require('dotenv').config();
 const { config, validateEnv } = require('./config/env');
 
-validateEnv();
+try {
+  validateEnv();
+} catch (err) {
+  console.error(err.message);
+  process.exit(1);
+}
 
 const app = require('./app');
 const prisma = require('./lib/prisma');
