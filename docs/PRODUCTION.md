@@ -153,6 +153,29 @@ Backup files contain every user's financial data. Store them encrypted and delet
   alert on `"[Cron]"` together with `failed`.
 - Recommended next step: an external uptime monitor on `/api/health`.
 
+### 6.1 Login log
+
+Every successful sign-in through `POST /api/auth/login` adds a row to the `LoginEvent` table:
+the user and the time, nothing else. Failed attempts and registrations are not recorded. Rows
+are deleted along with their user. There is no UI. Read the table from the Neon SQL editor:
+
+```sql
+-- Most recent sign-ins
+SELECT u.name, u.email, e."createdAt" AS "loggedInAt"
+FROM "LoginEvent" e JOIN "User" u ON u.id = e."userId"
+ORDER BY e."createdAt" DESC
+LIMIT 100;
+
+-- Last sign-in and total sign-ins per user
+SELECT u.name, u.email, MAX(e."createdAt") AS "lastLogin", COUNT(e.id) AS "logins"
+FROM "User" u LEFT JOIN "LoginEvent" e ON e."userId" = u.id
+GROUP BY u.id
+ORDER BY "lastLogin" DESC NULLS LAST;
+```
+
+Times are stored in UTC. The log starts empty on the day this release is deployed, because
+earlier sign-ins were never stored.
+
 ## 7. Capacity and scaling
 
 ### 7.1 Measured results

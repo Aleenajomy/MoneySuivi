@@ -27,6 +27,33 @@ test('login failures are indistinguishable for unknown email and wrong password'
   assert.equal(unknown.body.code, 'INVALID_CREDENTIALS');
 });
 
+test('each successful login is recorded and failed logins are not', async () => {
+  const user = await createUser();
+  await request(app).post('/api/auth/login').send({ email: user.email, password: 'wrong-password' });
+  assert.equal(await prisma.loginEvent.count(), 0);
+
+  const first = await request(app).post('/api/auth/login').send({ email: user.email, password: user.password });
+  const second = await request(app).post('/api/auth/login').send({ email: user.email, password: user.password });
+  assert.equal(first.status, 200);
+  assert.equal(second.status, 200);
+
+  const events = await prisma.loginEvent.findMany({ where: { userId: user.id } });
+  assert.equal(events.length, 2);
+});
+
+test('login still succeeds when the login log cannot be written', async () => {
+  const user = await createUser();
+  const original = prisma.loginEvent.create;
+  prisma.loginEvent.create = async () => { throw new Error('simulated write failure'); };
+  try {
+    const res = await request(app).post('/api/auth/login').send({ email: user.email, password: user.password });
+    assert.equal(res.status, 200);
+    assert.ok(res.body.token);
+  } finally {
+    prisma.loginEvent.create = original;
+  }
+});
+
 test('login is case-insensitive on email and returns a working token', async () => {
   const user = await createUser({ email: 'Mixed.Case@Example.test' });
   const res = await request(app).post('/api/auth/login').send({ email: 'MIXED.case@example.TEST', password: user.password });
