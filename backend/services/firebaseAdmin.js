@@ -48,13 +48,6 @@ const initializeFirebaseAdmin = () => {
   }
 };
 
-const isConfigured = () => {
-  if (!isInitialized) {
-    initializeFirebaseAdmin();
-  }
-  return isInitialized && Boolean(messagingInstance);
-};
-
 /**
  * Send notification to multiple FCM registration tokens.
  * Automatically identifies invalid/unregistered tokens for pruning.
@@ -137,6 +130,5 @@ const sendMulticast = async ({ tokens, notification, data = {} }) => {
 
 module.exports = {
   initializeFirebaseAdmin,
-  isConfigured,
   sendMulticast,
 };

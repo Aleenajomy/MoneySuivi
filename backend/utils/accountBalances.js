@@ -1,16 +1,4 @@
-const PAYMENT_BUCKETS = ['Cash', 'UPI', 'Credit Card', 'Debit Card', 'Net Banking'];
 const ACCOUNT_TYPES = ['Cash', 'Bank', 'UPI', 'Credit Card', 'Wallet', 'Debit Card', 'Net Banking'];
-const BALANCE_ACCOUNTS = ['Cash', 'Bank', 'UPI', 'Wallet', 'Credit Card', 'Debit Card', 'Net Banking'];
-
-const normalizePaymentMethod = (value) => {
-  const raw = String(value || '').trim().toLowerCase();
-  if (raw === 'upi' || raw === 'wallet') return 'UPI';
-  if (raw === 'credit card') return 'Credit Card';
-  if (raw === 'debit card') return 'Debit Card';
-  if (raw === 'net banking' || raw === 'bank transfer' || raw === 'bank') return 'Net Banking';
-  if (raw === 'cash') return 'Cash';
-  return 'Net Banking';
-};
 
 const normalizeAccountType = (value, fallback = 'Cash') => {
   const raw = String(value || fallback).trim().toLowerCase();
@@ -42,10 +30,6 @@ const resolveTransactionBucket = (transaction) => {
   if (acc === 'upi' || pm === 'upi' || acc === 'wallet' || pm === 'wallet') return 'UPI';
   if (acc === 'net banking' || pm === 'net banking' || acc === 'bank' || pm === 'bank' || pm === 'bank transfer') return 'Net Banking';
   return balanceBucketFor(transaction.accountType || transaction.paymentMethod || 'Net Banking');
-};
-
-const inferTransactionAccountType = (transaction) => {
-  return normalizeAccountType(transaction.accountType || transaction.paymentMethod);
 };
 
 const emptyBalances = () => ({
@@ -102,7 +86,7 @@ const calculateBalances = (transactions = []) => {
   return balances;
 };
 
-const buildBalanceAlerts = (balances, thresholds = {}) => {
+const buildBalanceAlerts = (balances) => {
   const alerts = [];
   if (balances.creditCardBalance < 0) {
     alerts.push({ type: 'warning', accountType: 'Credit Card', message: 'Credit Card balance is negative.' });
@@ -111,12 +95,8 @@ const buildBalanceAlerts = (balances, thresholds = {}) => {
 };
 
 module.exports = {
-  PAYMENT_BUCKETS,
   ACCOUNT_TYPES,
-  BALANCE_ACCOUNTS,
-  normalizePaymentMethod,
   normalizeAccountType,
-  inferTransactionAccountType,
   balanceBucketFor,
   resolveTransactionBucket,
   calculateBalances,

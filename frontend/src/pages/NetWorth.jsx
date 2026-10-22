@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Pencil, Trash2, X, TrendingUp, TrendingDown, Coins, Landmark, Calendar, Wallet, Info, HandCoins } from 'lucide-react'
+import { Plus, Pencil, Trash2, TrendingUp, TrendingDown, Coins, Landmark, Calendar, Wallet, Info, HandCoins } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { useNetWorth } from '../context/NetWorthContext'
 import { formatCurrency } from '../utils/constants'
