@@ -27,6 +27,7 @@ model User {
   ledgerContacts LedgerContact[]
   ledgerEntries  LedgerEntry[]
   passwordResetTokens PasswordResetToken[]
+  loginEvents   LoginEvent[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
@@ -41,6 +42,16 @@ model PasswordResetToken {
   createdAt DateTime  @default(now())
 
   @@index([userId])
+}
+
+model LoginEvent {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
 }
 
 model LedgerContact {

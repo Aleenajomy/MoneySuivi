@@ -55,6 +55,10 @@ const login = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user?.password || DUMMY_HASH).catch(() => false);
     if (!user || !isMatch) return res.status(401).json(INVALID_CREDENTIALS);
 
+    // The log is for visibility only; a failed write must never block a valid sign-in.
+    await prisma.loginEvent.create({ data: { userId: user.id } })
+      .catch((error) => logger.error('[auth.login] failed to record login event:', error.message));
+
     return res.json({
       success: true,
       message: 'Login successful',
