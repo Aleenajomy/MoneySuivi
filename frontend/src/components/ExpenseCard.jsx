@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Repeat, Trash2, Utensils, Bus, ShoppingBag, Receipt, Tv, Banknote, HeartPulse, Briefcase, TrendingUp, Gift, CircleDot, ArrowRightLeft } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useExpense } from '../context/ExpenseContext'
-import { CATEGORY_COLORS, CATEGORY_ICONS, formatCurrency, formatShortDate } from '../utils/constants'
+import { CATEGORY_COLORS, formatCurrency, formatShortDate } from '../utils/constants'
 import ConfirmDialog from './ConfirmDialog'
 
 export default function ExpenseCard({ expense, showActions = false }) {

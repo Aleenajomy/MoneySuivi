@@ -3,7 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   Home, Clock, WalletCards, CreditCard, Plus, BookOpen, TrendingUp,
   BarChart3, WalletIcon, BellIcon, UserCircle, LogOut, Settings,
-  Sun, Moon, ChevronLeft, ChevronRight, X, HandCoins, Download, Smartphone, Share2
+  Sun, Moon, ChevronLeft, ChevronRight, X, HandCoins, Download, Share2
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useNotification } from '../context/NotificationContext'
