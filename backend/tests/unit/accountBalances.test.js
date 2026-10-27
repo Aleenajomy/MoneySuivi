@@ -39,6 +39,18 @@ test('aggregated group rows produce the same balances as individual rows', () =>
   assert.deepEqual(calculateBalances(rows), calculateBalances([{ type: 'expense', amount: 300, accountType: 'UPI', paymentMethod: 'UPI' }]));
 });
 
+test('money paid or received via Other lands in the Other bucket, not UPI', () => {
+  const b = calculateBalances([
+    { type: 'income', amount: 700, accountType: 'Net Banking', paymentMethod: 'Other' },
+    // Entries saved before the fix carried accountType UPI.
+    { type: 'income', amount: 300, accountType: 'UPI', paymentMethod: 'Other' },
+    { type: 'expense', amount: 100, accountType: 'UPI', paymentMethod: 'Other' },
+  ]);
+  assert.equal(b.netBankingBalance, 900);
+  assert.equal(b.upiBalance, 0);
+  assert.equal(b.totalBalance, 900);
+});
+
 test('normalizeAccountType maps aliases to canonical accounts', () => {
   assert.equal(normalizeAccountType('net banking'), 'Bank');
   assert.equal(normalizeAccountType('wallet'), 'UPI');

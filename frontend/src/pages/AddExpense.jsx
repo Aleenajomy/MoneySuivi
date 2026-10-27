@@ -25,7 +25,7 @@ const accountTypeForPayment = (paymentMethod) => {
   if (m === 'credit card') return 'Credit Card'
   if (m === 'upi' || m === 'wallet') return 'UPI'
   if (m === 'debit card') return 'Debit Card'
-  if (m === 'net banking' || m === 'bank' || m === 'bank transfer') return 'Net Banking'
+  if (m === 'net banking' || m === 'bank' || m === 'bank transfer' || m === 'other') return 'Net Banking'
   return 'UPI'
 }
 
