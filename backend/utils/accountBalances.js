@@ -24,6 +24,9 @@ const balanceBucketFor = (accountType) => {
 const resolveTransactionBucket = (transaction) => {
   const acc = String(transaction.accountType || '').trim().toLowerCase();
   const pm = String(transaction.paymentMethod || '').trim().toLowerCase();
+  // "Other" is shown in the dashboard's Other row (the netBanking bucket). Older entries were
+  // saved with accountType UPI, so the payment method has to win here.
+  if (pm === 'other') return 'Net Banking';
   if (acc === 'cash' || pm === 'cash') return 'Cash';
   if (acc === 'credit card' || pm === 'credit card') return 'Credit Card';
   if (acc === 'debit card' || pm === 'debit card') return 'Debit Card';
