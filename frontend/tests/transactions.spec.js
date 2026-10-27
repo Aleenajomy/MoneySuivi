@@ -92,6 +92,31 @@ test.describe('Transaction Management UI & Functions', () => {
     await expect(page.locator('text=Total Balance').first()).toBeVisible();
   });
 
+  test('history labels a transaction paid via Other as Other, not its internal account', async ({ page }) => {
+    const otherEntry = {
+      id: 'exp_other',
+      title: 'Paid via other',
+      amount: 218,
+      category: 'Other',
+      type: 'expense',
+      accountType: 'UPI',
+      paymentMethod: 'Other',
+      expenseDate: new Date().toISOString(),
+    };
+    // Registered after the shared mocks, so it takes precedence for the list request only.
+    await page.route((url) => url.pathname === '/api/expenses', (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ expenses: [otherEntry], currentPage: 1, totalPages: 1, totalCount: 1 }),
+    }));
+
+    await page.goto('/#/history');
+    const card = page.locator('div', { hasText: 'Paid via other' }).filter({ hasText: '218' }).last();
+    await expect(card).toBeVisible();
+    await expect(card.getByText('Other', { exact: true }).last()).toBeVisible();
+    await expect(card.getByText('UPI', { exact: true })).toHaveCount(0);
+  });
+
   test('should view history and search transactions', async ({ page }) => {
     await page.goto('/#/history');
 
