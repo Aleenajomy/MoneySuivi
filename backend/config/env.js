@@ -30,10 +30,10 @@ const validateEnv = () => {
   if (!process.env.DATABASE_URL) problems.push('DATABASE_URL is required');
   if (!config.jwtSecret) problems.push('JWT_SECRET is required');
   else if (isProduction && config.jwtSecret.length < 32) problems.push('JWT_SECRET must be at least 32 characters in production');
-  if (isProduction && !process.env.APP_URL) problems.push('APP_URL is required in production (used in password reset links)');
   if (problems.length) {
     throw new Error(`Invalid environment configuration:\n - ${problems.join('\n - ')}`);
   }
+  if (isProduction && !process.env.APP_URL) console.warn(`[Config] APP_URL not set; password reset links will use ${config.appUrl}`);
   if (!config.supportEmailTo) console.warn('[Config] SUPPORT_EMAIL_TO not set; support tickets will be rejected');
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) console.warn('[Config] SMTP not configured; password reset and support emails will not be delivered');
 };

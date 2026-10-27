@@ -15,7 +15,7 @@ The server refuses to start when a required variable is missing or unsafe.
 | `DIRECT_URL` | yes | Direct (non-pooled) Neon URL, used by migrations. |
 | `JWT_SECRET` | yes | At least 32 characters in production (`openssl rand -hex 32`). Changing it signs everyone out. |
 | `JWT_EXPIRE` | no (default `7d`) | Session length. |
-| `APP_URL` | yes in production | Frontend origin used in reset links, e.g. `https://smartexpencetracker-frontend.onrender.com`. |
+| `APP_URL` | recommended | Frontend origin used in reset links. Defaults to `https://smartexpencetracker-frontend.onrender.com` (a warning is logged when unset). |
 | `EMAIL_USER`, `EMAIL_PASS` | yes for password reset | SMTP credentials. Without them reset emails are not delivered and users cannot recover accounts. |
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_FROM` | no | Defaults: Gmail, 587, `EMAIL_USER`. TLS certificates are now verified. |
 | `SUPPORT_EMAIL_TO` | yes for support tickets | Recipient of support tickets. Falls back to `EMAIL_TO`; there is no hardcoded address any more. Without it tickets return 503. |
