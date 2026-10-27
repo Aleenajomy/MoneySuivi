@@ -5,6 +5,11 @@ import { useExpense } from '../context/ExpenseContext'
 import { CATEGORY_COLORS, formatCurrency, formatShortDate } from '../utils/constants'
 import ConfirmDialog from './ConfirmDialog'
 
+// "Other" is stored with an internal accountType (UPI on older entries, Bank on newer ones),
+// so show the payment method the user actually picked.
+const accountLabel = (expense) =>
+  expense.paymentMethod === 'Other' ? 'Other' : expense.accountType || expense.paymentMethod
+
 export default function ExpenseCard({ expense, showActions = false }) {
   const navigate = useNavigate()
   const { deleteExpense } = useExpense()
@@ -64,7 +69,7 @@ export default function ExpenseCard({ expense, showActions = false }) {
           <p className={`font-bold text-sm tabular-nums ${isTransfer ? 'text-sky-500' : isIncome ? 'text-secondary' : 'text-danger'}`}>
             {isTransfer ? '' : isIncome ? '+' : '-'}{formatCurrency(expense.amount)}
           </p>
-          <p className="text-[10px] dark:text-gray-400 text-slate-400 mt-0.5">{isTransfer ? 'Transfer' : expense.accountType || expense.paymentMethod}</p>
+          <p className="text-[10px] dark:text-gray-400 text-slate-400 mt-0.5">{isTransfer ? 'Transfer' : accountLabel(expense)}</p>
         </div>
         {showActions && (
           <button
