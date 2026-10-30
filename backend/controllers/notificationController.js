@@ -51,6 +51,7 @@ const deleteNotification = async (req, res) => {
 const subscribePush = async (req, res) => {
   try {
     const { endpoint, keys } = req.body;
+    const installedApp = req.body.installedApp === true;
     if (!endpoint || !keys?.p256dh || !keys?.auth) {
       return res.status(400).json({ success: false, message: 'Invalid subscription object' });
     }
@@ -61,12 +62,14 @@ const subscribePush = async (req, res) => {
         userId: req.user.id,
         p256dh: keys.p256dh,
         auth: keys.auth,
+        installedApp,
       },
       create: {
         userId: req.user.id,
         endpoint,
         p256dh: keys.p256dh,
         auth: keys.auth,
+        installedApp,
       },
     });
 
@@ -78,7 +81,7 @@ const subscribePush = async (req, res) => {
 
 const registerFcmToken = async (req, res) => {
   try {
-    const { token, device, platform, isNewLogin } = req.body;
+    const { token, device, platform, isNewLogin, installedApp } = req.body;
     if (!token) {
       return res.status(400).json({ success: false, message: 'FCM token is required' });
     }
@@ -89,6 +92,7 @@ const registerFcmToken = async (req, res) => {
       device,
       platform,
       isNewLogin: Boolean(isNewLogin),
+      installedApp: installedApp === true,
     });
 
     res.status(200).json({ success: true, message: 'FCM token registered successfully', record });

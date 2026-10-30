@@ -19,7 +19,7 @@ if (publicKey && privateKey) {
 const sendPushNotification = async (userId, { title, body }) => {
   try {
     const subscriptions = await prisma.pushSubscription.findMany({
-      where: { userId },
+      where: { userId, installedApp: true },
     });
 
     if (subscriptions.length === 0) return;

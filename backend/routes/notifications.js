@@ -18,6 +18,7 @@ const subscribeRules = [
   body('endpoint').isString().isURL({ protocols: ['https'], require_tld: false }).isLength({ max: 1000 }).withMessage('Invalid subscription endpoint'),
   body('keys.p256dh').isString().isLength({ min: 1, max: 200 }),
   body('keys.auth').isString().isLength({ min: 1, max: 100 }),
+  body('installedApp').optional().isBoolean().toBoolean(),
 ];
 
 const fcmRules = [
@@ -25,6 +26,7 @@ const fcmRules = [
   v.text('device', { max: 100 }),
   v.text('platform', { max: 50 }),
   body('isNewLogin').optional().isBoolean(),
+  body('installedApp').optional().isBoolean().toBoolean(),
 ];
 
 router.use(protect);

@@ -57,8 +57,9 @@ class NotificationService {
     // 2. Firebase Cloud Messaging (FCM)
     let fcmResults = { successCount: 0, failureCount: 0, invalidTokens: [] };
     try {
+      // Push goes only to the installed app; a site merely opened in a browser tab gets none.
       const tokenRecords = await prisma.fcmToken.findMany({
-        where: { userId },
+        where: { userId, installedApp: true },
         select: { id: true, token: true },
       });
 
@@ -106,7 +107,7 @@ class NotificationService {
    * Registers or updates an FCM token for an authenticated user.
    * Supports multiple devices per user.
    */
-  async registerFcmToken(userId, { token, device = null, platform = null, isNewLogin = false }) {
+  async registerFcmToken(userId, { token, device = null, platform = null, isNewLogin = false, installedApp = false }) {
     if (!userId || !token) {
       throw new Error('User ID and token are required');
     }
@@ -117,6 +118,7 @@ class NotificationService {
         userId,
         device: device || undefined,
         platform: platform || undefined,
+        installedApp,
         lastUsedAt: new Date(),
       },
       create: {
@@ -124,6 +126,7 @@ class NotificationService {
         token,
         device,
         platform,
+        installedApp,
         lastUsedAt: new Date(),
       },
     });
