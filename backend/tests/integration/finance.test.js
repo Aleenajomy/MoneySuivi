@@ -247,3 +247,34 @@ test('support tickets escape HTML and are rejected when no recipient is configur
     config.supportEmailTo = saved;
   }
 });
+
+test('recurring=true lists only active recurring templates, and stopping one ends its schedule', async () => {
+  const user = await createUser();
+  const rent = (await tx(user, { title: 'Rent', amount: 15000, type: 'expense', accountType: 'Bank', paymentMethod: 'Net Banking', recurring: true, recurringType: 'monthly', expenseDate: '2026-09-01' })).body.expense;
+  await tx(user, { title: 'Tea', amount: 20, type: 'expense', accountType: 'Cash', paymentMethod: 'Cash' });
+  await processRecurring(new Date('2026-10-01T01:00:00+05:30'));
+
+  const listed = await request(app).get('/api/expenses?recurring=true').set(auth(user));
+  assert.equal(listed.status, 200);
+  assert.deepEqual(listed.body.expenses.map(e => e.id), [rent.id]);
+
+  const stopped = await request(app).put(`/api/expenses/${rent.id}`).set(auth(user)).send({ recurring: false });
+  assert.equal(stopped.status, 200);
+  assert.equal(stopped.body.expense.recurring, false);
+  assert.equal(stopped.body.expense.nextRunDate, null);
+
+  const after = await request(app).get('/api/expenses?recurring=true').set(auth(user));
+  assert.equal(after.body.expenses.length, 0);
+  // Past occurrences stay; no new ones are created.
+  const before = await prisma.expense.count({ where: { userId: user.id } });
+  await processRecurring(new Date('2026-12-15T01:00:00+05:30'));
+  assert.equal(await prisma.expense.count({ where: { userId: user.id } }), before);
+});
+
+test('recurring list is scoped to the signed-in user', async () => {
+  const owner = await createUser();
+  const other = await createUser();
+  await tx(owner, { title: 'Netflix', amount: 649, type: 'expense', accountType: 'UPI', paymentMethod: 'UPI', recurring: true, recurringType: 'monthly' });
+  const res = await request(app).get('/api/expenses?recurring=true').set(auth(other));
+  assert.equal(res.body.expenses.length, 0);
+});

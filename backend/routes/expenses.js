@@ -54,6 +54,7 @@ const listRules = [
   query('type').optional().isIn([...TYPES, 'All']),
   query('category').optional().isString().isLength({ max: 50 }),
   query('search').optional().isString().isLength({ max: 100 }),
+  query('recurring').optional().isBoolean().withMessage('recurring must be true or false').toBoolean(),
   query('startDate').optional({ values: 'falsy' }).isISO8601(),
   query('endDate').optional({ values: 'falsy' }).isISO8601(),
 ];

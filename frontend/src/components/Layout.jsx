@@ -3,7 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   Home, Clock, WalletCards, CreditCard, Plus, BookOpen, TrendingUp,
   BarChart3, WalletIcon, BellIcon, UserCircle, LogOut, Settings,
-  Sun, Moon, ChevronLeft, ChevronRight, X, HandCoins, Download, Share2
+  Sun, Moon, ChevronLeft, ChevronRight, X, HandCoins, Download, Share2, Repeat
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useNotification } from '../context/NotificationContext'
@@ -26,6 +26,7 @@ const sidebarNavItems = [
   { path: '/history', icon: Clock, label: 'History' },
   { path: '/add', icon: Plus, label: 'Add Transaction' },
   { path: '/emis', icon: CreditCard, label: 'Loans & EMIs' },
+  { path: '/recurring', icon: Repeat, label: 'Recurring' },
   { path: '/networth', icon: WalletCards, label: 'Net Worth' },
   { path: '/analytics', icon: BarChart3, label: 'Analytics' },
   { path: '/budgets', icon: WalletIcon, label: 'Budgets' },
@@ -94,6 +95,8 @@ export default function Layout() {
     if (path === '/') {
       return location.pathname === '/'
     }
+    // Recurring has no tab of its own on mobile; it is opened from the EMI tab.
+    if (path === '/emis' && location.pathname === '/recurring') return true
     return location.pathname === path || location.pathname.startsWith(path + '/')
   }
 
