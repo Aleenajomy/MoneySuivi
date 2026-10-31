@@ -16,12 +16,24 @@ test('income and expense move the matching account bucket', () => {
 
 test('a transfer moves money between accounts without changing the total', () => {
   const b = calculateBalances([
-    { type: 'income', amount: 10000, accountType: 'Bank', paymentMethod: 'Net Banking' },
-    { type: 'transfer', amount: 2000, accountType: 'Bank', paymentMethod: 'Bank', fromAccountType: 'Bank', toAccountType: 'Cash' },
+    { type: 'income', amount: 10000, accountType: 'Net Banking', paymentMethod: 'Net Banking' },
+    { type: 'transfer', amount: 2000, accountType: 'Net Banking', paymentMethod: 'Net Banking', fromAccountType: 'Net Banking', toAccountType: 'Cash' },
   ]);
   assert.equal(b.netBankingBalance, 8000);
   assert.equal(b.cashBalance, 2000);
   assert.equal(b.totalBalance, 10000);
+});
+
+test('a transfer from Bank takes the money from UPI, and a transfer to Bank adds it there', () => {
+  const b = calculateBalances([
+    { type: 'income', amount: 5000, accountType: 'UPI', paymentMethod: 'UPI' },
+    { type: 'transfer', amount: 2000, accountType: 'Bank', paymentMethod: 'Bank', fromAccountType: 'Bank', toAccountType: 'Cash' },
+    { type: 'transfer', amount: 500, accountType: 'Cash', paymentMethod: 'Cash', fromAccountType: 'Cash', toAccountType: 'Bank' },
+  ]);
+  assert.equal(b.upiBalance, 3500);
+  assert.equal(b.cashBalance, 1500);
+  assert.equal(b.netBankingBalance, 0);
+  assert.equal(b.totalBalance, 5000);
 });
 
 test('credit card spending is a negative balance included in the total', () => {
