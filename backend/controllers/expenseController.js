@@ -11,8 +11,9 @@ const logger = require('../utils/logger');
 const toExpenseResponse = (e) => ({ ...e, _id: e.id });
 
 const buildFilter = (userId, query) => {
-  const { category, startDate, endDate, search, type } = query;
+  const { category, startDate, endDate, search, type, recurring } = query;
   const where = { userId };
+  if (typeof recurring === 'boolean') where.recurring = recurring;
   if (category && category !== 'All') where.category = category;
   if (type && type !== 'All') where.type = type;
   if (search) where.title = { contains: search, mode: 'insensitive' };

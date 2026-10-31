@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, BarChart3, CreditCard, TrendingUp, WalletCards, Clock, X, TrendingDown, Sparkles, Plus } from 'lucide-react'
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, BarChart3, CreditCard, TrendingUp, WalletCards, Clock, X, TrendingDown, Sparkles, Plus, Repeat } from 'lucide-react'
 import { PieChart, Pie, Cell } from 'recharts'
 import { motion } from 'framer-motion'
 import ExpenseCard from '../components/ExpenseCard'
@@ -356,6 +356,13 @@ export default function Dashboard() {
                     ))}
                   </>
                 )}
+                <button
+                  type="button"
+                  onClick={() => navigate('/recurring')}
+                  className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold text-sky-500 pt-2"
+                >
+                  <Repeat size={13} /> Manage recurring payments
+                </button>
               </div>
             </Widget>
           </div>

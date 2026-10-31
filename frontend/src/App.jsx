@@ -21,6 +21,7 @@ import Notifications from './pages/Notifications'
 import EMITracker from './pages/EMITracker'
 import NetWorth from './pages/NetWorth'
 import Ledger from './pages/Ledger'
+import Recurring from './pages/Recurring'
 import Layout from './components/Layout'
 
 function PrivateRoute({ children }) {
@@ -62,6 +63,7 @@ export default function App() {
                     <Route path="budgets" element={<Budgets />} />
                     <Route path="notifications" element={<Notifications />} />
                     <Route path="emis" element={<EMITracker />} />
+                    <Route path="recurring" element={<Recurring />} />
                     <Route path="networth" element={<NetWorth />} />
                     <Route path="ledger" element={<Ledger />} />
                     <Route path="profile" element={<Profile />} />

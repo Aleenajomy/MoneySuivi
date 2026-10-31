@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { CheckCircle, ChevronDown, ChevronUp, Pencil, Plus, Trash2, Calendar, Landmark, Coins, Landmark as LoanIcon, Info } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { CheckCircle, ChevronDown, ChevronUp, Pencil, Plus, Trash2, Calendar, Landmark, Coins, Landmark as LoanIcon, Info, Repeat, ChevronRight } from 'lucide-react'
 import { useEMI } from '../context/EMIContext'
 import { formatCurrency, formatShortDate, getLoanDetails } from '../utils/constants'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -17,6 +18,7 @@ const getNextDue = (startDate, paidInstallments) => {
 }
 
 export default function EMITracker() {
+  const navigate = useNavigate()
   const { emis, loading, fetchEMIs, addEMI, updateEMI, payInstallment, deleteEMI, deletePayment } = useEMI()
 
   // Dashboard navigation states
@@ -155,6 +157,23 @@ export default function EMITracker() {
           </button>
         }
       />
+
+      <button
+        type="button"
+        onClick={() => navigate('/recurring')}
+        className="card w-full p-4 flex items-center justify-between gap-3 text-left active:scale-[0.99] transition-all"
+      >
+        <span className="flex items-center gap-3">
+          <span className="w-9 h-9 rounded-xl bg-sky-500/10 text-sky-500 flex items-center justify-center flex-shrink-0">
+            <Repeat size={18} />
+          </span>
+          <span>
+            <span className="block text-sm font-bold dark:text-white text-slate-800">Recurring Payments</span>
+            <span className="block text-xs dark:text-gray-400 text-slate-500">Rent, subscriptions: view, edit or stop</span>
+          </span>
+        </span>
+        <ChevronRight size={18} className="dark:text-gray-500 text-slate-400 flex-shrink-0" />
+      </button>
 
       {/* Live Aggregate Summary Card */}
       {activeLoans.length > 0 && (
