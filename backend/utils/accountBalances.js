@@ -21,6 +21,10 @@ const balanceBucketFor = (accountType) => {
   return 'Net Banking';
 };
 
+// In transfers, "Bank" is the account UPI spends from, so Bank -> Cash must reduce the UPI row.
+const transferBucketFor = (accountType) =>
+  String(accountType || '').trim().toLowerCase() === 'bank' ? 'UPI' : balanceBucketFor(accountType);
+
 const resolveTransactionBucket = (transaction) => {
   const acc = String(transaction.accountType || '').trim().toLowerCase();
   const pm = String(transaction.paymentMethod || '').trim().toLowerCase();
@@ -62,8 +66,8 @@ const calculateBalances = (transactions = []) => {
     if (!amount || isNaN(amount)) return;
 
     if (transaction.type === 'transfer') {
-      const fromBucket = balanceBucketFor(transaction.fromAccountType || 'Bank');
-      const toBucket = balanceBucketFor(transaction.toAccountType || 'Cash');
+      const fromBucket = transferBucketFor(transaction.fromAccountType || 'Bank');
+      const toBucket = transferBucketFor(transaction.toAccountType || 'Cash');
       addToPaymentBucket(balances, fromBucket, -amount);
       addToPaymentBucket(balances, toBucket, amount);
       return;

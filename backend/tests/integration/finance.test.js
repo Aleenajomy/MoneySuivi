@@ -18,9 +18,10 @@ test('balances across Cash, Bank, UPI and Card, with a transfer, are exact', asy
   await tx(user, { title: 'Shoes', amount: 3000, type: 'expense', accountType: 'Credit Card', paymentMethod: 'Credit Card' });
 
   const b = await balances(user);
-  assert.equal(b.netBankingBalance, 45000);
+  // The ATM transfer is from Bank, which is the UPI account; the Net Banking salary stays in its own row.
+  assert.equal(b.netBankingBalance, 50000);
   assert.equal(b.cashBalance, 4979.9);
-  assert.equal(b.upiBalance, -1234.56);
+  assert.equal(b.upiBalance, -6234.56);
   assert.equal(b.creditCardBalance, -3000);
   assert.equal(b.totalBalance, 45745.34);
 
