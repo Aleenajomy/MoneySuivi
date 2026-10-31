@@ -12,6 +12,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { subscribeUserToPush } from '../utils/pushManager'
 import { registerFcmToken, setupForegroundListener } from '../services/firebase'
 import toast from 'react-hot-toast'
+import { isInstalledApp } from '../utils/platform'
 
 const mobileNavItems = [
   { path: '/', icon: Home, label: 'Home' },
@@ -44,7 +45,8 @@ export default function Layout() {
   
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   useEffect(() => {
-    if (user) {
+    // Push notifications belong to the installed app only, never to a browser tab.
+    if (user && isInstalledApp()) {
       // 1. Existing Web Push subscription (preserves compatibility)
       subscribeUserToPush()
 

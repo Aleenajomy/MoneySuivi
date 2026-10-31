@@ -60,7 +60,7 @@ export async function subscribeUserToPush() {
     }
 
     // Send subscription payload to the backend
-    const response = await api.post('/notifications/subscribe', subscription);
+    const response = await api.post('/notifications/subscribe', { ...subscription.toJSON(), installedApp: true });
     console.log('[PushManager] Subscription successfully registered on backend:', response.data);
     return subscription;
   } catch (error) {

@@ -47,6 +47,9 @@ const getFirebaseMessaging = async () => {
   }
 };
 
+// Bumped when the registration payload changes, so every app re-registers once.
+const FCM_TOKEN_KEY = 'last_registered_fcm_token_v2'
+
 const getDeviceDetails = () => {
   if (typeof window === 'undefined') return { platform: 'Unknown', device: 'Unknown' };
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
@@ -114,7 +117,7 @@ export async function registerFcmToken(options = {}) {
       return null;
     }
 
-    const lastToken = localStorage.getItem('last_registered_fcm_token');
+    const lastToken = localStorage.getItem(FCM_TOKEN_KEY);
     const isNewToken = lastToken !== token;
 
     // Send token to backend if it's new, or if this is an explicit new login
@@ -125,8 +128,9 @@ export async function registerFcmToken(options = {}) {
         device: details.device,
         platform: details.platform,
         isNewLogin: Boolean(options.isNewLogin),
+        installedApp: true,
       });
-      localStorage.setItem('last_registered_fcm_token', token);
+      localStorage.setItem(FCM_TOKEN_KEY, token);
       console.log('[FCM] Token registered successfully with backend');
     }
 
@@ -167,12 +171,12 @@ export function setupForegroundListener(onMessageReceived) {
  * Unregisters the current FCM token from the backend.
  */
 export async function unregisterFcmToken() {
-  const token = localStorage.getItem('last_registered_fcm_token');
+  const token = localStorage.getItem(FCM_TOKEN_KEY);
   if (!token) return;
 
   try {
     await api.delete('/notifications/fcm-token', { data: { token } });
-    localStorage.removeItem('last_registered_fcm_token');
+    localStorage.removeItem(FCM_TOKEN_KEY);
   } catch (err) {
     console.warn('[FCM] Failed to unregister token:', err.message);
   }

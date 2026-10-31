@@ -6,6 +6,7 @@ import { Eye, EyeOff, ArrowLeft, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../../services/api'
 import AuthShell from '../../components/AuthShell'
+import { isInstalledApp } from '../../utils/platform'
 
 // Reusable field error hint
 function FieldError({ msg }) {
@@ -56,7 +57,7 @@ export default function Login() {
     setLoading(true)
     try {
       await login(form.email, form.password)
-      registerFcmToken({ isNewLogin: true }).catch(() => {})
+      if (isInstalledApp()) registerFcmToken({ isNewLogin: true }).catch(() => {})
       navigate('/')
     } catch (err) {
       const status = err.status

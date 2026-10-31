@@ -210,6 +210,7 @@ model PushSubscription {
   endpoint  String   @unique
   p256dh    String
   auth      String
+  installedApp Boolean @default(false)
   createdAt DateTime @default(now())
 
   @@index([userId])
@@ -222,6 +223,7 @@ model FcmToken {
   token      String    @unique
   device     String?   @db.VarChar(100)
   platform   String?   @db.VarChar(50)
+  installedApp Boolean @default(false)
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
   lastUsedAt DateTime?
