@@ -13,6 +13,7 @@ import SalaryPanel from '../components/planner/SalaryPanel'
 import SpendingPanel from '../components/planner/SpendingPanel'
 import GoalsPanel from '../components/planner/GoalsPanel'
 import InvestmentsPanel from '../components/planner/InvestmentsPanel'
+import BillsPanel from '../components/planner/BillsPanel'
 import { formatAmount, periodLabel } from '../utils/planner'
 
 const TABS = [
@@ -22,6 +23,7 @@ const TABS = [
   { id: 'spending', label: 'Spending' },
   { id: 'goals', label: 'Goals' },
   { id: 'invest', label: 'Invest' },
+  { id: 'bills', label: 'Bills' },
 ]
 
 function Overview({ month, onOpen }) {
@@ -89,7 +91,7 @@ export default function SalaryPlanner() {
 
       <MonthSelector period={period} onChange={setPeriod} />
 
-      {/* Six tabs don't fit a 320px phone, so the bar scrolls sideways there instead of squeezing labels. */}
+      {/* Seven tabs don't fit a 320px phone, so the bar scrolls sideways there instead of squeezing labels. */}
       <div role="tablist" aria-label="Planner sections" className="flex gap-1 p-1 rounded-xl dark:bg-dark-card bg-slate-100 border dark:border-dark-border border-transparent overflow-x-auto scrollbar-none">
         {TABS.map(t => (
           <button key={t.id} type="button" role="tab" id={`tab-${t.id}`} aria-selected={tab === t.id} aria-controls="planner-panel"
@@ -112,7 +114,7 @@ export default function SalaryPlanner() {
           <LoadingState />
         ) : ready && !month.plan ? (
           tab === 'salary' ? <SalaryPanel /> : tab === 'spending' ? <SpendingPanel focusLine={null} onFocusLine={() => {}} />
-            : tab === 'goals' ? <GoalsPanel /> : tab === 'invest' ? <InvestmentsPanel /> : (
+            : tab === 'goals' ? <GoalsPanel /> : tab === 'invest' ? <InvestmentsPanel /> : tab === 'bills' ? <BillsPanel /> : (
             <EmptyState icon={CalendarPlus} title={`No plan for ${periodLabel(period)}`}
               description="This month has passed. You can still start a plan to record what you intended; repeating lines from your latest earlier month are copied in."
               actionLabel="Start plan for this month" onAction={() => startPlan().catch(() => {})} />
@@ -123,6 +125,7 @@ export default function SalaryPlanner() {
               : tab === 'spending' ? <SpendingPanel focusLine={focusLine} onFocusLine={showSpending} />
                 : tab === 'goals' ? <GoalsPanel />
                   : tab === 'invest' ? <InvestmentsPanel />
+                    : tab === 'bills' ? <BillsPanel />
                 : <Overview month={month} onOpen={openTab} />
         ) : null}
       </div>

@@ -229,3 +229,70 @@ Each plan returns:
 - `unlinkedThisMonth`: Investment-category transactions entered in History without an investment.
 - `totalThisMonth`: `investedThisMonth` + `unlinkedThisMonth`. This equals the month summary's
   `actual.investmentNet`.
+
+## Bills and EMIs
+
+`GET /bills?year=&month=` (default: the current month) is **read-only**. Bills are the user's
+active recurring expenses (Recurring Payments) and EMIs are their Loans & EMIs. The planner never
+keeps its own copy of either, so nothing can be duplicated. EMIs are paid through the existing
+`PATCH /api/emis/:id/pay`.
+
+Returns `{ bills, emis, upcoming, summary }`:
+
+- **`bills[]`** has one entry per date an active recurring **expense** falls on in the month.
+  Weekly bills can appear up to 5 times. Stopped recurring payments, recurring income and
+  recurring transfers are not bills.
+
+  A date counts as paid when a transaction in History backs it:
+
+  - the first payment itself;
+  - otherwise an auto-added copy with the same title, category and date;
+  - otherwise, for a bill that was renamed or recategorised later, an auto-added copy on the same
+    day with the same amount and payment method.
+
+  Each transaction backs one date only. Statuses:
+
+  | Status | Meaning |
+  |---|---|
+  | `RECORDED` | Backed by a transaction in History. |
+  | `NOT_FOUND` | The nightly job has already passed this date, but no transaction backs it any more. It was deleted or edited. |
+  | `DUE` | Due today or earlier, and not yet added. |
+  | `SCHEDULED` | A future date. |
+
+- **`emis[]`** follows the EMI tracker's own rules:
+  - **Fixed EMI.** Installment *k* is due *k* months after the start date. It is `PAID` once the
+    tracker counts it paid, whichever month the payment was made in. A payment made this month for
+    a different installment shows as `paidThisMonth`, but settles that installment's month, not
+    this one.
+  - **Flexible EMI with an EMI amount.** It is due monthly on its due day: `nextDueDate`, otherwise
+    one month after the start. It is `PAID` or `PARTIAL` from that month's payments.
+  - **Flexible EMI without an amount.** It only appears in its `nextDueDate` month, or in a month
+    with a payment.
+  - Otherwise the status is `OVERDUE`, `DUE_TODAY`, `UPCOMING`, or `NO_DATE`.
+  - **`payable`** marks the one row a payment would settle. For a fixed EMI, the tracker always
+    pays the next unpaid installment, so only that row is payable. A flexible EMI is payable only in
+    the current month, because payments are dated today.
+- **`upcoming[]`** lists the next 30 days from today, whatever month is being viewed: each
+  recurring bill's next date, each fixed EMI's `nextDueDate` (including overdue ones), and each
+  flexible EMI's next unpaid monthly due date.
+- **`summary`** has:
+  - `expected`: all bill dates plus EMI amounts due in the month.
+  - `settled`: recorded bills, plus the EMI amounts settled for this month.
+  - `pending`: added up item by item, so an EMI paid ahead can't hide another bill.
+  - `overdueCount` and `notFoundCount`.
+
+**Limits:**
+
+- A stopped recurring payment, or a completed fixed EMI, no longer appears in past months unless a
+  payment was made that month.
+- EMI payments recorded in Loans & EMIs keep their time of day. A payment made just after midnight
+  IST on the 1st can therefore fall in the previous month, because months are grouped in UTC.
+
+**Reminder.** The nightly job (00:00 Asia/Kolkata) sends a "Bill tomorrow" notification the day
+before a recurring bill is added. It goes in-app, and as a push notification to the installed app.
+
+- Identical bills (same title, amount and account) share one message, for example "2 payments of …".
+- Each message is sent at most once a day. The check and the in-app record happen in one database
+  transaction holding a lock on that message, so two runs can't both send it.
+- A bill created after midnight that is due the next day gets no reminder.
+- The existing EMI reminders are unchanged.

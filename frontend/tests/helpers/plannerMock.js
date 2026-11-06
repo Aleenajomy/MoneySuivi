@@ -18,6 +18,7 @@ export async function setupPlannerMock(page, options = {}) {
     contributions: [],
     investments: [],
     investmentTxs: [],
+    bills: options.bills || { bills: [], emis: [], upcoming: [], summary: { expected: 0, settled: 0, pending: 0, overdueCount: 0, notFoundCount: 0 } },
     requests: [],
     failOverview: Boolean(options.failOverview),
     overviewDelayMs: options.overviewDelayMs || 0,
@@ -205,6 +206,7 @@ export async function setupPlannerMock(page, options = {}) {
       const invested = plans.reduce((t, p) => t + paise(p.thisMonthAmount), 0);
       return { success: true, plans, summary: { plannedThisMonth: rupees(planned), investedThisMonth: rupees(invested), unlinkedThisMonth: 0, totalThisMonth: rupees(invested), totalInvested: rupees(invested), progress: null } };
     };
+    if (path === '/bills' && method === 'GET') return json(route, 200, { success: true, year, month, ...state.bills });
     if (path === '/goals' && method === 'GET') return json(route, 200, { success: true, goals: state.goals.map(goalBody) });
     if (path === '/goals' && method === 'POST') {
       const goal = { id: uuid(), archived: false, initialAmount: 0, monthlyContribution: null, targetDate: null, note: null, ...body };

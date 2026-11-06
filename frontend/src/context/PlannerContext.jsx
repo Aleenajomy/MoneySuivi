@@ -16,6 +16,7 @@ export function PlannerProvider({ children }) {
   const [incomeSources, setIncomeSources] = useState([])
   const [goals, setGoals] = useState([])
   const [investments, setInvestments] = useState({ plans: [], summary: null })
+  const [bills, setBills] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const requestId = useRef(0)
@@ -32,6 +33,7 @@ export function PlannerProvider({ children }) {
       setIncomeSources([])
       setGoals([])
       setInvestments({ plans: [], summary: null })
+      setBills(null)
       setUps.current = new Map()
     }
     lastUserId.current = user.id
@@ -56,10 +58,11 @@ export function PlannerProvider({ children }) {
     setLoading(true)
     setError('')
     try {
-      const [overview, goalsRes, investRes] = await Promise.all([
+      const [overview, goalsRes, investRes, billsRes] = await Promise.all([
         api.get('/planner/overview', { params: target }),
         api.get('/planner/goals', { params: target }),
         api.get('/planner/investments', { params: target }),
+        api.get('/planner/bills', { params: target }),
         loadSources(),
       ])
       let data = overview.data
@@ -77,6 +80,7 @@ export function PlannerProvider({ children }) {
         applyMonth(data)
         setGoals(goalsRes.data.goals)
         setInvestments({ plans: investRes.data.plans, summary: investRes.data.summary })
+        setBills(billsRes.data)
       }
     } catch (err) {
       if (id === requestId.current && err.status !== 401) setError(err.message || 'Could not load your planner')
@@ -225,6 +229,12 @@ export function PlannerProvider({ children }) {
 
   const getInvestmentTxs = useCallback(async (planId) => (await api.get(`/planner/investments/${planId}/transactions`)).data.transactions, [])
 
+  // Paid through the existing Loans & EMIs endpoint, so the EMI tracker stays the only record of it.
+  const payEmi = useCallback(async (emiId, values) => {
+    await mutate(() => api.patch(`/emis/${emiId}/pay`, values), 'EMI payment recorded')
+    await refresh()
+  }, [mutate, refresh])
+
   const startPlan = useCallback(async () => {
     await mutate(() => api.post('/planner/budgets', period), 'Plan created for this month')
     await refresh()
@@ -237,6 +247,7 @@ export function PlannerProvider({ children }) {
       receiveSalary, undoSalary, deleteSalary, getLinkCandidates, getSalaryHistory,
       saveAllocation, deleteAllocation, copyRecurring, assignTransaction,
       goals, saveGoal, archiveGoal, deleteGoal, addContribution, deleteContribution, getContributions,
+      bills, payEmi,
       investments, saveInvestment, setInvestmentActive, deleteInvestment, addInvestmentTx, deleteInvestmentTx, getInvestmentTxs,
     }}>
       {children}
