@@ -3,7 +3,7 @@ import Modal from '../common/Modal'
 import Field from './Field'
 import { usePlanner } from '../../context/PlannerContext'
 import { PAYMENT_METHODS, formatDate } from '../../utils/constants'
-import { amountError, defaultReceivedDate, formatAmount, todayInput } from '../../utils/planner'
+import { amountError, defaultReceivedDate, formatAmount, periodLabel, receivedDateRange } from '../../utils/planner'
 
 /**
  * Records income as received. If a matching income transaction is already in History the user
@@ -21,6 +21,8 @@ export default function ReceiveSalaryForm({ salary, period, onClose }) {
   })
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
+  const range = receivedDateRange(period)
+  const monthStarted = Boolean(range.max)
 
   useEffect(() => {
     let cancelled = false
@@ -46,6 +48,7 @@ export default function ReceiveSalaryForm({ salary, period, onClose }) {
       const amount = amountError(form.receivedAmount, { allowZero: false, label: 'Received amount' })
       if (amount) next.receivedAmount = amount
       if (!form.receivedAt) next.receivedAt = 'Choose the date it arrived'
+      else if (form.receivedAt < range.min || form.receivedAt > range.max) next.receivedAt = `Choose a date in ${periodLabel(period)}, up to today`
     }
     setErrors(next)
     if (Object.keys(next).length) return
@@ -98,8 +101,12 @@ export default function ReceiveSalaryForm({ salary, period, onClose }) {
               ))}
             </div>
             {errors.link && <p role="alert" className="text-[11px] text-red-500 mt-1">{errors.link}</p>}
-            <p className="text-[11px] dark:text-gray-500 text-slate-400 mt-2">Linking uses that transaction's amount and date. No new transaction is added.</p>
+            <p className="text-[11px] dark:text-gray-500 text-slate-400 mt-2">Only income dated in {periodLabel(period)} is listed. Linking uses that transaction's amount and date; no new transaction is added.</p>
           </fieldset>
+        ) : !monthStarted ? (
+          <p className="text-xs dark:text-gray-300 text-slate-600" role="status">
+            {periodLabel(period)} hasn't started yet. Income for it can be recorded from the 1st of the month.
+          </p>
         ) : (
           <>
             <Field label="Amount received (₹)" error={errors.receivedAmount}>
@@ -107,7 +114,7 @@ export default function ReceiveSalaryForm({ salary, period, onClose }) {
             </Field>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Received on" error={errors.receivedAt}>
-                {(a) => <input {...a} className="input cursor-pointer" type="date" max={todayInput()} value={form.receivedAt} onChange={e => set('receivedAt', e.target.value)} />}
+                {(a) => <input {...a} className="input cursor-pointer" type="date" min={range.min} max={range.max} value={form.receivedAt} onChange={e => set('receivedAt', e.target.value)} />}
               </Field>
               <Field label="Received in">
                 {(a) => (
@@ -123,7 +130,7 @@ export default function ReceiveSalaryForm({ salary, period, onClose }) {
 
         <div className="flex gap-3 pt-1">
           <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancel</button>
-          <button type="submit" disabled={saving || candidates === null} className="btn-primary flex-1">
+          <button type="submit" disabled={saving || candidates === null || (mode === 'create' && !monthStarted)} className="btn-primary flex-1">
             {saving ? 'Saving…' : mode === 'link' ? 'Link transaction' : 'Mark received'}
           </button>
         </div>

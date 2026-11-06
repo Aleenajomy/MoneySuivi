@@ -10,12 +10,18 @@ import PlannerSummary from '../components/planner/PlannerSummary'
 import DistributionChart from '../components/planner/DistributionChart'
 import BudgetPanel from '../components/planner/BudgetPanel'
 import SalaryPanel from '../components/planner/SalaryPanel'
+import SpendingPanel from '../components/planner/SpendingPanel'
+import GoalsPanel from '../components/planner/GoalsPanel'
+import InvestmentsPanel from '../components/planner/InvestmentsPanel'
 import { formatAmount, periodLabel } from '../utils/planner'
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'salary', label: 'Salary' },
   { id: 'budget', label: 'Budget' },
+  { id: 'spending', label: 'Spending' },
+  { id: 'goals', label: 'Goals' },
+  { id: 'invest', label: 'Invest' },
 ]
 
 function Overview({ month, onOpen }) {
@@ -64,9 +70,15 @@ export default function SalaryPlanner() {
   const { period, setPeriod, month, loading, error, refresh, startPlan } = usePlanner()
   const [params, setParams] = useSearchParams()
   const tab = TABS.some(t => t.id === params.get('tab')) ? params.get('tab') : 'overview'
-  const openTab = (id) => setParams(id === 'overview' ? {} : { tab: id }, { replace: true })
+  const focusLine = params.get('line')
+  const openTab = (id, extra = {}) => setParams(id === 'overview' ? {} : { tab: id, ...extra }, { replace: true })
+  const showSpending = (lineId) => openTab('spending', lineId ? { line: lineId } : {})
 
   useEffect(() => { refresh(period) }, [period, refresh])
+  // On a narrow phone the tab bar scrolls; keep the selected tab fully visible.
+  useEffect(() => {
+    document.getElementById(`tab-${tab}`)?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+  }, [tab])
 
   const ready = month.summary && !error
   const showLoading = loading && !month.summary
@@ -77,11 +89,12 @@ export default function SalaryPlanner() {
 
       <MonthSelector period={period} onChange={setPeriod} />
 
-      <div role="tablist" aria-label="Planner sections" className="flex gap-1 p-1 rounded-xl dark:bg-dark-card bg-slate-100 border dark:border-dark-border border-transparent">
+      {/* Six tabs don't fit a 320px phone, so the bar scrolls sideways there instead of squeezing labels. */}
+      <div role="tablist" aria-label="Planner sections" className="flex gap-1 p-1 rounded-xl dark:bg-dark-card bg-slate-100 border dark:border-dark-border border-transparent overflow-x-auto scrollbar-none">
         {TABS.map(t => (
           <button key={t.id} type="button" role="tab" id={`tab-${t.id}`} aria-selected={tab === t.id} aria-controls="planner-panel"
             onClick={() => openTab(t.id)}
-            className={`flex-1 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${tab === t.id ? 'bg-white dark:bg-dark-bg shadow-sm dark:text-white text-slate-800' : 'dark:text-gray-400 text-slate-500'}`}>
+            className={`flex-1 min-w-[4.5rem] px-2 py-2 rounded-lg text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${tab === t.id ? 'bg-white dark:bg-dark-bg shadow-sm dark:text-white text-slate-800' : 'dark:text-gray-400 text-slate-500'}`}>
             {t.label}
           </button>
         ))}
@@ -98,13 +111,19 @@ export default function SalaryPlanner() {
         ) : showLoading ? (
           <LoadingState />
         ) : ready && !month.plan ? (
-          tab === 'salary' ? <SalaryPanel /> : (
+          tab === 'salary' ? <SalaryPanel /> : tab === 'spending' ? <SpendingPanel focusLine={null} onFocusLine={() => {}} />
+            : tab === 'goals' ? <GoalsPanel /> : tab === 'invest' ? <InvestmentsPanel /> : (
             <EmptyState icon={CalendarPlus} title={`No plan for ${periodLabel(period)}`}
               description="This month has passed. You can still start a plan to record what you intended; repeating lines from your latest earlier month are copied in."
               actionLabel="Start plan for this month" onAction={() => startPlan().catch(() => {})} />
           )
         ) : ready ? (
-          tab === 'salary' ? <SalaryPanel /> : tab === 'budget' ? <BudgetPanel /> : <Overview month={month} onOpen={openTab} />
+          tab === 'salary' ? <SalaryPanel />
+            : tab === 'budget' ? <BudgetPanel onShowSpending={showSpending} />
+              : tab === 'spending' ? <SpendingPanel focusLine={focusLine} onFocusLine={showSpending} />
+                : tab === 'goals' ? <GoalsPanel />
+                  : tab === 'invest' ? <InvestmentsPanel />
+                : <Overview month={month} onOpen={openTab} />
         ) : null}
       </div>
     </div>

@@ -7,6 +7,7 @@ const { roundMoney, roundMoneyFields } = require('../utils/money');
 const { firstRunDate } = require('../utils/recurrence');
 const { handleError } = require('../utils/http');
 const logger = require('../utils/logger');
+const { resetInvalidSalaryLinks } = require('../services/plannerService');
 
 const toExpenseResponse = (e) => ({ ...e, _id: e.id });
 
@@ -147,7 +148,13 @@ const updateExpense = async (req, res) => {
       data.recurringType = nextType;
       data.nextRunDate = firstRunDate(data.expenseDate || existing.expenseDate, nextType);
     }
-    const expense = await prisma.expense.update({ where: { id: existing.id }, data });
+    // A Salary Planner record linked to this income stops counting as received if the edit makes it
+    // something else (an expense, an investment, or income in another month).
+    const expense = await prisma.$transaction(async (tx) => {
+      const updated = await tx.expense.update({ where: { id: existing.id }, data });
+      await resetInvalidSalaryLinks(tx, req.user.id, existing.id);
+      return updated;
+    });
     if ((data.type || existing.type) === 'expense' && (data.amount !== undefined || data.category || data.type)) {
       await checkBudgetAlert(req.user.id, data.category || existing.category);
     }
@@ -161,7 +168,14 @@ const deleteExpense = async (req, res) => {
   try {
     const existing = await prisma.expense.findFirst({ where: { id: req.params.id, userId: req.user.id } });
     if (!existing) return res.status(404).json({ success: false, message: 'Expense not found' });
-    await prisma.expense.delete({ where: { id: existing.id } });
+    // Deleting a linked income puts its Salary Planner record back to pending in the same step. The
+    // row lock makes a concurrent planner "link" either finish first (so it is reset here) or wait
+    // and then find the transaction gone.
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Expense" WHERE id = ${existing.id} FOR UPDATE`;
+      await tx.monthlySalary.updateMany({ where: { userId: req.user.id, expenseId: existing.id }, data: { receivedAmount: '0', receivedAt: null, expenseId: null } });
+      await tx.expense.delete({ where: { id: existing.id } });
+    });
     res.json({ success: true, message: 'Expense deleted successfully' });
   } catch (error) {
     handleError(res, error, 'expense.deleteExpense');

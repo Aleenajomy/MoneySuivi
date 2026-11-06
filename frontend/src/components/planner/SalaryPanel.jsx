@@ -184,7 +184,7 @@ export default function SalaryPanel() {
           </button>
         </div>
         {incomeSources.length === 0 ? (
-          <p className="text-xs dark:text-gray-500 text-slate-400">No sources yet. A source is income you expect every month, such as your salary or travel allowance.</p>
+          <p className="text-xs dark:text-gray-500 text-slate-400">No sources yet. A source is income you expect every month, such as your salary or an allowance.</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {incomeSources.map(src => (

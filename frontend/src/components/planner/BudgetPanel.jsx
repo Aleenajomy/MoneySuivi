@@ -8,8 +8,10 @@ import AllocationCard from './AllocationCard'
 import AllocationForm from './AllocationForm'
 import { GROUPS, GROUP_META, formatAmount } from '../../utils/planner'
 
-export default function BudgetPanel() {
-  const { month, saveAllocation, deleteAllocation, copyRecurring } = usePlanner()
+export default function BudgetPanel({ onShowSpending }) {
+  const { month, saveAllocation, deleteAllocation, copyRecurring, goals, investments } = usePlanner()
+  const linkedName = (a) => (a.group === 'SAVINGS' && a.savingsGoalId ? goals.find(g => g.id === a.savingsGoalId)?.name
+    : a.group === 'INVESTMENT' && a.investmentPlanId ? investments.plans.find(p => p.id === a.investmentPlanId)?.name : null)
   const { dark } = useTheme()
   const [editing, setEditing] = useState(null)
   const [deleting, setDeleting] = useState(null)
@@ -76,7 +78,7 @@ export default function BudgetPanel() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
                 {items.map(a => (
-                  <AllocationCard key={a.id} allocation={a} onEdit={setEditing} onDelete={setDeleting} onToggleRecurring={toggleRecurring} />
+                  <AllocationCard key={a.id} allocation={{ ...a, linkedName: linkedName(a) }} onEdit={setEditing} onDelete={setDeleting} onToggleRecurring={toggleRecurring} onShowSpending={onShowSpending} />
                 ))}
               </div>
             )}
@@ -86,8 +88,11 @@ export default function BudgetPanel() {
 
       {summary.unplanned.length > 0 && (
         <section className="card p-4" aria-labelledby="unplanned-title">
-          <h3 id="unplanned-title" className="text-sm font-bold dark:text-white text-slate-800">Spending outside the plan</h3>
-          <p className="text-xs dark:text-gray-400 text-slate-500 mb-2">Transactions this month whose category no line tracks.</p>
+          <div className="flex items-center justify-between gap-2">
+            <h3 id="unplanned-title" className="text-sm font-bold dark:text-white text-slate-800">Spending outside the plan</h3>
+            <button type="button" onClick={() => onShowSpending('UNPLANNED')} className="text-xs font-semibold text-sky-600 dark:text-sky-400">Review</button>
+          </div>
+          <p className="text-xs dark:text-gray-400 text-slate-500 mb-2">Spending this month that no line matched by name or category.</p>
           <ul className="text-xs space-y-1">
             {summary.unplanned.map(u => (
               <li key={u.category} className="flex justify-between dark:text-gray-300 text-slate-600">
@@ -111,7 +116,7 @@ export default function BudgetPanel() {
       <ConfirmDialog
         open={Boolean(deleting)}
         title="Delete this allocation?"
-        message={deleting ? `${deleting.name} (${formatAmount(deleting.plannedAmount)}) is removed from this month only. Other months and your transactions are not changed.` : ''}
+        message={deleting ? `${deleting.name} (${formatAmount(deleting.plannedAmount)}) is removed from this month only. Other months and your transactions are not changed; spending you moved to this line goes back to automatic matching.` : ''}
         confirmText="Delete"
         onConfirm={confirmDelete}
         onCancel={() => setDeleting(null)}

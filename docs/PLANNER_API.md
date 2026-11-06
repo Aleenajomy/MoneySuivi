@@ -38,7 +38,7 @@ salary record. `plan` is `null` if the month hasn't been set up.
 | `unallocated` | Expected income minus everything planned. Negative means over-allocated (see `overAllocated`). |
 | `allocatedPercent` | Share of expected income that is planned. `null` when no income is expected. |
 | `actual.income` | Income transactions this month, excluding the Investment category. |
-| `actual.expenses` | Expense transactions plus EMI payments this month. Investment-category and investment-linked transactions are excluded. |
+| `actual.expenses` | Expense transactions plus EMI payments this month. Investment-category transactions are excluded. |
 | `actual.emi` | EMI payments this month. Already included in `actual.expenses`. |
 | `actual.savingsNet` | Savings contributions minus withdrawals. These only set money aside: no transaction is created. |
 | `actual.investmentNet` | Investment buys minus redemptions, from Investment-category transactions. |
@@ -47,18 +47,48 @@ salary record. `plan` is `null` if the month hasn't been set up.
 
 Transfers are never counted as income or spending.
 
+Whether a transaction is an investment is decided by its **category** (Investment), the same rule
+Analytics uses. If you change a buy to another category in History, it becomes ordinary spending
+in the planner, on the Invest tab and in Analytics alike, and it is never counted as both. If you
+change it into a transfer, it stops counting at all.
+
 Each allocation in `plan.allocations[]` also has:
 
-- `actualAmount`, `remainingAmount` and `utilization` (%) for FIXED and VARIABLE lines.
-- `null` for those three on SAVINGS and INVESTMENT lines. Those are tracked through goals and
-  investment plans in Phase 5.
+- `actualAmount`, `remainingAmount` and `utilization` (%):
+  - For FIXED and VARIABLE lines: the spending matched to the line.
+  - For a SAVINGS line linked to a goal (`savingsGoalId`): that goal's contributions minus
+    withdrawals this month.
+  - For an INVESTMENT line linked to an investment (`investmentPlanId`): that investment's buys
+    minus redemptions this month.
+  - `null` for an unlinked SAVINGS or INVESTMENT line, which means "not tracked" rather than ₹0.
 
-Each spending transaction counts toward **exactly one** allocation:
+Each spending item counts toward **exactly one** FIXED or VARIABLE line. The first rule that
+applies wins:
 
-1. A manual assignment, if there is one (Phase 4).
-2. Otherwise, the first line (by `sortOrder`) whose `matchCategories` include the transaction's
-   category. EMI payments match the pseudo-category `EMI`.
-3. Otherwise it is unplanned.
+1. **ASSIGNED.** The user pinned the transaction to a line in this month's plan. A pin to a
+   deleted line, or to another month's plan (because the transaction's date was edited), is
+   ignored.
+2. **NAME.** The transaction's title contains a distinctive word from a line's name. For
+   example, "Mess" matches "Mess / Food" and "House rent" matches "Rent / Accommodation".
+   Generic words such as *other*, *bills*, *personal*, *fund* and *misc* don't count. The line
+   with the most matching words wins, then the lower `sortOrder`.
+3. **CATEGORY.** The first line (by `sortOrder`) whose `matchCategories` include the item's
+   category. EMI payments use the pseudo-category `EMI`.
+4. **UNPLANNED.**
+
+Matching is calculated every time the month is read, so adding, editing or deleting a
+transaction in History shows up straight away. The planner never creates or edits transactions.
+
+Each allocation also has `transactionCount`. `GET /overview` (and every budget write) also
+returns `spending[]`:
+
+```
+{ id, source: "TRANSACTION" | "EMI", title, category, amount, date, paymentMethod,
+  allocationId | null, matchedBy: "ASSIGNED" | "NAME" | "CATEGORY" | "UNPLANNED", reassignable }
+```
+
+EMI payments have the id `emi:<paymentId>` and `reassignable: false`. They come from the EMI
+tracker, so there is no transaction to pin.
 
 ## Income sources
 
@@ -113,3 +143,89 @@ Allocation fields:
 - `group` is one of `FIXED`, `VARIABLE`, `SAVINGS`, `INVESTMENT`.
 - `matchCategories` is up to 20 transaction categories. `"EMI"` matches EMI payments.
 - `recurring` is the "repeat next month" flag.
+
+## Spending and manual reassignment
+
+| Method | Path | Body | Notes |
+|---|---|---|---|
+| GET | `/budgets/spending?year=&month=` | | `{ planId, spending[] }`. Works for a month with no plan, where everything is unplanned. |
+| PUT | `/transactions/:expenseId/assignment` | `allocationId` | Pins the transaction to a line, replacing any earlier pin. Returns the whole month. |
+| DELETE | `/transactions/:expenseId/assignment` | | Removes the pin, so the transaction goes back to automatic matching. Returns the whole month. |
+
+A pin is rejected with:
+
+- **404** if the transaction or the line isn't the user's.
+- **400** if the transaction isn't spending (income, a transfer or an investment).
+- **400** if the line is a SAVINGS or INVESTMENT line.
+- **400** if the line belongs to a different month from the transaction.
+
+Pinning never changes the transaction itself. Because `expenseId` is unique, a transaction always
+has at most one pin. Deleting the line removes its pins, and those transactions go back to
+automatic matching.
+
+## Savings goals
+
+Goals only **set money aside on paper**. Adding to or withdrawing from a goal never creates a
+transaction and never changes an account balance; the month summary reports it as
+`actual.savingsNet`.
+
+| Method | Path | Body | Notes |
+|---|---|---|---|
+| GET | `/goals?year=&month=` | | All goals, active first. `thisMonthAmount` is for the given month (default: the current month). |
+| POST | `/goals` | `name`, `targetAmount` (> 0), `initialAmount?`, `monthlyContribution?`, `targetDate?`, `note?` | `initialAmount` is what was saved before the goal was created. |
+| PUT | `/goals/:id` | any of the above | `targetDate` and `monthlyContribution` can be set to `null`. Lowering `initialAmount` below what has already been withdrawn returns 409. |
+| PATCH | `/goals/:id/archive` | `archived` (boolean) | An archived goal accepts no new entries (409 `ARCHIVED`) until it is restored. |
+| DELETE | `/goals/:id` | | Removes the goal and its entries. Budget lines linked to it are kept and unlinked. |
+| GET | `/goals/:id/contributions` | | Newest first, up to 200. |
+| POST | `/goals/:id/contributions` | `type` (`CONTRIBUTION` or `WITHDRAWAL`), `amount`, `date`, `note?` | A withdrawal larger than what is saved returns 409 `INSUFFICIENT_SAVED`. |
+| DELETE | `/goals/contributions/:contributionId` | | Removing a deposit that later withdrawals depend on returns 409. |
+
+Each goal returns:
+
+- `savedAmount`: `initialAmount` + contributions − withdrawals. It never goes below ₹0: every
+  check that could lower it locks the goal row, so concurrent requests are checked one at a time.
+  A withdrawal may be dated before the deposits that cover it; only the overall balance is checked.
+- `remainingAmount`, `progress` (%, can exceed 100) and `reached`.
+- `monthsLeft` (this month included) and `requiredMonthly`: what would still need to be set aside
+  each month to reach the target by the target date's month, rounded up to the paisa. This is
+  plain arithmetic, not a forecast.
+- `overdue`: the target date has passed without reaching the target.
+
+## Investments
+
+For planning and tracking only: MoneySuivi never buys or sells anything and doesn't estimate
+returns.
+
+| Method | Path | Body | Notes |
+|---|---|---|---|
+| GET | `/investments?year=&month=` | | `{ plans, summary }` for the given month (default: current). |
+| POST | `/investments` | `name`, `category`, `monthlyPlannedAmount?`, `note?` | `category` is one of `GOLD`, `GOLD_ETF`, `MUTUAL_FUND`, `INDEX_FUND`, `STOCK`, `OTHER`. |
+| PUT | `/investments/:id` | any of the above | |
+| PATCH | `/investments/:id/active` | `active` (boolean) | A paused investment accepts no new buys (409 `PAUSED`); redemptions are still allowed. |
+| DELETE | `/investments/:id?deleteTransactions=true` | | Refused with 409 `HAS_TRANSACTIONS` while it has transactions, unless `deleteTransactions=true`, which also deletes them from History and balances. |
+| GET | `/investments/:id/transactions` | | Newest first, up to 200. |
+| POST | `/investments/:id/transactions` | `type` (`BUY` or `REDEEM`), `amount`, `date`, `paymentMethod?`, `note?` | See below. |
+| DELETE | `/investments/transactions/:txId` | | Deletes the transaction from History and balances, and the investment record with it. |
+
+Recording a buy or redemption creates **exactly one** transaction in History, in the same database
+transaction as the investment record:
+
+- A buy is an `expense` and a redemption an `income`, both in the **Investment** category, on the
+  account chosen by `paymentMethod`. Account balances change like for any transaction.
+- The planner counts them in `actual.investmentNet` only, never as income or spending.
+- The History transaction is the source of truth. Editing its amount or date shows up everywhere;
+  changing it into a transfer or another category means it no longer counts as an investment.
+
+Each plan returns:
+
+- `investedTotal`: all buys minus redemptions. It can be negative if more was taken out than put in.
+- `thisMonthAmount` and `thisMonthProgress` (% of `monthlyPlannedAmount`).
+- `transactionCount` and `lastTransactionAt`.
+
+`summary` contains:
+
+- `plannedThisMonth`: active plans only.
+- `investedThisMonth` and `totalInvested`.
+- `unlinkedThisMonth`: Investment-category transactions entered in History without an investment.
+- `totalThisMonth`: `investedThisMonth` + `unlinkedThisMonth`. This equals the month summary's
+  `actual.investmentNet`.
