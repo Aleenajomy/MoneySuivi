@@ -248,3 +248,124 @@ throughput-bound at that point.
   - Frontend runtime: `react-router-dom` 6 → 7 (moderate), and `firebase` 12, whose advisories
     are in `@firebase/firestore` / `@grpc/grpc-js`. The app only uses Firebase Messaging; npm's
     suggested "fix" is a downgrade to 9.x, so leave it and recheck when firebase releases a patch.
+
+## 9. Salary Planner release
+
+The Salary Planner (Phases 2–7) adds the **Salary Planner** screen:
+
+- seven tabs: Overview, Salary, Budget, Spending, Goals, Invest and Bills;
+- the `/api/planner/*` endpoints, documented in [PLANNER_API.md](PLANNER_API.md);
+- a nightly bill reminder.
+
+It reuses the existing transactions, EMIs and recurring payments. It never creates a copy of
+them.
+
+### 9.1 What changes in production
+
+| Change | Effect |
+|---|---|
+| Migrations `20261106000100_salary_planner` and `20261107000100_planner_incentive_kind` | **Additive.** They add nine new tables and widen one CHECK constraint. No existing table or row is altered. See §3.2. |
+| Phases 3–7 | No further migrations. |
+| History edit and delete of a transaction (`expenseController`) | If the transaction backs a received salary in the planner and the change turns it into something else (an expense, an investment, another month) or deletes it, that salary record goes back to pending, in the same database transaction. All other transactions behave exactly as before. |
+| Recurring edits (fix #16) | Editing a recurring payment no longer moves its schedule backwards, so it no longer re-creates past occurrences. Turning recurring back on starts from today. |
+| Nightly job (00:00 Asia/Kolkata) | A new `bill-reminders` step runs after `recurring` and `emi-reminders`. |
+| Reset All Data | Also deletes the user's planner data, in the same transaction. |
+
+### 9.2 Before deploying
+
+1. **Take a backup or Neon branch** (§5).
+2. **Check the migration state, read-only.** This only reads catalog tables and migration history,
+   never user records:
+
+   ```
+   PGOPTIONS='-c default_transaction_read_only=on' psql "$DATABASE_URL" -f docs/sql/planner-migration-check.sql
+   ```
+
+   - Both planner migrations should be finished, and section 4 of the output (failed migrations)
+     should be empty.
+   - A failed migration blocks every deploy with `P3009`. Stop and investigate it before
+     deploying again; never reset the database.
+3. **Check for duplicate recurring transactions**, read-only. The edit bug fixed in #16 may already
+   have created some:
+
+   ```
+   PGOPTIONS='-c default_transaction_read_only=on' psql "$DATABASE_URL" -f docs/sql/recurring-duplicates-check.sql
+   ```
+
+   Any cleanup is a separate, reviewed step, done after the backup.
+4. **Check Render.** Confirm the backend's build command is `npm install && npm run build` (which
+   runs `prisma migrate deploy`), and check whether Auto-Deploy is on for `main`. If it is, merging
+   is deploying.
+
+### 9.3 Deploy
+
+1. Deploy the **backend** first. Its build applies any pending migration. A failed migration fails
+   the build, and Render keeps serving the previous version.
+2. Then deploy the **frontend**. The new screens only call endpoints that the new backend already
+   serves.
+
+### 9.4 Smoke test after deploying
+
+These need no account:
+
+```
+curl -s https://smartexpencetracker.onrender.com/api/health                     # 200, "database":"up"
+curl -s -o /dev/null -w '%{http_code}\n' https://smartexpencetracker.onrender.com/api/planner/report   # 401 (route exists, needs sign-in)
+```
+
+Then, in the app, signed in with a **test account**:
+
+1. Open **Salary Planner**. Each tab loads without a "Could not load" message.
+2. Add a salary source, mark it received, and confirm one income appears in History.
+3. Add a budget line, then an expense in History, and confirm the line's "Spent" updates.
+4. Add money to a goal, and confirm no transaction appears in History.
+5. Record an investment buy, and confirm exactly one Investment transaction appears in History.
+6. Open **Bills** and check the recurring payments and EMIs you know about.
+
+### 9.5 Monitoring
+
+- **Nightly job.** Render logs show `[Cron] recurring completed`, `[Cron] emi-reminders completed`
+  and `[Cron] bill-reminders completed` with counts and duration. Alert on `[Cron] … failed`.
+- **Errors.** Planner endpoints log errors as `planner.<action>` through the same redacting logger.
+  No request bodies or amounts are logged.
+- **Latency.** `node loadtest/planner-latency.js 20000`, run against a **local test** database,
+  seeds 20,000 transactions plus a year of planner data and times every read endpoint. It refuses
+  any non-local, non-test database. On a laptop, p50 is:
+
+  | Endpoint | p50 |
+  |---|---|
+  | overview | 22 ms |
+  | report (6 months) | 71 ms |
+  | report (12 months) | 138 ms |
+  | bills | 13 ms |
+  | spending | 20 ms |
+  | goals | 4 ms |
+  | investments | 14 ms |
+
+  A small Render instance will be several times slower. The report is the heaviest endpoint
+  because it recomputes each month in its trend. It is capped at 12 months, and it computes two
+  months at a time so it can't exhaust the connection pool shared with the rest of the app.
+
+### 9.6 Rollback
+
+- **Code.** Use Render's Rollback for both services. This is safe because the planner migrations
+  are additive and the previous code ignores the new tables.
+  - Rolling back past #16 brings back the recurring-edit duplicate bug.
+  - Rolling back past the Phase 4 review fix brings back the History reset gap for linked salaries.
+- **Schema.** Don't roll back migrations. If it is ever really necessary, the nine planner tables
+  can be dropped, because nothing outside the planner references them. Then delete their rows from
+  `_prisma_migrations`.
+
+### 9.7 Known limitations
+
+These are documented in PLANNER_API.md:
+
+- A savings withdrawal may be dated before the deposits that cover it. Only the overall balance is
+  checked.
+- EMI payments keep their time of day, so one made just after midnight IST on the 1st can be
+  grouped into the previous month.
+- A recurring bill that was stopped, or an EMI that was completed, no longer appears in past
+  months unless a payment was made that month.
+- A recurring bill created after midnight for the next day gets no reminder.
+- **No linter is configured** in either package. `vite build` and `node --check` are the static
+  checks.

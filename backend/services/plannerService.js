@@ -188,7 +188,7 @@ const ALLOCATION_ORDER = [{ sortOrder: 'asc' }, { createdAt: 'asc' }];
  * it only reads the user's existing transactions, so nothing recorded in History is duplicated.
  * With `includeSpending`, it also returns each spending item and the line it counted toward.
  */
-const getMonth = async (userId, year, month, { includeSpending = false } = {}, db = prisma) => {
+const getMonth = async (userId, year, month, { includeSpending = false, includeRaw = false } = {}, db = prisma) => {
   const range = monthRange(year, month);
   const [salaries, plan, transactions, emiPayments, contributions] = await Promise.all([
     db.monthlySalary.findMany({ where: { userId, year, month }, include: SALARY_INCLUDE, orderBy: [{ createdAt: 'asc' }] }),
@@ -256,6 +256,27 @@ const getMonth = async (userId, year, month, { includeSpending = false } = {}, d
     salaries: salaries.map(serializeSalary),
     summary: serializeSummary(summary, plan ? matched.unplannedByCategory : []),
     ...(includeSpending && { spending: serializeSpending(matched.resolved, transactions, emiPayments) }),
+    // Exact BigInt figures for reports and insights, so they reuse this calculation instead of
+    // re-deriving it. Never sent to clients as is.
+    ...(includeRaw && {
+      raw: {
+        summary,
+        spendingCount: actuals.spending.length,
+        // Like summary.unplanned: without a plan there is nothing to be "outside" of.
+        unplanned: plan ? matched.unplanned : 0n,
+        unplannedByCategory: plan ? matched.unplannedByCategory : [],
+        byCategory: [...actuals.spending.reduce((m, s) => m.set(s.category || 'Other', (m.get(s.category || 'Other') || 0n) + s.amountPaise), new Map())]
+          .map(([category, paise]) => ({ category, paise })),
+        allocations: allocations.map(a => ({
+          id: a.id,
+          name: a.name,
+          group: a.group,
+          savingsGoalId: a.savingsGoalId,
+          plannedPaise: toPaise(a.plannedAmount),
+          spentPaise: matched.byAllocation.get(a.id) ?? 0n,
+        })),
+      },
+    }),
   };
 };
 
@@ -269,8 +290,18 @@ const latestEarlierPlan = (tx, userId, year, month) => tx.budgetPlan.findFirst({
 const copyRecurringAllocations = async (tx, userId, plan) => {
   const source = await latestEarlierPlan(tx, userId, plan.year, plan.month);
   if (!source || source.allocations.length === 0) return 0;
+  // A goal or investment is tracked by one line per month: keep a copied link only if no line in
+  // this month (or earlier in this copy) already tracks it.
+  const existing = await tx.budgetAllocation.findMany({ where: { planId: plan.id }, select: { name: true, savingsGoalId: true, investmentPlanId: true } });
+  const names = new Set(existing.map(a => a.name));
+  const used = new Set(existing.flatMap(a => [a.savingsGoalId, a.investmentPlanId]).filter(Boolean));
+  const claim = (id) => {
+    if (!id || used.has(id)) return null;
+    used.add(id);
+    return id;
+  };
   const { count } = await tx.budgetAllocation.createMany({
-    data: source.allocations.map(a => ({
+    data: source.allocations.filter(a => !names.has(a.name)).map(a => ({
       planId: plan.id,
       group: a.group,
       name: a.name,
@@ -278,8 +309,8 @@ const copyRecurringAllocations = async (tx, userId, plan) => {
       matchCategories: a.matchCategories,
       recurring: true,
       sortOrder: a.sortOrder,
-      savingsGoalId: a.savingsGoalId,
-      investmentPlanId: a.investmentPlanId,
+      savingsGoalId: claim(a.savingsGoalId),
+      investmentPlanId: claim(a.investmentPlanId),
     })),
     skipDuplicates: true,
   });

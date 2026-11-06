@@ -139,6 +139,8 @@ const updateBudget = withDuplicateNameGuard(async (req, res) => {
   const plan = await findPlan(userId, req.params.id);
   const edits = req.body.allocations || [];
   await prisma.$transaction(async (tx) => {
+    // Plan row first, as every other allocation write does, so concurrent edits can't deadlock.
+    await tx.$queryRaw`SELECT id FROM "BudgetPlan" WHERE id = ${plan.id} FOR UPDATE`;
     if (req.body.note !== undefined) await tx.budgetPlan.update({ where: { id: plan.id }, data: { note: req.body.note || null } });
     for (const edit of edits) {
       const existing = await tx.budgetAllocation.findFirst({ where: { id: edit.id, planId: plan.id } });
@@ -147,7 +149,7 @@ const updateBudget = withDuplicateNameGuard(async (req, res) => {
       await tx.budgetAllocation.update({ where: { id: existing.id }, data });
     }
     await dropPinsOffSpendingLines(tx, edits.map(e => e.id));
-  });
+  }, { timeout: 15000 });
   await respondWithMonth(res, userId, plan.year, plan.month);
 }, 'planner.updateBudget');
 

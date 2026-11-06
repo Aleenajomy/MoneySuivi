@@ -1,4 +1,4 @@
-import { Banknote, PlusCircle, CalendarClock, CheckCircle2, Receipt, PiggyBank, TrendingUp, Scale } from 'lucide-react'
+import { Banknote, PlusCircle, CalendarClock, CheckCircle2, Receipt, PiggyBank, TrendingUp, Scale, ShoppingCart, Wallet } from 'lucide-react'
 import StatCard from '../common/StatCard'
 import { formatAmount } from '../../utils/planner'
 
@@ -16,7 +16,7 @@ function CardGroup({ title, cards }) {
   )
 }
 
-export default function PlannerSummary({ summary }) {
+export default function PlannerSummary({ summary, kpis }) {
   const { income, plan, unallocated, overAllocated, allocatedPercent } = summary
   const incomeCards = [
     { label: 'Salary', amount: income.expectedSalary, icon: Banknote, tone: 'secondary', subtext: 'Monthly fixed salary' },
@@ -44,6 +44,17 @@ export default function PlannerSummary({ summary }) {
     <div className="space-y-4" data-testid="planner-summary">
       <CardGroup title="Income" cards={incomeCards} />
       <CardGroup title="Plan" cards={planCards} />
+      {kpis && (
+        <CardGroup title="Actual" cards={[
+          {
+            label: 'Spent', amount: kpis.expenses, icon: ShoppingCart, tone: 'danger',
+            subtext: kpis.budgetUtilization === null ? 'No spending planned' : `${kpis.budgetUtilization}% of planned spending`,
+          },
+          { label: 'Saved', amount: kpis.savingsNet, icon: PiggyBank, tone: 'secondary', subtext: kpis.savingsRate === null ? 'In savings goals' : `${kpis.savingsRate}% of income received` },
+          { label: 'Invested', amount: kpis.investmentNet, icon: TrendingUp, tone: 'warning', subtext: 'Net of redemptions' },
+          { label: 'Available', amount: kpis.available, icon: Wallet, tone: Number(kpis.available) < 0 ? 'danger' : 'info', subtext: 'Received − spent − saved − invested' },
+        ]} />
+      )}
     </div>
   )
 }

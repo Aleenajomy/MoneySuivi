@@ -31,7 +31,8 @@ const toPaise = (value) => {
     text = String(value).trim();
   }
   const match = DECIMAL_PATTERN.exec(text);
-  if (!match) throw new RangeError(`Not a valid amount with at most 2 decimals: ${text}`);
+  // The value is left out of the message so a malformed amount never ends up in the logs.
+  if (!match) throw new RangeError('Not a valid amount with at most 2 decimals');
   const [, sign, rupees, fraction = ''] = match;
   const paise = BigInt(rupees) * 100n + BigInt(fraction.padEnd(2, '0'));
   return sign ? -paise : paise;
