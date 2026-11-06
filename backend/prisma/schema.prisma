@@ -28,6 +28,11 @@ model User {
   ledgerEntries  LedgerEntry[]
   passwordResetTokens PasswordResetToken[]
   loginEvents   LoginEvent[]
+  incomeSources   IncomeSource[]
+  monthlySalaries MonthlySalary[]
+  budgetPlans     BudgetPlan[]
+  savingsGoals    SavingsGoal[]
+  investmentPlans InvestmentPlan[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
@@ -104,6 +109,9 @@ model Expense {
   recurringType  String?
   nextRunDate    DateTime?
   isAutoCreated  Boolean   @default(false)
+  monthlySalary         MonthlySalary?
+  allocationAssignment  AllocationAssignment?
+  investmentTransaction InvestmentTransaction?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -229,4 +237,171 @@ model FcmToken {
   lastUsedAt DateTime?
 
   @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Salary & Monthly Financial Planner
+// Money is Decimal(14,2) here (unlike the legacy Float columns) and is computed in paise.
+// Planned figures live only in these tables; actual money movement is always an Expense row,
+// so nothing here changes account balances on its own.
+// ---------------------------------------------------------------------------
+
+model IncomeSource {
+  id             String          @id @default(uuid())
+  userId         String
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String          @db.VarChar(50)
+  kind           String          @default("SALARY") // SALARY | ALLOWANCE | BONUS | OTHER
+  expectedAmount Decimal         @db.Decimal(14, 2)
+  payDay         Int? // 1-31; clamped to the month's last day when used
+  active         Boolean         @default(true)
+  monthlyRecords MonthlySalary[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([userId, active])
+}
+
+model MonthlySalary {
+  id             String        @id @default(uuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Null for one-off income, or when the source was deleted; label/kind keep the history readable.
+  incomeSourceId String?
+  incomeSource   IncomeSource? @relation(fields: [incomeSourceId], references: [id], onDelete: SetNull)
+  label          String        @db.VarChar(50)
+  kind           String        @default("SALARY")
+  year           Int
+  month          Int // 1-12
+  expectedAmount Decimal       @db.Decimal(14, 2)
+  receivedAmount Decimal       @default(0) @db.Decimal(14, 2)
+  receivedAt     DateTime?
+  // The income transaction that records the money arriving; unique so one transaction backs one record.
+  expenseId      String?       @unique
+  expense        Expense?      @relation(fields: [expenseId], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([incomeSourceId, year, month])
+  @@index([userId, year, month])
+}
+
+model BudgetPlan {
+  id          String             @id @default(uuid())
+  userId      String
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  year        Int
+  month       Int // 1-12
+  note        String?            @db.VarChar(500)
+  allocations BudgetAllocation[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@unique([userId, year, month])
+}
+
+model BudgetAllocation {
+  id               String                 @id @default(uuid())
+  planId           String
+  plan             BudgetPlan             @relation(fields: [planId], references: [id], onDelete: Cascade)
+  group            String // FIXED | VARIABLE | SAVINGS | INVESTMENT
+  name             String                 @db.VarChar(50)
+  plannedAmount    Decimal                @db.Decimal(14, 2)
+  // Expense categories counted against this line when a transaction has no explicit assignment.
+  matchCategories  String[]               @default([])
+  recurring        Boolean                @default(true)
+  sortOrder        Int                    @default(0)
+  savingsGoalId    String?
+  savingsGoal      SavingsGoal?           @relation(fields: [savingsGoalId], references: [id], onDelete: SetNull)
+  investmentPlanId String?
+  investmentPlan   InvestmentPlan?        @relation(fields: [investmentPlanId], references: [id], onDelete: SetNull)
+  assignments      AllocationAssignment[]
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@unique([planId, name])
+  @@index([savingsGoalId])
+  @@index([investmentPlanId])
+}
+
+// Pins one transaction to one allocation; expenseId is unique so a transaction is never counted twice.
+model AllocationAssignment {
+  id           String           @id @default(uuid())
+  expenseId    String           @unique
+  expense      Expense          @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  allocationId String
+  allocation   BudgetAllocation @relation(fields: [allocationId], references: [id], onDelete: Cascade)
+  createdAt    DateTime         @default(now())
+
+  @@index([allocationId])
+}
+
+model SavingsGoal {
+  id                  String                @id @default(uuid())
+  userId              String
+  user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                String                @db.VarChar(50)
+  targetAmount        Decimal               @db.Decimal(14, 2)
+  // Already saved before the goal was created; current saved = initial + contributions - withdrawals.
+  initialAmount       Decimal               @default(0) @db.Decimal(14, 2)
+  monthlyContribution Decimal?              @db.Decimal(14, 2)
+  targetDate          DateTime?
+  archived            Boolean               @default(false)
+  note                String?               @db.VarChar(500)
+  contributions       SavingsContribution[]
+  allocations         BudgetAllocation[]
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  @@index([userId, archived])
+}
+
+// Earmarks money that stays in the user's accounts, so it never creates or links a transaction.
+model SavingsContribution {
+  id        String      @id @default(uuid())
+  goalId    String
+  goal      SavingsGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  type      String      @default("CONTRIBUTION") // CONTRIBUTION | WITHDRAWAL
+  amount    Decimal     @db.Decimal(14, 2)
+  date      DateTime
+  note      String?     @db.VarChar(300)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([goalId, date])
+}
+
+model InvestmentPlan {
+  id                   String                  @id @default(uuid())
+  userId               String
+  user                 User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                 String                  @db.VarChar(50)
+  category             String // GOLD | GOLD_ETF | MUTUAL_FUND | INDEX_FUND | STOCK | OTHER
+  monthlyPlannedAmount Decimal                 @default(0) @db.Decimal(14, 2)
+  active               Boolean                 @default(true)
+  note                 String?                 @db.VarChar(500)
+  transactions         InvestmentTransaction[]
+  allocations          BudgetAllocation[]
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+
+  @@index([userId, active])
+}
+
+model InvestmentTransaction {
+  id        String         @id @default(uuid())
+  planId    String
+  plan      InvestmentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  type      String         @default("BUY") // BUY | REDEEM
+  amount    Decimal        @db.Decimal(14, 2)
+  date      DateTime
+  note      String?        @db.VarChar(300)
+  // The Investment-category transaction that moved the money. Cascade: deleting it in History
+  // undoes the investment too, so the two can never disagree.
+  expenseId String?        @unique
+  expense   Expense?       @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([planId, date])
 }
