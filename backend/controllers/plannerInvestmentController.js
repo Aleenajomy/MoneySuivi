@@ -177,7 +177,9 @@ const deleteInvestment = async (req, res) => {
     await prisma.$transaction(async (tx) => {
       // Locked so a buy recorded at the same moment can't slip in after the check and be orphaned.
       await lockPlan(tx, plan.id);
-      const linked = await tx.investmentTransaction.findMany({ where: { planId: plan.id }, select: { expenseId: true } });
+      // Only transactions that still count as this investment (the same rule as transactionCount) are
+      // affected; one recategorised in History is the user's ordinary spending now and is kept.
+      const linked = await tx.investmentTransaction.findMany({ where: { planId: plan.id, expense: { is: COUNTED } }, select: { expenseId: true } });
       if (linked.length && req.query.deleteTransactions !== 'true') {
         throw new HttpError(409, 'This investment has transactions. Pause it instead, or delete it together with its transactions.', 'HAS_TRANSACTIONS');
       }

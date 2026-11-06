@@ -141,7 +141,24 @@ const receiveRules = [
   v.text('note', { max: 500 }),
 ];
 
+// express-validator applies standard validators to each element of an array, so ["SALARY"] would
+// pass an enum check and then fail in the database with a 500. Only these fields may be lists.
+const LIST_FIELDS = new Set(['allocations', 'matchCategories']);
+const rejectUnexpectedLists = (req, res, next) => {
+  const badQuery = Object.entries(req.query || {}).find(([, value]) => Array.isArray(value));
+  const scan = (obj) => Object.entries(obj || {}).find(([key, value]) => Array.isArray(value) && !LIST_FIELDS.has(key));
+  const badBody = req.body && typeof req.body === 'object' && !Array.isArray(req.body)
+    ? scan(req.body) || (Array.isArray(req.body.allocations) && req.body.allocations.map(a => (a && typeof a === 'object' ? scan(a) : null)).find(Boolean))
+    : null;
+  const bad = badQuery || badBody;
+  if (bad || Array.isArray(req.body)) {
+    return res.status(400).json({ success: false, message: `${bad ? bad[0] : 'body'} must be a single value, not a list` });
+  }
+  return next();
+};
+
 router.use(protect);
+router.use(rejectUnexpectedLists);
 
 router.get('/overview', yearMonthQuery, validate, budget.getOverview);
 

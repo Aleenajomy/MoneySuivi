@@ -1,6 +1,6 @@
 const prisma = require('../lib/prisma');
 const { HttpError, handleError } = require('../utils/http');
-const { toPaise, toApiAmount, paiseToNumber, paiseToDecimalString, sumPaise } = require('../utils/plannerCalculations');
+const { toPaise, toApiAmount, paiseToNumber, paiseToDecimalString, sumPaise, MAX_PLANNER_AMOUNT } = require('../utils/plannerCalculations');
 const planner = require('../services/plannerService');
 
 const NOT_FOUND_SOURCE = new HttpError(404, 'Income source not found');
@@ -211,6 +211,8 @@ const receiveSalary = async (req, res) => {
           throw new HttpError(400, 'An investment transaction cannot be linked as income');
         }
         if (!planner.isValidSalaryLink(transaction, existing)) throw WRONG_MONTH;
+        // History allows slightly larger amounts than the planner's DECIMAL(14,2) columns hold.
+        if (toPaise(transaction.amount) > toPaise(MAX_PLANNER_AMOUNT)) throw new HttpError(400, 'That income is larger than the planner can record.');
         if (transaction.monthlySalary) throw ALREADY_LINKED;
       } else {
         const receivedOn = calendarDay(receivedAt);

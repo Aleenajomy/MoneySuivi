@@ -262,8 +262,9 @@ const getMonth = async (userId, year, month, { includeSpending = false, includeR
       raw: {
         summary,
         spendingCount: actuals.spending.length,
-        unplanned: matched.unplanned,
-        unplannedByCategory: matched.unplannedByCategory,
+        // Like summary.unplanned: without a plan there is nothing to be "outside" of.
+        unplanned: plan ? matched.unplanned : 0n,
+        unplannedByCategory: plan ? matched.unplannedByCategory : [],
         byCategory: [...actuals.spending.reduce((m, s) => m.set(s.category || 'Other', (m.get(s.category || 'Other') || 0n) + s.amountPaise), new Map())]
           .map(([category, paise]) => ({ category, paise })),
         allocations: allocations.map(a => ({
@@ -289,8 +290,18 @@ const latestEarlierPlan = (tx, userId, year, month) => tx.budgetPlan.findFirst({
 const copyRecurringAllocations = async (tx, userId, plan) => {
   const source = await latestEarlierPlan(tx, userId, plan.year, plan.month);
   if (!source || source.allocations.length === 0) return 0;
+  // A goal or investment is tracked by one line per month: keep a copied link only if no line in
+  // this month (or earlier in this copy) already tracks it.
+  const existing = await tx.budgetAllocation.findMany({ where: { planId: plan.id }, select: { name: true, savingsGoalId: true, investmentPlanId: true } });
+  const names = new Set(existing.map(a => a.name));
+  const used = new Set(existing.flatMap(a => [a.savingsGoalId, a.investmentPlanId]).filter(Boolean));
+  const claim = (id) => {
+    if (!id || used.has(id)) return null;
+    used.add(id);
+    return id;
+  };
   const { count } = await tx.budgetAllocation.createMany({
-    data: source.allocations.map(a => ({
+    data: source.allocations.filter(a => !names.has(a.name)).map(a => ({
       planId: plan.id,
       group: a.group,
       name: a.name,
@@ -298,8 +309,8 @@ const copyRecurringAllocations = async (tx, userId, plan) => {
       matchCategories: a.matchCategories,
       recurring: true,
       sortOrder: a.sortOrder,
-      savingsGoalId: a.savingsGoalId,
-      investmentPlanId: a.investmentPlanId,
+      savingsGoalId: claim(a.savingsGoalId),
+      investmentPlanId: claim(a.investmentPlanId),
     })),
     skipDuplicates: true,
   });

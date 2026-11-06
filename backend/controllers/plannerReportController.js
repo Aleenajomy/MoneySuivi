@@ -30,8 +30,17 @@ const buildReport = async (userId, period, months, now = new Date()) => {
   const periods = Array.from({ length: months }, (_, i) => shift(period, i - months + 1));
   if (!periods.some(p => index(p) === index(shift(period, -1)))) periods.unshift(shift(period, -1));
 
+  // Months are computed two at a time: each one runs several queries, and firing them all at once
+  // could exhaust the connection pool shared with the rest of the app.
+  const loadMonths = async () => {
+    const out = [];
+    for (let i = 0; i < periods.length; i += 2) {
+      out.push(...await Promise.all(periods.slice(i, i + 2).map(p => planner.getMonth(userId, p.year, p.month, { includeRaw: true }))));
+    }
+    return out;
+  };
   const [monthData, goals, bills] = await Promise.all([
-    Promise.all(periods.map(p => planner.getMonth(userId, p.year, p.month, { includeRaw: true }))),
+    loadMonths(),
     loadGoals(userId, period),
     index(period) === index(thisMonth) ? buildBills(userId, period.year, period.month, now) : null,
   ]);
