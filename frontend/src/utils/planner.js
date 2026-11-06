@@ -14,7 +14,7 @@ export const UNALLOCATED_COLOR = { light: '#cbd5e1', dark: '#475569' }
 
 export const INCOME_KINDS = [
   { value: 'SALARY', label: 'Fixed Salary' },
-  { value: 'ALLOWANCE', label: 'Travel Allowance' },
+  { value: 'ALLOWANCE', label: 'Allowance' },
   { value: 'BONUS', label: 'Bonus' },
   { value: 'INCENTIVE', label: 'Incentive' },
   { value: 'OTHER', label: 'Other Income' },

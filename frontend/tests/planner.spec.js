@@ -49,6 +49,7 @@ test.describe('Salary Planner', () => {
     await page.goto('/#/planner?tab=salary');
     await page.getByRole('button', { name: 'Add salary' }).click();
     const dialog = page.getByRole('dialog');
+    await expect(dialog.getByLabel('Type').locator('option')).toHaveText(['Fixed Salary', 'Allowance', 'Bonus', 'Incentive', 'Other Income']);
     await dialog.getByRole('button', { name: 'Save' }).click();
     await expect(dialog.getByText('Name is required')).toBeVisible();
     await expect(dialog.getByText('Expected amount is required')).toBeVisible();
