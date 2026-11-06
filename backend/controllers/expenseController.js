@@ -4,12 +4,26 @@ const notificationService = require('../services/notificationService');
 const { getAccountBalances } = require('../services/balanceService');
 const { buildBalanceAlerts, normalizeAccountType } = require('../utils/accountBalances');
 const { roundMoney, roundMoneyFields } = require('../utils/money');
-const { firstRunDate } = require('../utils/recurrence');
+const { firstRunDate, firstOccurrenceOnOrAfter, todayInTimezone } = require('../utils/recurrence');
+const { config } = require('../config/env');
 const { handleError } = require('../utils/http');
 const logger = require('../utils/logger');
 const { resetInvalidSalaryLinks } = require('../services/plannerService');
 
 const toExpenseResponse = (e) => ({ ...e, _id: e.id });
+
+/**
+ * Next run date after editing a recurring transaction. The scheduler has already added every date
+ * before the current nextRunDate to History, so an edit must never move it back: doing so (as the
+ * edit form resends the schedule on every save) made the next run re-create all past occurrences.
+ * Turning recurring back on likewise starts from today, so a resumed schedule doesn't back-fill
+ * copies that were already recorded before it was stopped.
+ */
+const nextRunAfterEdit = (existing, anchor, type) => {
+  const floor = existing.recurring && existing.nextRunDate ? existing.nextRunDate : todayInTimezone(config.timezone);
+  const first = firstRunDate(anchor, type);
+  return first >= floor ? first : firstOccurrenceOnOrAfter(anchor, type, floor);
+};
 
 const buildFilter = (userId, query) => {
   const { category, startDate, endDate, search, type, recurring } = query;
@@ -142,11 +156,11 @@ const updateExpense = async (req, res) => {
     if (req.body.recurring !== undefined) {
       data.recurring = Boolean(req.body.recurring);
       data.recurringType = req.body.recurring ? req.body.recurringType : null;
-      data.nextRunDate = req.body.recurring ? firstRunDate(data.expenseDate || existing.expenseDate, req.body.recurringType) : null;
+      data.nextRunDate = req.body.recurring ? nextRunAfterEdit(existing, data.expenseDate || existing.expenseDate, req.body.recurringType) : null;
     } else if (existing.recurring && (req.body.expenseDate !== undefined || req.body.recurringType !== undefined)) {
       const nextType = req.body.recurringType || existing.recurringType;
       data.recurringType = nextType;
-      data.nextRunDate = firstRunDate(data.expenseDate || existing.expenseDate, nextType);
+      data.nextRunDate = nextRunAfterEdit(existing, data.expenseDate || existing.expenseDate, nextType);
     }
     // A Salary Planner record linked to this income stops counting as received if the edit makes it
     // something else (an expense, an investment, or income in another month).
