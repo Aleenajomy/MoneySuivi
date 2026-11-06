@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Modal from '../common/Modal'
 import Field from './Field'
+import { usePlanner } from '../../context/PlannerContext'
 import { ALLOCATION_PRESETS, GROUPS, GROUP_META, MATCHABLE_CATEGORIES, amountError } from '../../utils/planner'
 
 const toForm = (allocation, group) => ({
@@ -9,6 +10,8 @@ const toForm = (allocation, group) => ({
   plannedAmount: allocation ? String(allocation.plannedAmount) : '',
   matchCategories: allocation?.matchCategories || [],
   recurring: allocation ? allocation.recurring : true,
+  savingsGoalId: allocation?.savingsGoalId || '',
+  investmentPlanId: allocation?.investmentPlanId || '',
 })
 
 export default function AllocationForm({ allocation, group, existingNames, onSave, onClose }) {
@@ -17,6 +20,10 @@ export default function AllocationForm({ allocation, group, existingNames, onSav
   const [saving, setSaving] = useState(false)
   const presets = ALLOCATION_PRESETS[form.group] || []
   const tracksSpending = form.group === 'FIXED' || form.group === 'VARIABLE'
+  const { goals, investments } = usePlanner()
+  // A line can track an archived goal or paused investment it was already linked to.
+  const goalOptions = goals.filter(g => !g.archived || g.id === allocation?.savingsGoalId)
+  const investmentOptions = investments.plans.filter(p => p.active || p.id === allocation?.investmentPlanId)
 
   const set = (key, value) => setForm(prev => ({ ...prev, [key]: value }))
 
@@ -49,6 +56,9 @@ export default function AllocationForm({ allocation, group, existingNames, onSav
         plannedAmount: form.plannedAmount.trim(),
         matchCategories: tracksSpending ? form.matchCategories : [],
         recurring: form.recurring,
+        // Only the link that fits the group is sent; the server drops a link the group no longer allows.
+        ...(form.group === 'SAVINGS' && { savingsGoalId: form.savingsGoalId || null }),
+        ...(form.group === 'INVESTMENT' && { investmentPlanId: form.investmentPlanId || null }),
       })
       onClose()
     } catch {
@@ -107,6 +117,27 @@ export default function AllocationForm({ allocation, group, existingNames, onSav
               })}
             </div>
           </fieldset>
+        )}
+
+        {form.group === 'SAVINGS' && (
+          <Field label="Track a savings goal" hint={goalOptions.length ? 'Money added to the goal this month counts toward this line' : 'Create a goal in the Goals tab to track it here'}>
+            {(a) => (
+              <select {...a} className="input cursor-pointer" value={form.savingsGoalId} onChange={e => set('savingsGoalId', e.target.value)}>
+                <option value="">Not linked</option>
+                {goalOptions.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+              </select>
+            )}
+          </Field>
+        )}
+        {form.group === 'INVESTMENT' && (
+          <Field label="Track an investment" hint={investmentOptions.length ? 'Amounts invested in it this month count toward this line' : 'Add an investment in the Invest tab to track it here'}>
+            {(a) => (
+              <select {...a} className="input cursor-pointer" value={form.investmentPlanId} onChange={e => set('investmentPlanId', e.target.value)}>
+                <option value="">Not linked</option>
+                {investmentOptions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            )}
+          </Field>
         )}
 
         <label className="flex items-center justify-between gap-3 cursor-pointer">

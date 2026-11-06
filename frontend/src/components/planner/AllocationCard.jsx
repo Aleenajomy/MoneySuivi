@@ -1,7 +1,8 @@
 import { Pencil, Trash2, Repeat } from 'lucide-react'
 import { formatAmount } from '../../utils/planner'
 
-const meterColor = (pct) => {
+const meterColor = (pct, tracksSpending) => {
+  if (!tracksSpending) return pct >= 100 ? 'bg-emerald-500' : 'bg-sky-500'
   if (pct > 100) return 'bg-red-500'
   if (pct >= 80) return 'bg-amber-500'
   return 'bg-emerald-500'
@@ -9,14 +10,19 @@ const meterColor = (pct) => {
 
 export default function AllocationCard({ allocation, onEdit, onDelete, onToggleRecurring, onShowSpending }) {
   const tracked = allocation.actualAmount !== null
-  const pct = allocation.utilization ?? 0
-  const over = tracked && allocation.remainingAmount < 0
+  const pct = Math.max(allocation.utilization ?? 0, 0)
+  const tracksSpending = allocation.group === 'FIXED' || allocation.group === 'VARIABLE'
+  // Going past a savings or investment target is good news, not an overspend.
+  const over = tracked && tracksSpending && allocation.remainingAmount < 0
 
   return (
     <article className="card p-3.5" data-testid="allocation-card" aria-label={allocation.name}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h4 className="font-bold text-sm dark:text-white text-slate-800 truncate">{allocation.name}</h4>
+          {allocation.linkedName && (
+            <p className="text-[11px] dark:text-gray-500 text-slate-400 truncate mt-0.5">Tracks {allocation.linkedName}</p>
+          )}
           {allocation.matchCategories.length > 0 && (
             <p className="text-[11px] dark:text-gray-500 text-slate-400 truncate mt-0.5">
               Tracks {allocation.matchCategories.map(c => (c === 'EMI' ? 'EMI payments' : c)).join(', ')}
@@ -31,15 +37,23 @@ export default function AllocationCard({ allocation, onEdit, onDelete, onToggleR
           <div className="h-1.5 rounded-full dark:bg-dark-border bg-slate-100 overflow-hidden" role="meter"
             aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(pct, 100)}
             aria-label={`${allocation.name}: ${pct}% used`}>
-            <div className={`h-full rounded-full ${meterColor(pct)}`} style={{ width: `${Math.min(pct, 100)}%` }} />
+            <div className={`h-full rounded-full ${meterColor(pct, tracksSpending)}`} style={{ width: `${Math.min(pct, 100)}%` }} />
           </div>
           <p className="flex justify-between text-[11px] mt-1 dark:text-gray-400 text-slate-500">
-            <button type="button" onClick={() => onShowSpending(allocation.id)} className="hover:text-sky-500 underline-offset-2 hover:underline"
-              aria-label={`Show ${allocation.transactionCount} transactions counted toward ${allocation.name}`}>
-              Spent {formatAmount(allocation.actualAmount)} · {allocation.transactionCount} item{allocation.transactionCount === 1 ? '' : 's'}
-            </button>
+            {allocation.group === 'FIXED' || allocation.group === 'VARIABLE' ? (
+              <button type="button" onClick={() => onShowSpending(allocation.id)} className="hover:text-sky-500 underline-offset-2 hover:underline"
+                aria-label={`Show ${allocation.transactionCount} transactions counted toward ${allocation.name}`}>
+                Spent {formatAmount(allocation.actualAmount)} · {allocation.transactionCount} item{allocation.transactionCount === 1 ? '' : 's'}
+              </button>
+            ) : (
+              <span>{Number(allocation.actualAmount) < 0
+                ? `${allocation.group === 'SAVINGS' ? 'Withdrew' : 'Took out'} ${formatAmount(-allocation.actualAmount)} this month`
+                : `${allocation.group === 'SAVINGS' ? 'Saved' : 'Invested'} ${formatAmount(allocation.actualAmount)} this month`}</span>
+            )}
             <span className={over ? 'text-red-500 font-semibold' : ''}>
-              {over ? `${formatAmount(-allocation.remainingAmount)} over` : `${formatAmount(allocation.remainingAmount)} left`}
+              {over ? `${formatAmount(-allocation.remainingAmount)} over`
+                : Number(allocation.remainingAmount) < 0 ? `${formatAmount(-allocation.remainingAmount)} above plan`
+                  : `${formatAmount(allocation.remainingAmount)} ${tracksSpending ? 'left' : 'to go'}`}
             </span>
           </p>
         </div>

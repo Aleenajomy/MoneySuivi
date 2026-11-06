@@ -9,7 +9,9 @@ import AllocationForm from './AllocationForm'
 import { GROUPS, GROUP_META, formatAmount } from '../../utils/planner'
 
 export default function BudgetPanel({ onShowSpending }) {
-  const { month, saveAllocation, deleteAllocation, copyRecurring } = usePlanner()
+  const { month, saveAllocation, deleteAllocation, copyRecurring, goals, investments } = usePlanner()
+  const linkedName = (a) => (a.group === 'SAVINGS' && a.savingsGoalId ? goals.find(g => g.id === a.savingsGoalId)?.name
+    : a.group === 'INVESTMENT' && a.investmentPlanId ? investments.plans.find(p => p.id === a.investmentPlanId)?.name : null)
   const { dark } = useTheme()
   const [editing, setEditing] = useState(null)
   const [deleting, setDeleting] = useState(null)
@@ -76,7 +78,7 @@ export default function BudgetPanel({ onShowSpending }) {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
                 {items.map(a => (
-                  <AllocationCard key={a.id} allocation={a} onEdit={setEditing} onDelete={setDeleting} onToggleRecurring={toggleRecurring} onShowSpending={onShowSpending} />
+                  <AllocationCard key={a.id} allocation={{ ...a, linkedName: linkedName(a) }} onEdit={setEditing} onDelete={setDeleting} onToggleRecurring={toggleRecurring} onShowSpending={onShowSpending} />
                 ))}
               </div>
             )}

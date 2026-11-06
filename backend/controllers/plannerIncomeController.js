@@ -1,6 +1,5 @@
 const prisma = require('../lib/prisma');
 const { HttpError, handleError } = require('../utils/http');
-const { normalizeAccountType } = require('../utils/accountBalances');
 const { toPaise, toApiAmount, paiseToNumber, paiseToDecimalString, sumPaise } = require('../utils/plannerCalculations');
 const planner = require('../services/plannerService');
 
@@ -10,17 +9,6 @@ const ALREADY_RECEIVED = new HttpError(409, 'This income is already marked as re
 const ALREADY_LINKED = new HttpError(409, 'That transaction is already linked to another income record.', 'TRANSACTION_ALREADY_LINKED');
 
 const decimal = (value) => paiseToDecimalString(toPaise(value));
-
-// Mirrors the Add Transaction form: the account follows the payment method, and "Other" lands in
-// the Other (net banking) balance row.
-const accountTypeForPayment = (paymentMethod) => {
-  const m = String(paymentMethod || '').trim().toLowerCase();
-  if (m === 'cash') return 'Cash';
-  if (m === 'credit card') return 'Credit Card';
-  if (m === 'upi' || m === 'wallet') return 'UPI';
-  if (m === 'debit card') return 'Debit Card';
-  return normalizeAccountType('Net Banking');
-};
 
 const transactionCategoryFor = (kind) => (kind === 'OTHER' ? 'Other' : 'Salary');
 
@@ -235,7 +223,7 @@ const receiveSalary = async (req, res) => {
             amount: paiseToNumber(toPaise(receivedAmount)),
             category: transactionCategoryFor(existing.kind),
             type: 'income',
-            accountType: accountTypeForPayment(method),
+            accountType: planner.accountTypeForPayment(method),
             paymentMethod: method,
             note: note || null,
             expenseDate: receivedOn,

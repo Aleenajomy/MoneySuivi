@@ -244,3 +244,28 @@ test('output helpers only take BigInt paise, so a Number can never be silently r
   assert.throws(() => calc.paiseToNumber('150'), TypeError);
   assert.equal(calc.paiseToDecimalString(150n), '1.50');
 });
+
+test('goal status: progress, remaining and the monthly amount still needed, counting this month', () => {
+  const d = (s) => new Date(`${s}T00:00:00.000Z`);
+  const today = d('2026-11-06');
+  const g = calc.goalStatus({ targetPaise: 5000000n, savedPaise: 1000000n, targetDate: d('2027-02-28'), today });
+  assert.equal(g.remaining, 4000000n);
+  assert.equal(g.progress, 20);
+  assert.equal(g.monthsLeft, 4); // Nov, Dec, Jan, Feb
+  assert.equal(g.requiredMonthly, 1000000n);
+  assert.equal(g.reached, false);
+  assert.equal(g.overdue, false);
+
+  // Uneven split rounds up to the paisa so the target is still met.
+  assert.equal(calc.goalStatus({ targetPaise: 100n, savedPaise: 0n, targetDate: d('2027-01-15'), today }).requiredMonthly, 34n);
+  // Target date this month: everything left is needed now.
+  assert.equal(calc.goalStatus({ targetPaise: 100n, savedPaise: 40n, targetDate: d('2026-11-30'), today }).requiredMonthly, 60n);
+  // Past target date: overdue, no monthly figure.
+  const late = calc.goalStatus({ targetPaise: 100n, savedPaise: 40n, targetDate: d('2026-10-31'), today });
+  assert.deepEqual([late.overdue, late.monthsLeft, late.requiredMonthly], [true, 0, null]);
+  // Reached (even over-saved): nothing remaining, nothing required, progress above 100 is kept.
+  const done = calc.goalStatus({ targetPaise: 100n, savedPaise: 150n, targetDate: d('2026-10-31'), today });
+  assert.deepEqual([done.reached, done.remaining, done.requiredMonthly, done.overdue, done.progress], [true, 0n, null, false, 150]);
+  // No target date.
+  assert.deepEqual([calc.goalStatus({ targetPaise: 100n, savedPaise: 0n, today }).monthsLeft, calc.goalStatus({ targetPaise: 100n, savedPaise: 0n, today }).requiredMonthly], [null, null]);
+});

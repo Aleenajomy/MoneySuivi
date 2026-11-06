@@ -76,6 +76,34 @@ const percentOf = (part, whole) => {
   return Number(rounded);
 };
 
+const ceilDiv = (a, b) => (a + b - 1n) / b;
+
+/**
+ * Where a savings goal stands. Planning arithmetic only, no forecasting: `requiredMonthly` is what
+ * would still need to be set aside each month, this month included, to reach the target by the
+ * target date's month.
+ * today and targetDate are UTC-midnight calendar dates.
+ */
+const goalStatus = ({ targetPaise, savedPaise, targetDate = null, today }) => {
+  const remaining = maxPaise(targetPaise - savedPaise, 0n);
+  const reached = savedPaise >= targetPaise;
+  let monthsLeft = null;
+  if (targetDate) {
+    const diff = (targetDate.getUTCFullYear() - today.getUTCFullYear()) * 12 + (targetDate.getUTCMonth() - today.getUTCMonth());
+    monthsLeft = targetDate < today ? 0 : diff + 1;
+  }
+  return {
+    saved: savedPaise,
+    target: targetPaise,
+    remaining,
+    reached,
+    progress: percentOf(maxPaise(savedPaise, 0n), targetPaise),
+    monthsLeft,
+    overdue: Boolean(targetDate) && targetDate < today && !reached,
+    requiredMonthly: !reached && monthsLeft > 0 ? ceilDiv(remaining, BigInt(monthsLeft)) : null,
+  };
+};
+
 /** Income for one month. Records: [{ kind, expectedPaise, receivedPaise }]. */
 const summarizeIncome = (records) => {
   const expectedSalary = sumPaise(records.filter(r => r.kind === 'SALARY').map(r => r.expectedPaise));
@@ -260,6 +288,7 @@ module.exports = {
   sumPaise,
   comparePaise,
   percentOf,
+  goalStatus,
   summarizeIncome,
   summarizePlan,
   nameKeywords,

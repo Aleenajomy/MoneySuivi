@@ -19,6 +19,16 @@ export const INCOME_KINDS = [
   { value: 'INCENTIVE', label: 'Incentive' },
   { value: 'OTHER', label: 'Other Income' },
 ]
+export const INVESTMENT_CATEGORIES = [
+  { value: 'GOLD', label: 'Gold' },
+  { value: 'GOLD_ETF', label: 'Gold ETF' },
+  { value: 'MUTUAL_FUND', label: 'Mutual Fund' },
+  { value: 'INDEX_FUND', label: 'Index Fund' },
+  { value: 'STOCK', label: 'Stocks' },
+  { value: 'OTHER', label: 'Other' },
+]
+export const investmentCategoryLabel = (value) => INVESTMENT_CATEGORIES.find(c => c.value === value)?.label || 'Other'
+
 export const incomeKindLabel = (kind) => INCOME_KINDS.find(k => k.value === kind)?.label || 'Income'
 
 // EMI payments are not transactions; the backend matches them to lines that list "EMI".
