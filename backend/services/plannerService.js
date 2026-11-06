@@ -87,7 +87,7 @@ const serializeSummary = (summary, unplannedByCategory) => {
   };
 };
 
-const serializeAllocation = (allocation, actualPaise) => {
+const serializeAllocation = (allocation, actualPaise, transactionCount) => {
   const plannedPaise = toPaise(allocation.plannedAmount);
   // Savings and investment actuals come from goals and investment plans (Phase 5), not from
   // category matching, so they are reported as not tracked rather than as zero.
@@ -106,22 +106,53 @@ const serializeAllocation = (allocation, actualPaise) => {
     actualAmount: tracked ? fromPaise(actualPaise) : null,
     remainingAmount: tracked ? fromPaise(plannedPaise - actualPaise) : null,
     utilization: tracked ? calc.percentOf(actualPaise, plannedPaise) : null,
+    transactionCount,
   };
+};
+
+const EMI_PREFIX = 'emi:';
+
+// Newest first. EMI payments come from the EMI tracker and follow the "EMI" category rule, so
+// they can be seen here but not reassigned (there is no transaction row to pin).
+const serializeSpending = (resolved, transactions, emiPayments) => {
+  const txById = new Map(transactions.map(t => [t.id, t]));
+  const emiById = new Map(emiPayments.map(p => [`${EMI_PREFIX}${p.id}`, p]));
+  return resolved.map((r) => {
+    const emi = emiById.get(r.id);
+    const base = emi
+      ? { id: r.id, source: 'EMI', title: emi.emi.title, category: calc.EMI_CATEGORY, amount: fromPaise(toPaise(emi.amount)), date: emi.paidAt, paymentMethod: null }
+      : (({ id, title, category, amount, expenseDate, paymentMethod }) => ({
+        id, source: 'TRANSACTION', title, category, amount: fromPaise(toPaise(amount)), date: expenseDate, paymentMethod,
+      }))(txById.get(r.id));
+    return { ...base, allocationId: r.allocationId, matchedBy: r.matchedBy, reassignable: !emi };
+  }).sort((a, b) => new Date(b.date) - new Date(a.date));
 };
 
 const ALLOCATION_ORDER = [{ sortOrder: 'asc' }, { createdAt: 'asc' }];
 
-/** Everything the planner shows for one month. Read-only: it never creates plans or records. */
-const getMonth = async (userId, year, month, db = prisma) => {
+/**
+ * Everything the planner shows for one month. Read-only: it never creates plans or records, and
+ * it only reads the user's existing transactions, so nothing recorded in History is duplicated.
+ * With `includeSpending`, it also returns each spending item and the line it counted toward.
+ */
+const getMonth = async (userId, year, month, { includeSpending = false } = {}, db = prisma) => {
   const range = monthRange(year, month);
   const [salaries, plan, transactions, emiPayments, contributions] = await Promise.all([
     db.monthlySalary.findMany({ where: { userId, year, month }, include: SALARY_INCLUDE, orderBy: [{ createdAt: 'asc' }] }),
     db.budgetPlan.findUnique({ where: { userId_year_month: { userId, year, month } }, include: { allocations: { orderBy: ALLOCATION_ORDER } } }),
     db.expense.findMany({
       where: { userId, expenseDate: range, type: { in: ['income', 'expense'] } },
-      select: { id: true, type: true, category: true, amount: true, investmentTransaction: { select: { id: true } }, allocationAssignment: { select: { allocationId: true } } },
+      select: {
+        id: true, type: true, title: true, category: true, amount: true, expenseDate: true, paymentMethod: true,
+        investmentTransaction: { select: { id: true } }, allocationAssignment: { select: { allocationId: true } },
+      },
+      orderBy: [{ expenseDate: 'desc' }, { createdAt: 'desc' }],
     }),
-    db.eMIPayment.findMany({ where: { emi: { userId }, paidAt: range }, select: { id: true, amount: true } }),
+    db.eMIPayment.findMany({
+      where: { emi: { userId }, paidAt: range },
+      select: { id: true, amount: true, paidAt: true, emi: { select: { title: true } } },
+      orderBy: { paidAt: 'desc' },
+    }),
     db.savingsContribution.findMany({ where: { goal: { userId }, date: range }, select: { type: true, amount: true } }),
   ]);
 
@@ -130,6 +161,7 @@ const getMonth = async (userId, year, month, db = prisma) => {
     transactions.map(t => ({
       id: t.id,
       type: t.type,
+      title: t.title,
       category: t.category,
       amountPaise: toPaise(t.amount),
       isInvestment: Boolean(t.investmentTransaction),
@@ -138,9 +170,11 @@ const getMonth = async (userId, year, month, db = prisma) => {
     emiPayments.map(p => ({ id: p.id, amountPaise: toPaise(p.amount) })),
   );
   const matched = calc.matchSpending(
-    allocations.map(a => ({ id: a.id, group: a.group, matchCategories: a.matchCategories, sortOrder: a.sortOrder })),
+    allocations.map(a => ({ id: a.id, group: a.group, name: a.name, matchCategories: a.matchCategories, sortOrder: a.sortOrder })),
     actuals.spending,
   );
+  const counts = new Map();
+  matched.resolved.forEach(r => r.allocationId && counts.set(r.allocationId, (counts.get(r.allocationId) || 0) + 1));
   const savingsNet = calc.sumPaise(contributions.map(c => (c.type === 'WITHDRAWAL' ? -1 : 1) * toPaise(c.amount)));
   const summary = calc.buildMonthSummary({
     income: calc.summarizeIncome(incomeInput(salaries)),
@@ -157,10 +191,11 @@ const getMonth = async (userId, year, month, db = prisma) => {
       year: plan.year,
       month: plan.month,
       note: plan.note,
-      allocations: allocations.map(a => serializeAllocation(a, matched.byAllocation.get(a.id) || 0)),
+      allocations: allocations.map(a => serializeAllocation(a, matched.byAllocation.get(a.id) || 0, counts.get(a.id) || 0)),
     } : null,
     salaries: salaries.map(serializeSalary),
     summary: serializeSummary(summary, plan ? matched.unplannedByCategory : []),
+    ...(includeSpending && { spending: serializeSpending(matched.resolved, transactions, emiPayments) }),
   };
 };
 

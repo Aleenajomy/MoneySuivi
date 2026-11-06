@@ -145,3 +145,55 @@ test('large amounts near the DECIMAL(14,2) limit stay exact', () => {
   assert.equal(plan.totalAllocated, 2 * max);
   assert.equal(calc.paiseToDecimalString(plan.totalAllocated), '1999999999999.98');
 });
+
+test('name keywords skip generic words so "Other Bills" does not grab every bill', () => {
+  assert.deepEqual(calc.nameKeywords('Mess / Food'), ['mess', 'food']);
+  assert.deepEqual(calc.nameKeywords('Rent / Accommodation'), ['rent', 'accommodation']);
+  assert.deepEqual(calc.nameKeywords('Other Bills'), []);
+  assert.deepEqual(calc.nameKeywords('EMI / Loan'), ['emi', 'loan']);
+  assert.deepEqual(calc.nameKeywords('Personal Care'), ['care']);
+});
+
+test('matching order: manual assignment, then the line named in the title, then category', () => {
+  const allocations = [
+    { id: 'bills', group: 'FIXED', name: 'Other Bills', matchCategories: ['Bills'], sortOrder: 0 },
+    { id: 'rent', group: 'FIXED', name: 'Rent / Accommodation', matchCategories: [], sortOrder: 1 },
+    { id: 'mess', group: 'FIXED', name: 'Mess / Food', matchCategories: ['Food'], sortOrder: 2 },
+    { id: 'outside', group: 'VARIABLE', name: 'Food outside', matchCategories: [], sortOrder: 3 },
+    { id: 'gold', group: 'INVESTMENT', name: 'Rent savings', matchCategories: ['Bills'], sortOrder: 4 },
+  ];
+  const m = calc.matchSpending(allocations, [
+    { id: 'rent-tx', title: 'House rent Nov', category: 'Bills', amountPaise: 350000 },
+    { id: 'mess-tx', title: 'Mess', category: 'Food', amountPaise: 250000 },
+    { id: 'snack', title: 'Snacks', category: 'Food', amountPaise: 5000 },
+    { id: 'outside-tx', title: 'Food outside with friends', category: 'Food', amountPaise: 80000 },
+    { id: 'power', title: 'Electricity', category: 'Bills', amountPaise: 60000 },
+    { id: 'pinned', title: 'Mess advance', category: 'Food', amountPaise: 10000, assignedAllocationId: 'outside' },
+    { id: 'gift', title: 'Gift', category: 'Shopping', amountPaise: 20000 },
+  ]);
+  const how = Object.fromEntries(m.resolved.map(r => [r.id, [r.allocationId, r.matchedBy]]));
+  assert.deepEqual(how, {
+    'rent-tx': ['rent', 'NAME'],
+    'mess-tx': ['mess', 'NAME'],
+    snack: ['mess', 'CATEGORY'],
+    'outside-tx': ['outside', 'NAME'],
+    power: ['bills', 'CATEGORY'],
+    pinned: ['outside', 'ASSIGNED'],
+    gift: [null, 'UNPLANNED'],
+  });
+  assert.equal(m.byAllocation.get('mess'), 255000);
+  assert.equal(m.byAllocation.get('outside'), 90000);
+  assert.equal(m.byAllocation.get('gold'), 0);
+  assert.equal(m.unplanned, 20000);
+});
+
+test('a ₹2,500 Mess expense reduces the Mess line and nothing else', () => {
+  const allocations = [
+    { id: 'rent', group: 'FIXED', name: 'Rent', matchCategories: [], sortOrder: 0 },
+    { id: 'mess', group: 'FIXED', name: 'Mess / Food', matchCategories: ['Food'], sortOrder: 1 },
+  ];
+  const m = calc.matchSpending(allocations, [{ id: 'e1', title: 'Mess', category: 'Food', amountPaise: 250000 }]);
+  assert.equal(m.byAllocation.get('mess'), 250000);
+  assert.equal(m.byAllocation.get('rent'), 0);
+  assert.equal(m.unplanned, 0);
+});

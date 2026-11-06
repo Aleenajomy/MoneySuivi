@@ -10,12 +10,14 @@ import PlannerSummary from '../components/planner/PlannerSummary'
 import DistributionChart from '../components/planner/DistributionChart'
 import BudgetPanel from '../components/planner/BudgetPanel'
 import SalaryPanel from '../components/planner/SalaryPanel'
+import SpendingPanel from '../components/planner/SpendingPanel'
 import { formatAmount, periodLabel } from '../utils/planner'
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'salary', label: 'Salary' },
   { id: 'budget', label: 'Budget' },
+  { id: 'spending', label: 'Spending' },
 ]
 
 function Overview({ month, onOpen }) {
@@ -64,7 +66,9 @@ export default function SalaryPlanner() {
   const { period, setPeriod, month, loading, error, refresh, startPlan } = usePlanner()
   const [params, setParams] = useSearchParams()
   const tab = TABS.some(t => t.id === params.get('tab')) ? params.get('tab') : 'overview'
-  const openTab = (id) => setParams(id === 'overview' ? {} : { tab: id }, { replace: true })
+  const focusLine = params.get('line')
+  const openTab = (id, extra = {}) => setParams(id === 'overview' ? {} : { tab: id, ...extra }, { replace: true })
+  const showSpending = (lineId) => openTab('spending', lineId ? { line: lineId } : {})
 
   useEffect(() => { refresh(period) }, [period, refresh])
 
@@ -98,13 +102,16 @@ export default function SalaryPlanner() {
         ) : showLoading ? (
           <LoadingState />
         ) : ready && !month.plan ? (
-          tab === 'salary' ? <SalaryPanel /> : (
+          tab === 'salary' ? <SalaryPanel /> : tab === 'spending' ? <SpendingPanel focusLine={null} onFocusLine={() => {}} /> : (
             <EmptyState icon={CalendarPlus} title={`No plan for ${periodLabel(period)}`}
               description="This month has passed. You can still start a plan to record what you intended; repeating lines from your latest earlier month are copied in."
               actionLabel="Start plan for this month" onAction={() => startPlan().catch(() => {})} />
           )
         ) : ready ? (
-          tab === 'salary' ? <SalaryPanel /> : tab === 'budget' ? <BudgetPanel /> : <Overview month={month} onOpen={openTab} />
+          tab === 'salary' ? <SalaryPanel />
+            : tab === 'budget' ? <BudgetPanel onShowSpending={showSpending} />
+              : tab === 'spending' ? <SpendingPanel focusLine={focusLine} onFocusLine={showSpending} />
+                : <Overview month={month} onOpen={openTab} />
         ) : null}
       </div>
     </div>

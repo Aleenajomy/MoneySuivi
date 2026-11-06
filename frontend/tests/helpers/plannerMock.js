@@ -12,18 +12,37 @@ export async function setupPlannerMock(page, options = {}) {
     salaries: [],
     plans: {},
     candidates: options.candidates || [],
+    // Spending items: { id, title, category, amount, date, source?, autoLine?, autoBy?, pinned? }.
+    spending: (options.spending || []).map(s => ({ source: 'TRANSACTION', ...s })),
     requests: [],
     failOverview: Boolean(options.failOverview),
     overviewDelayMs: options.overviewDelayMs || 0,
   };
 
   const key = (y, m) => `${y}-${m}`;
+  if (options.plan) {
+    const { year, month, allocations } = options.plan;
+    const id = uuid();
+    state.plans[key(year, month)] = {
+      id,
+      allocations: allocations.map((a, i) => ({ id: uuid(), planId: id, recurring: true, matchCategories: [], sortOrder: i, ...a })),
+    };
+  }
   const salariesFor = (y, m) => state.salaries.filter(s => s.year === y && s.month === m);
 
   const monthBody = (year, month) => {
     const plan = state.plans[key(year, month)] || null;
     const salaries = salariesFor(year, month);
     const allocations = plan ? plan.allocations : [];
+    const spending = state.spending.map((s) => {
+      const auto = allocations.find(a => a.name === s.autoLine);
+      const allocationId = s.pinned || auto?.id || null;
+      return {
+        id: s.id, source: s.source, title: s.title, category: s.category, amount: s.amount, date: s.date, paymentMethod: s.paymentMethod || null,
+        allocationId, matchedBy: s.pinned ? 'ASSIGNED' : allocationId ? (s.autoBy || 'CATEGORY') : 'UNPLANNED', reassignable: s.source !== 'EMI',
+      };
+    });
+    const spentOn = (id) => spending.filter(s => s.allocationId === id);
     const byGroup = Object.fromEntries(GROUPS.map(g => [g, 0]));
     allocations.forEach(a => { byGroup[a.group] += paise(a.plannedAmount); });
     const expected = salaries.reduce((s, r) => s + paise(r.expectedAmount), 0);
@@ -34,7 +53,21 @@ export async function setupPlannerMock(page, options = {}) {
       success: true,
       year,
       month,
-      plan: plan && { id: plan.id, year, month, note: null, allocations: allocations.map(a => ({ ...a, actualAmount: ['FIXED', 'VARIABLE'].includes(a.group) ? 0 : null, remainingAmount: ['FIXED', 'VARIABLE'].includes(a.group) ? a.plannedAmount : null, utilization: ['FIXED', 'VARIABLE'].includes(a.group) ? 0 : null })) },
+      plan: plan && {
+        id: plan.id, year, month, note: null,
+        allocations: allocations.map((a) => {
+          const tracked = ['FIXED', 'VARIABLE'].includes(a.group);
+          const spent = spentOn(a.id).reduce((t, s) => t + paise(s.amount), 0);
+          return {
+            ...a,
+            transactionCount: spentOn(a.id).length,
+            actualAmount: tracked ? rupees(spent) : null,
+            remainingAmount: tracked ? rupees(paise(a.plannedAmount) - spent) : null,
+            utilization: tracked ? (paise(a.plannedAmount) > 0 ? Math.round((spent * 100) / paise(a.plannedAmount)) : null) : null,
+          };
+        }),
+      },
+      spending,
       salaries,
       summary: {
         income: {
@@ -51,7 +84,8 @@ export async function setupPlannerMock(page, options = {}) {
         overAllocated: expected - total < 0,
         allocatedPercent: expected > 0 ? Math.round((total * 100) / expected) : null,
         actual: { income: rupees(received), expenses: 0, emi: 0, savingsNet: 0, investmentNet: 0, available: rupees(received) },
-        unplanned: [],
+        unplanned: Object.entries(spending.filter(x => !x.allocationId).reduce((acc, x) => ({ ...acc, [x.category]: (acc[x.category] || 0) + paise(x.amount) }), {}))
+          .map(([category, p]) => ({ category, amount: rupees(p) })),
       },
     };
   };
@@ -142,6 +176,12 @@ export async function setupPlannerMock(page, options = {}) {
       if (method === 'DELETE') found.plan.allocations = found.plan.allocations.filter(a => a.id !== m[1]);
       else Object.assign(found.a, body, body.plannedAmount !== undefined ? { plannedAmount: Number(body.plannedAmount) } : {});
       return json(route, 200, monthBody(found.year, found.month));
+    }
+    m = /^\/transactions\/([^/]+)\/assignment$/.exec(path);
+    if (m) {
+      const spend = state.spending.find(s => s.id === m[1]);
+      spend.pinned = method === 'DELETE' ? undefined : body.allocationId;
+      return json(route, 200, monthBody(Number(spend.date.slice(0, 4)), Number(spend.date.slice(5, 7))));
     }
     if (method === 'GET' && path === '/salaries/history') return json(route, 200, { success: true, history: [] });
     return json(route, 404, { success: false, message: 'Route not found' });

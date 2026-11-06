@@ -87,6 +87,7 @@ router.post('/salaries/:id/undo', v.uuidParam(), body('deleteTransaction').optio
 router.delete('/salaries/:id', v.uuidParam(), validate, income.deleteSalary);
 
 router.get('/budgets', yearMonthQuery, validate, budget.getBudget);
+router.get('/budgets/spending', yearMonthQuery, validate, budget.getSpending);
 router.post('/budgets', yearMonthBody, validate, budget.createBudget);
 router.put('/budgets/allocations/:allocationId', v.uuidParam('allocationId'), allocationRules('', true), validate, budget.updateAllocation);
 router.delete('/budgets/allocations/:allocationId', v.uuidParam('allocationId'), validate, budget.deleteAllocation);
@@ -98,5 +99,9 @@ router.put('/budgets/:id', v.uuidParam(), [
   body('allocations.*.id').isUUID().withMessage('Each allocation needs a valid id'),
   ...allocationRules('allocations.*.', true),
 ], validate, budget.updateBudget);
+
+router.put('/transactions/:expenseId/assignment', v.uuidParam('expenseId'),
+  body('allocationId').isUUID().withMessage('allocationId must be a valid id'), validate, budget.assignTransaction);
+router.delete('/transactions/:expenseId/assignment', v.uuidParam('expenseId'), validate, budget.clearAssignment);
 
 module.exports = router;

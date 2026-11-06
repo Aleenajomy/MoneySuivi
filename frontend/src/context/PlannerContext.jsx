@@ -7,7 +7,7 @@ import { comparePeriods, currentPeriod } from '../utils/planner'
 const PlannerContext = createContext(null)
 export const usePlanner = () => useContext(PlannerContext)
 
-const EMPTY_MONTH = { plan: null, salaries: [], summary: null }
+const EMPTY_MONTH = { plan: null, salaries: [], summary: null, spending: [] }
 
 export function PlannerProvider({ children }) {
   const { user } = useAuth()
@@ -34,7 +34,7 @@ export function PlannerProvider({ children }) {
   }, [user?.id])
 
   const applyMonth = useCallback((data) => {
-    setMonth({ plan: data.plan, salaries: data.salaries, summary: data.summary })
+    setMonth({ plan: data.plan, salaries: data.salaries, summary: data.summary, spending: data.spending || [] })
   }, [])
 
   const loadSources = useCallback(async () => {
@@ -152,6 +152,13 @@ export function PlannerProvider({ children }) {
     toast.success(data.copied ? `Copied ${data.copied} recurring line${data.copied === 1 ? '' : 's'}` : 'Nothing new to copy')
   }, [mutate, applyMonth, month.plan?.id])
 
+  // Pins a transaction to a line, or (allocationId null) hands it back to automatic matching.
+  const assignTransaction = useCallback(async (expenseId, allocationId) => {
+    applyMonth(await mutate(() => (allocationId
+      ? api.put(`/planner/transactions/${expenseId}/assignment`, { allocationId })
+      : api.delete(`/planner/transactions/${expenseId}/assignment`)), allocationId ? 'Moved to the chosen line' : 'Back to automatic matching'))
+  }, [mutate, applyMonth])
+
   const startPlan = useCallback(async () => {
     await mutate(() => api.post('/planner/budgets', period), 'Plan created for this month')
     await refresh()
@@ -162,7 +169,7 @@ export function PlannerProvider({ children }) {
       period, setPeriod, month, incomeSources, loading, error, refresh, startPlan,
       saveIncomeSource, setSourceActive, deleteIncomeSource, addOneOffIncome, updateSalary,
       receiveSalary, undoSalary, deleteSalary, getLinkCandidates, getSalaryHistory,
-      saveAllocation, deleteAllocation, copyRecurring,
+      saveAllocation, deleteAllocation, copyRecurring, assignTransaction,
     }}>
       {children}
     </PlannerContext.Provider>

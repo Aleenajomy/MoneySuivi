@@ -1,6 +1,6 @@
 const prisma = require('../lib/prisma');
 const { HttpError, handleError } = require('../utils/http');
-const { toPaise, paiseToDecimalString } = require('../utils/plannerCalculations');
+const { toPaise, paiseToDecimalString, EXPENSE_GROUPS } = require('../utils/plannerCalculations');
 const planner = require('../services/plannerService');
 
 const NOT_FOUND_PLAN = new HttpError(404, 'Budget plan not found');
@@ -34,8 +34,10 @@ const findAllocation = async (userId, id, db = prisma) => {
   return allocation;
 };
 
+// Every budget write answers with the whole month, including the spending breakdown, so the
+// screen never shows totals from before the change.
 const respondWithMonth = async (res, userId, year, month, status = 200, extra = {}) => {
-  const data = await planner.getMonth(userId, year, month);
+  const data = await planner.getMonth(userId, year, month, { includeSpending: true });
   res.status(status).json({ success: true, ...extra, ...data });
 };
 
@@ -130,4 +132,70 @@ const deleteAllocation = async (req, res) => {
   }
 };
 
-module.exports = { getOverview, getBudget, createBudget, copyRecurring, updateBudget, addAllocation, updateAllocation, deleteAllocation };
+const getSpending = async (req, res) => {
+  try {
+    const data = await planner.getMonth(req.user.id, req.query.year, req.query.month, { includeSpending: true });
+    res.json({ success: true, year: data.year, month: data.month, planId: data.plan?.id ?? null, spending: data.spending });
+  } catch (error) {
+    handleError(res, error, 'planner.getSpending');
+  }
+};
+
+const findSpendingTransaction = async (userId, expenseId) => {
+  const expense = await prisma.expense.findFirst({
+    where: { id: expenseId, userId },
+    select: { id: true, type: true, category: true, expenseDate: true, investmentTransaction: { select: { id: true } } },
+  });
+  if (!expense) throw new HttpError(404, 'Transaction not found');
+  // Income, transfers and investments never count as spending, so pinning them would be meaningless.
+  if (expense.type !== 'expense' || expense.investmentTransaction || String(expense.category).trim().toLowerCase() === 'investment') {
+    throw new HttpError(400, 'Only spending transactions can be assigned to a budget line');
+  }
+  return expense;
+};
+
+/**
+ * Pins a transaction to a line, overriding automatic matching. The transaction itself is not
+ * changed; the unique expenseId on AllocationAssignment keeps it counted toward one line only.
+ */
+const assignTransaction = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const expense = await findSpendingTransaction(userId, req.params.expenseId);
+    const allocation = await findAllocation(userId, req.body.allocationId);
+    if (!EXPENSE_GROUPS.includes(allocation.group)) {
+      throw new HttpError(400, 'Savings and investment lines do not take spending. Choose a fixed or variable line.');
+    }
+    const date = expense.expenseDate;
+    if (date.getUTCFullYear() !== allocation.plan.year || date.getUTCMonth() + 1 !== allocation.plan.month) {
+      throw new HttpError(400, 'That line belongs to a different month than this transaction.');
+    }
+    const write = () => prisma.allocationAssignment.upsert({
+      where: { expenseId: expense.id },
+      update: { allocationId: allocation.id },
+      create: { expenseId: expense.id, allocationId: allocation.id },
+    });
+    // Two first-time assignments racing both try to insert; the loser retries as an update.
+    await write().catch(error => (error?.code === 'P2002' ? write() : Promise.reject(error)));
+    await respondWithMonth(res, userId, allocation.plan.year, allocation.plan.month);
+  } catch (error) {
+    handleError(res, error, 'planner.assignTransaction');
+  }
+};
+
+const clearAssignment = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const expense = await prisma.expense.findFirst({ where: { id: req.params.expenseId, userId }, select: { id: true, expenseDate: true } });
+    if (!expense) throw new HttpError(404, 'Transaction not found');
+    await prisma.allocationAssignment.deleteMany({ where: { expenseId: expense.id } });
+    await respondWithMonth(res, userId, expense.expenseDate.getUTCFullYear(), expense.expenseDate.getUTCMonth() + 1);
+  } catch (error) {
+    handleError(res, error, 'planner.clearAssignment');
+  }
+};
+
+module.exports = {
+  getOverview, getBudget, createBudget, copyRecurring, updateBudget, addAllocation, updateAllocation, deleteAllocation,
+  getSpending, assignTransaction, clearAssignment,
+};

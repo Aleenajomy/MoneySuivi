@@ -53,12 +53,33 @@ Each allocation in `plan.allocations[]` also has:
 - `null` for those three on SAVINGS and INVESTMENT lines. Those are tracked through goals and
   investment plans in Phase 5.
 
-Each spending transaction counts toward **exactly one** allocation:
+Each spending item counts toward **exactly one** FIXED or VARIABLE line. The first rule that
+applies wins:
 
-1. A manual assignment, if there is one (Phase 4).
-2. Otherwise, the first line (by `sortOrder`) whose `matchCategories` include the transaction's
-   category. EMI payments match the pseudo-category `EMI`.
-3. Otherwise it is unplanned.
+1. **ASSIGNED.** The user pinned the transaction to a line in this month's plan. A pin to a
+   deleted line, or to another month's plan (because the transaction's date was edited), is
+   ignored.
+2. **NAME.** The transaction's title contains a distinctive word from a line's name. For
+   example, "Mess" matches "Mess / Food" and "House rent" matches "Rent / Accommodation".
+   Generic words such as *other*, *bills*, *personal*, *fund* and *misc* don't count. The line
+   with the most matching words wins, then the lower `sortOrder`.
+3. **CATEGORY.** The first line (by `sortOrder`) whose `matchCategories` include the item's
+   category. EMI payments use the pseudo-category `EMI`.
+4. **UNPLANNED.**
+
+Matching is calculated every time the month is read, so adding, editing or deleting a
+transaction in History shows up straight away. The planner never creates or edits transactions.
+
+Each allocation also has `transactionCount`. `GET /overview` (and every budget write) also
+returns `spending[]`:
+
+```
+{ id, source: "TRANSACTION" | "EMI", title, category, amount, date, paymentMethod,
+  allocationId | null, matchedBy: "ASSIGNED" | "NAME" | "CATEGORY" | "UNPLANNED", reassignable }
+```
+
+EMI payments have the id `emi:<paymentId>` and `reassignable: false`. They come from the EMI
+tracker, so there is no transaction to pin.
 
 ## Income sources
 
@@ -113,3 +134,22 @@ Allocation fields:
 - `group` is one of `FIXED`, `VARIABLE`, `SAVINGS`, `INVESTMENT`.
 - `matchCategories` is up to 20 transaction categories. `"EMI"` matches EMI payments.
 - `recurring` is the "repeat next month" flag.
+
+## Spending and manual reassignment
+
+| Method | Path | Body | Notes |
+|---|---|---|---|
+| GET | `/budgets/spending?year=&month=` | | `{ planId, spending[] }`. Works for a month with no plan, where everything is unplanned. |
+| PUT | `/transactions/:expenseId/assignment` | `allocationId` | Pins the transaction to a line, replacing any earlier pin. Returns the whole month. |
+| DELETE | `/transactions/:expenseId/assignment` | | Removes the pin, so the transaction goes back to automatic matching. Returns the whole month. |
+
+A pin is rejected with:
+
+- **404** if the transaction or the line isn't the user's.
+- **400** if the transaction isn't spending (income, a transfer or an investment).
+- **400** if the line is a SAVINGS or INVESTMENT line.
+- **400** if the line belongs to a different month from the transaction.
+
+Pinning never changes the transaction itself. Because `expenseId` is unique, a transaction always
+has at most one pin. Deleting the line removes its pins, and those transactions go back to
+automatic matching.
