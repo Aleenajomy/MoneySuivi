@@ -1,7 +1,7 @@
 const prisma = require('../lib/prisma');
 const { HttpError, handleError } = require('../utils/http');
 const { normalizeAccountType } = require('../utils/accountBalances');
-const { toPaise, fromPaise, paiseToDecimalString, sumPaise } = require('../utils/plannerCalculations');
+const { toPaise, toApiAmount, paiseToNumber, paiseToDecimalString, sumPaise } = require('../utils/plannerCalculations');
 const planner = require('../services/plannerService');
 
 const NOT_FOUND_SOURCE = new HttpError(404, 'Income source not found');
@@ -23,6 +23,16 @@ const accountTypeForPayment = (paymentMethod) => {
 };
 
 const transactionCategoryFor = (kind) => (kind === 'OTHER' ? 'Other' : 'Salary');
+
+const WRONG_MONTH = new HttpError(400, 'The income must be dated in the same month as this record.', 'WRONG_MONTH');
+
+// Stored like every transaction date: UTC midnight of the calendar day the user picked, whatever
+// time zone the client sent, so the month check matches how the planner groups transactions.
+const calendarDay = (value) => new Date(`${String(value).slice(0, 10)}T00:00:00.000Z`);
+
+// A record left marked received after its transaction stopped backing it (deleted, or edited into
+// another month or type before the History-side reset existed) is put back to pending.
+const STALE_RESET = { receivedAmount: '0', receivedAt: null, expenseId: null };
 
 const findSource = async (userId, id, db = prisma) => {
   const source = await db.incomeSource.findFirst({ where: { id, userId } });
@@ -193,10 +203,16 @@ const receiveSalary = async (req, res) => {
 
     const record = await prisma.$transaction(async (tx) => {
       const existing = await findSalary(userId, req.params.id, tx);
-      if (existing.receivedAt || existing.expenseId) throw ALREADY_RECEIVED;
+      if (planner.isReceived(existing)) throw ALREADY_RECEIVED;
+      if (existing.receivedAt || existing.expenseId) {
+        await tx.monthlySalary.updateMany({ where: { id: existing.id, receivedAt: existing.receivedAt, expenseId: existing.expenseId }, data: STALE_RESET });
+      }
 
       let transaction;
       if (mode === 'link') {
+        // Lock the transaction so a concurrent History edit or delete either completes first (and is
+        // seen by the checks below) or waits until the link exists (and then resets it).
+        await tx.$queryRaw`SELECT id FROM "Expense" WHERE id = ${expenseId} AND "userId" = ${userId} FOR UPDATE`;
         transaction = await tx.expense.findFirst({
           where: { id: expenseId, userId },
           include: { monthlySalary: { select: { id: true } }, investmentTransaction: { select: { id: true } } },
@@ -206,20 +222,23 @@ const receiveSalary = async (req, res) => {
         if (transaction.investmentTransaction || String(transaction.category).trim().toLowerCase() === 'investment') {
           throw new HttpError(400, 'An investment transaction cannot be linked as income');
         }
+        if (!planner.isValidSalaryLink(transaction, existing)) throw WRONG_MONTH;
         if (transaction.monthlySalary) throw ALREADY_LINKED;
       } else {
+        const receivedOn = calendarDay(receivedAt);
+        if (receivedOn.getUTCFullYear() !== existing.year || receivedOn.getUTCMonth() + 1 !== existing.month) throw WRONG_MONTH;
         const method = paymentMethod || 'Net Banking';
         transaction = await tx.expense.create({
           data: {
             userId,
             title: existing.label,
-            amount: fromPaise(toPaise(receivedAmount)),
+            amount: paiseToNumber(toPaise(receivedAmount)),
             category: transactionCategoryFor(existing.kind),
             type: 'income',
             accountType: accountTypeForPayment(method),
             paymentMethod: method,
             note: note || null,
-            expenseDate: new Date(receivedAt),
+            expenseDate: receivedOn,
           },
         });
       }
@@ -249,12 +268,11 @@ const undoReceived = async (req, res) => {
     const userId = req.user.id;
     const record = await prisma.$transaction(async (tx) => {
       const existing = await findSalary(userId, req.params.id, tx);
-      if (!existing.receivedAt) throw new HttpError(400, 'This income is not marked as received');
-      await tx.monthlySalary.update({
-        where: { id: existing.id },
-        data: { receivedAmount: '0', receivedAt: null, expenseId: null },
-      });
-      if (req.body.deleteTransaction && existing.expenseId) {
+      if (!existing.receivedAt && !existing.expenseId) throw new HttpError(400, 'This income is not marked as received');
+      await tx.monthlySalary.update({ where: { id: existing.id }, data: STALE_RESET });
+      // Only a transaction that still backs the record is deleted; one the user has since turned into
+      // something else in History is left alone.
+      if (req.body.deleteTransaction && planner.isReceived(existing)) {
         await tx.expense.deleteMany({ where: { id: existing.expenseId, userId } });
       }
       return tx.monthlySalary.findUnique({ where: { id: existing.id }, include: planner.SALARY_INCLUDE });
@@ -268,7 +286,7 @@ const undoReceived = async (req, res) => {
 const deleteSalary = async (req, res) => {
   try {
     const existing = await findSalary(req.user.id, req.params.id);
-    if (existing.receivedAt) throw new HttpError(409, 'Received income is part of your history. Undo it first to delete the record.', 'ALREADY_RECEIVED');
+    if (planner.isReceived(existing)) throw new HttpError(409, 'Received income is part of your history. Undo it first to delete the record.', 'ALREADY_RECEIVED');
     await prisma.monthlySalary.delete({ where: { id: existing.id } });
     res.json({ success: true, message: 'Income record deleted' });
   } catch (error) {
@@ -276,19 +294,17 @@ const deleteSalary = async (req, res) => {
   }
 };
 
-// Income transactions around the record's month that are not yet linked to any income record,
-// so the user can link the salary they already entered instead of recording it twice.
-const CANDIDATE_LEAD_DAYS = 7;
+// Income transactions in the record's month that are not yet linked to any income record, so the
+// user can link the salary they already entered instead of recording it twice. Same month only:
+// that is the rule receiveSalary enforces.
 const getLinkCandidates = async (req, res) => {
   try {
     const record = await findSalary(req.user.id, req.params.id);
-    const range = planner.monthRange(record.year, record.month);
-    const from = new Date(range.gte.getTime() - CANDIDATE_LEAD_DAYS * 24 * 60 * 60 * 1000);
     const candidates = await prisma.expense.findMany({
       where: {
         userId: req.user.id,
         type: 'income',
-        expenseDate: { gte: from, lt: range.lt },
+        expenseDate: planner.monthRange(record.year, record.month),
         monthlySalary: { is: null },
         investmentTransaction: { is: null },
         NOT: { category: { equals: 'Investment', mode: 'insensitive' } },
@@ -300,7 +316,7 @@ const getLinkCandidates = async (req, res) => {
     const expected = toPaise(record.expectedAmount);
     res.json({
       success: true,
-      candidates: candidates.map(c => ({ ...c, amount: fromPaise(toPaise(c.amount)), matchesExpected: toPaise(c.amount) === expected })),
+      candidates: candidates.map(c => ({ ...c, amount: toApiAmount(toPaise(c.amount)), matchesExpected: toPaise(c.amount) === expected })),
     });
   } catch (error) {
     handleError(res, error, 'planner.getLinkCandidates');
@@ -333,8 +349,8 @@ const getSalaryHistory = async (req, res) => {
     });
     const history = [...byMonth.values()].map(m => ({
       ...m,
-      expectedAmount: fromPaise(sumPaise(m.records.map(r => toPaise(r.expectedAmount)))),
-      receivedAmount: fromPaise(sumPaise(m.records.map(r => toPaise(r.receivedAmount)))),
+      expectedAmount: toApiAmount(sumPaise(m.records.map(r => toPaise(r.expectedAmount)))),
+      receivedAmount: toApiAmount(sumPaise(m.records.map(r => toPaise(r.receivedAmount)))),
     }));
     res.json({ success: true, history });
   } catch (error) {

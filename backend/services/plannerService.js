@@ -3,7 +3,7 @@ const { config } = require('../config/env');
 const { todayInTimezone } = require('../utils/recurrence');
 const calc = require('../utils/plannerCalculations');
 
-const { toPaise, fromPaise } = calc;
+const { toPaise, toApiAmount } = calc;
 
 // Transaction dates are stored as UTC midnight of the chosen calendar day, so a calendar month
 // is exactly this UTC range.
@@ -23,20 +23,53 @@ const periodIndex = ({ year, month }) => year * 12 + (month - 1);
 const fromPeriodWhere = ({ year, month }) => ({ OR: [{ year: { gt: year } }, { year, month: { gte: month } }] });
 
 const SALARY_INCLUDE = {
-  expense: { select: { id: true, title: true, amount: true, expenseDate: true, paymentMethod: true, accountType: true } },
+  expense: {
+    select: {
+      id: true, title: true, amount: true, expenseDate: true, paymentMethod: true, accountType: true,
+      type: true, category: true, investmentTransaction: { select: { id: true } },
+    },
+  },
   incomeSource: { select: { payDay: true, active: true } },
 };
 
-const salaryReceivedPaise = (record) => (record.expense ? toPaise(record.expense.amount) : toPaise(record.receivedAmount));
+const isInvestment = (expense) => Boolean(expense.investmentTransaction)
+  || String(expense.category || '').trim().toLowerCase() === 'investment';
+
+/**
+ * A salary record is backed by its transaction only while that transaction is a non-investment
+ * income dated in the record's own month. Otherwise "received" and actual income would disagree:
+ * the money would be counted in another month, or as spending/investment, as well as received.
+ */
+const isValidSalaryLink = (expense, { year, month }) => Boolean(expense)
+  && expense.type === 'income'
+  && !isInvestment(expense)
+  && expense.expenseDate.getUTCFullYear() === year
+  && expense.expenseDate.getUTCMonth() + 1 === month;
+
+// The linked transaction is the source of truth, so a later edit to its amount shows here and a
+// link that stopped being valid (see isValidSalaryLink) reads as not received.
+const isReceived = (record) => Boolean(record.receivedAt) && isValidSalaryLink(record.expense, record);
+/**
+ * Puts back to pending any salary record whose linked transaction no longer qualifies after a
+ * History edit, inside the caller's transaction so the two can never disagree.
+ */
+const resetInvalidSalaryLinks = async (tx, userId, expenseId) => {
+  const record = await tx.monthlySalary.findFirst({ where: { userId, expenseId }, include: SALARY_INCLUDE });
+  if (record && !isValidSalaryLink(record.expense, record)) {
+    await tx.monthlySalary.update({ where: { id: record.id }, data: { receivedAmount: '0', receivedAt: null, expenseId: null } });
+  }
+};
+
+const salaryReceivedPaise = (record) => (isReceived(record) ? toPaise(record.expense.amount) : 0n);
 
 const salaryStatus = (record, expectedPaise, receivedPaise) => {
-  if (!record.receivedAt) return 'PENDING';
+  if (!isReceived(record)) return 'PENDING';
   return receivedPaise < expectedPaise ? 'PARTIAL' : 'RECEIVED';
 };
 
 const serializeSalary = (record) => {
   const expectedPaise = toPaise(record.expectedAmount);
-  const receivedPaise = record.receivedAt ? salaryReceivedPaise(record) : 0;
+  const receivedPaise = salaryReceivedPaise(record);
   return {
     id: record.id,
     incomeSourceId: record.incomeSourceId,
@@ -45,12 +78,14 @@ const serializeSalary = (record) => {
     year: record.year,
     month: record.month,
     payDay: record.incomeSource?.payDay ?? null,
-    expectedAmount: fromPaise(expectedPaise),
-    receivedAmount: fromPaise(receivedPaise),
+    expectedAmount: toApiAmount(expectedPaise),
+    receivedAmount: toApiAmount(receivedPaise),
     status: salaryStatus(record, expectedPaise, receivedPaise),
-    receivedAt: record.receivedAt,
-    expenseId: record.expenseId,
-    transaction: record.expense ? { ...record.expense, amount: fromPaise(toPaise(record.expense.amount)) } : null,
+    receivedAt: isReceived(record) ? record.receivedAt : null,
+    expenseId: isReceived(record) ? record.expenseId : null,
+    transaction: isReceived(record) ? (({ id, title, amount, expenseDate, paymentMethod, accountType }) => ({
+      id, title, amount: toApiAmount(toPaise(amount)), expenseDate, paymentMethod, accountType,
+    }))(record.expense) : null,
   };
 };
 
@@ -58,7 +93,7 @@ const serializeIncomeSource = (source) => ({
   id: source.id,
   name: source.name,
   kind: source.kind,
-  expectedAmount: fromPaise(toPaise(source.expectedAmount)),
+  expectedAmount: toApiAmount(toPaise(source.expectedAmount)),
   payDay: source.payDay,
   active: source.active,
   createdAt: source.createdAt,
@@ -68,22 +103,22 @@ const serializeIncomeSource = (source) => ({
 const incomeInput = (records) => records.map((r) => ({
   kind: r.kind,
   expectedPaise: toPaise(r.expectedAmount),
-  receivedPaise: r.receivedAt ? salaryReceivedPaise(r) : 0,
+  receivedPaise: salaryReceivedPaise(r),
 }));
 
-const rupees = (obj) => Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, fromPaise(v)]));
+const rupees = (obj) => Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, toApiAmount(v)]));
 
 const serializeSummary = (summary, unplannedByCategory) => {
   const { pending, receivedCount, count, ...incomeMoney } = summary.income;
   const { byGroup, ...planMoney } = summary.plan;
   return {
-    income: { ...rupees(incomeMoney), pending: fromPaise(pending), receivedCount, count },
+    income: { ...rupees(incomeMoney), pending: toApiAmount(pending), receivedCount, count },
     plan: { ...rupees(planMoney), byGroup: rupees(byGroup) },
-    unallocated: fromPaise(summary.unallocated),
+    unallocated: toApiAmount(summary.unallocated),
     overAllocated: summary.overAllocated,
     allocatedPercent: summary.allocatedPercent,
     actual: rupees(summary.actual),
-    unplanned: unplannedByCategory.map(u => ({ category: u.category, amount: fromPaise(u.paise) })),
+    unplanned: unplannedByCategory.map(u => ({ category: u.category, amount: toApiAmount(u.paise) })),
   };
 };
 
@@ -97,14 +132,14 @@ const serializeAllocation = (allocation, actualPaise, transactionCount) => {
     planId: allocation.planId,
     group: allocation.group,
     name: allocation.name,
-    plannedAmount: fromPaise(plannedPaise),
+    plannedAmount: toApiAmount(plannedPaise),
     matchCategories: allocation.matchCategories,
     recurring: allocation.recurring,
     sortOrder: allocation.sortOrder,
     savingsGoalId: allocation.savingsGoalId,
     investmentPlanId: allocation.investmentPlanId,
-    actualAmount: tracked ? fromPaise(actualPaise) : null,
-    remainingAmount: tracked ? fromPaise(plannedPaise - actualPaise) : null,
+    actualAmount: tracked ? toApiAmount(actualPaise) : null,
+    remainingAmount: tracked ? toApiAmount(plannedPaise - actualPaise) : null,
     utilization: tracked ? calc.percentOf(actualPaise, plannedPaise) : null,
     transactionCount,
   };
@@ -120,9 +155,9 @@ const serializeSpending = (resolved, transactions, emiPayments) => {
   return resolved.map((r) => {
     const emi = emiById.get(r.id);
     const base = emi
-      ? { id: r.id, source: 'EMI', title: emi.emi.title, category: calc.EMI_CATEGORY, amount: fromPaise(toPaise(emi.amount)), date: emi.paidAt, paymentMethod: null }
+      ? { id: r.id, source: 'EMI', title: emi.emi.title, category: calc.EMI_CATEGORY, amount: toApiAmount(toPaise(emi.amount)), date: emi.paidAt, paymentMethod: null }
       : (({ id, title, category, amount, expenseDate, paymentMethod }) => ({
-        id, source: 'TRANSACTION', title, category, amount: fromPaise(toPaise(amount)), date: expenseDate, paymentMethod,
+        id, source: 'TRANSACTION', title, category, amount: toApiAmount(toPaise(amount)), date: expenseDate, paymentMethod,
       }))(txById.get(r.id));
     return { ...base, allocationId: r.allocationId, matchedBy: r.matchedBy, reassignable: !emi };
   }).sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -175,7 +210,7 @@ const getMonth = async (userId, year, month, { includeSpending = false } = {}, d
   );
   const counts = new Map();
   matched.resolved.forEach(r => r.allocationId && counts.set(r.allocationId, (counts.get(r.allocationId) || 0) + 1));
-  const savingsNet = calc.sumPaise(contributions.map(c => (c.type === 'WITHDRAWAL' ? -1 : 1) * toPaise(c.amount)));
+  const savingsNet = calc.sumPaise(contributions.map(c => (c.type === 'WITHDRAWAL' ? -toPaise(c.amount) : toPaise(c.amount))));
   const summary = calc.buildMonthSummary({
     income: calc.summarizeIncome(incomeInput(salaries)),
     plan: calc.summarizePlan(allocations.map(a => ({ group: a.group, plannedPaise: toPaise(a.plannedAmount) }))),
@@ -191,7 +226,7 @@ const getMonth = async (userId, year, month, { includeSpending = false } = {}, d
       year: plan.year,
       month: plan.month,
       note: plan.note,
-      allocations: allocations.map(a => serializeAllocation(a, matched.byAllocation.get(a.id) || 0, counts.get(a.id) || 0)),
+      allocations: allocations.map(a => serializeAllocation(a, matched.byAllocation.get(a.id) ?? 0n, counts.get(a.id) || 0)),
     } : null,
     salaries: salaries.map(serializeSalary),
     summary: serializeSummary(summary, plan ? matched.unplannedByCategory : []),
@@ -255,6 +290,9 @@ const initializeMonth = (userId, year, month) => prisma.$transaction(async (tx) 
 });
 
 module.exports = {
+  isValidSalaryLink,
+  isReceived,
+  resetInvalidSalaryLinks,
   monthRange,
   currentPeriod,
   periodIndex,

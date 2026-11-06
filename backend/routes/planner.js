@@ -23,17 +23,29 @@ const yearMonthBody = [
 const money = (field, { optional = false, allowZero = true, when } = {}) => {
   const min = allowZero ? 0 : 0.01;
   const start = when ? body(field).if(when) : body(field);
-  const base = optional ? start.optional({ values: 'null' }) : start.exists({ values: 'null' }).withMessage(`${field} is required`).bail();
+  // Optional means "may be left out"; an explicit null is an error, never a silent ₹0.
+  const base = optional ? start.optional() : start.exists({ values: 'null' }).withMessage(`${field} is required`).bail();
   return base
     .isFloat({ min, max: MAX_PLANNER_AMOUNT }).withMessage(`${field} must be a number between ${min} and ${MAX_PLANNER_AMOUNT}`).bail()
     .custom(value => /^\d+(\.\d{1,2})?$/.test(String(value).trim())).withMessage(`${field} can have at most 2 decimal places`);
 };
 
+// Trimmed and required to be non-empty whenever it is sent, on create and on update alike.
+const name = (field, { required = false } = {}) => (required
+  ? body(field).exists({ values: 'null' }).withMessage(`${field} is required`).bail()
+  : body(field).optional())
+  .isString().withMessage(`${field} must be text`).bail()
+  .trim()
+  .notEmpty().withMessage(`${field} cannot be empty`).bail()
+  .isLength({ max: 50 }).withMessage(`${field} must be at most 50 characters`);
+
+const kind = body('kind').optional().isIn(INCOME_KINDS).withMessage(`kind must be one of: ${INCOME_KINDS.join(', ')}`);
+
 const payDay = body('payDay').optional({ values: 'null' }).isInt({ min: 1, max: 31 }).withMessage('payDay must be between 1 and 31').toInt();
 
 const sourceRules = (optional) => [
-  v.text('name', { max: 50, required: !optional }),
-  v.oneOf('kind', INCOME_KINDS),
+  name('name', { required: !optional }),
+  kind,
   money('expectedAmount', { optional }),
   payDay,
 ];
@@ -41,9 +53,7 @@ const sourceRules = (optional) => [
 const allocationRules = (prefix, optional) => [
   optional ? body(`${prefix}group`).optional().isIn(GROUPS).withMessage(`group must be one of: ${GROUPS.join(', ')}`)
     : body(`${prefix}group`).isIn(GROUPS).withMessage(`group must be one of: ${GROUPS.join(', ')}`),
-  (optional ? body(`${prefix}name`).optional() : body(`${prefix}name`).exists({ values: 'null' }).withMessage('name is required').bail())
-    .isString().withMessage('name must be text').bail().trim().notEmpty().withMessage('name is required').bail()
-    .isLength({ max: 50 }).withMessage('name must be at most 50 characters'),
+  name(`${prefix}name`, { required: !optional }),
   money(`${prefix}plannedAmount`, { optional }),
   body(`${prefix}matchCategories`).optional().isArray({ max: 20 }).withMessage('matchCategories must be a list of at most 20 categories'),
   body(`${prefix}matchCategories.*`).isString().withMessage('Each category must be text').bail().trim()
@@ -57,7 +67,9 @@ const receiveRules = [
   body('expenseId').if(body('mode').equals('link')).isUUID().withMessage('expenseId is required to link a transaction'),
   money('receivedAmount', { allowZero: false, when: body('mode').equals('create') }),
   body('receivedAt').if(body('mode').equals('create')).exists({ values: 'falsy' }).withMessage('receivedAt is required').bail()
-    .isISO8601().withMessage('receivedAt must be a valid date'),
+    // Strict: an impossible day such as 2026-02-30 is rejected rather than rolled into March.
+    .matches(/^\d{4}-\d{2}-\d{2}/).withMessage('receivedAt must be a date like 2026-11-01').bail()
+    .isISO8601({ strict: true, strictSeparator: true }).withMessage('receivedAt must be a valid date'),
   body('paymentMethod').optional({ values: 'null' }).isIn(PAYMENT_METHODS).withMessage(`paymentMethod must be one of: ${PAYMENT_METHODS.join(', ')}`),
   v.text('note', { max: 500 }),
 ];
@@ -79,8 +91,8 @@ router.get('/salaries/history', [
   query('month').if(query('year').exists()).exists().withMessage('month is required with year').bail().isInt({ min: 1, max: 12 }).toInt(),
 ], validate, income.getSalaryHistory);
 router.post('/salaries/initialize', yearMonthBody, validate, income.initializeSalaries);
-router.post('/salaries', [...yearMonthBody, v.text('label', { max: 50, required: true }), v.oneOf('kind', INCOME_KINDS), money('expectedAmount')], validate, income.createSalary);
-router.put('/salaries/:id', v.uuidParam(), [money('expectedAmount', { optional: true }), v.text('label', { max: 50 })], validate, income.updateSalary);
+router.post('/salaries', [...yearMonthBody, name('label', { required: true }), kind, money('expectedAmount')], validate, income.createSalary);
+router.put('/salaries/:id', v.uuidParam(), [money('expectedAmount', { optional: true }), name('label')], validate, income.updateSalary);
 router.get('/salaries/:id/candidates', v.uuidParam(), validate, income.getLinkCandidates);
 router.post('/salaries/:id/receive', v.uuidParam(), receiveRules, validate, income.receiveSalary);
 router.post('/salaries/:id/undo', v.uuidParam(), body('deleteTransaction').optional().isBoolean({ strict: true }).withMessage('deleteTransaction must be true or false'), validate, income.undoReceived);

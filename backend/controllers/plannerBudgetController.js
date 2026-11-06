@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const prisma = require('../lib/prisma');
 const { HttpError, handleError } = require('../utils/http');
 const { toPaise, paiseToDecimalString, EXPENSE_GROUPS } = require('../utils/plannerCalculations');
@@ -21,6 +22,12 @@ const allocationData = (body) => {
   if (body.sortOrder !== undefined) data.sortOrder = body.sortOrder;
   return data;
 };
+
+// Savings and investment lines never take spending, so pins on a line that moves into one of those
+// groups are removed in the same transaction as the move.
+const dropPinsOffSpendingLines = (tx, allocationIds) => tx.allocationAssignment.deleteMany({
+  where: { allocationId: { in: allocationIds }, allocation: { group: { notIn: EXPENSE_GROUPS } } },
+});
 
 const findPlan = async (userId, id, db = prisma) => {
   const plan = await db.budgetPlan.findFirst({ where: { id, userId } });
@@ -98,6 +105,7 @@ const updateBudget = withDuplicateNameGuard(async (req, res) => {
       const { count } = await tx.budgetAllocation.updateMany({ where: { id: edit.id, planId: plan.id }, data: allocationData(edit) });
       if (count !== 1) throw NOT_FOUND_ALLOCATION;
     }
+    await dropPinsOffSpendingLines(tx, edits.map(e => e.id));
   });
   await respondWithMonth(res, userId, plan.year, plan.month);
 }, 'planner.updateBudget');
@@ -118,7 +126,10 @@ const addAllocation = withDuplicateNameGuard(async (req, res) => {
 // Allocations belong to one month's plan, so editing or deleting one never changes another month.
 const updateAllocation = withDuplicateNameGuard(async (req, res) => {
   const allocation = await findAllocation(req.user.id, req.params.allocationId);
-  await prisma.budgetAllocation.update({ where: { id: allocation.id }, data: allocationData(req.body) });
+  await prisma.$transaction(async (tx) => {
+    await tx.budgetAllocation.update({ where: { id: allocation.id }, data: allocationData(req.body) });
+    await dropPinsOffSpendingLines(tx, [allocation.id]);
+  });
   await respondWithMonth(res, req.user.id, allocation.plan.year, allocation.plan.month);
 }, 'planner.updateAllocation');
 
@@ -162,22 +173,26 @@ const assignTransaction = async (req, res) => {
   try {
     const userId = req.user.id;
     const expense = await findSpendingTransaction(userId, req.params.expenseId);
-    const allocation = await findAllocation(userId, req.body.allocationId);
-    if (!EXPENSE_GROUPS.includes(allocation.group)) {
-      throw new HttpError(400, 'Savings and investment lines do not take spending. Choose a fixed or variable line.');
-    }
+    const owned = await findAllocation(userId, req.body.allocationId);
     const date = expense.expenseDate;
-    if (date.getUTCFullYear() !== allocation.plan.year || date.getUTCMonth() + 1 !== allocation.plan.month) {
+    if (date.getUTCFullYear() !== owned.plan.year || date.getUTCMonth() + 1 !== owned.plan.month) {
       throw new HttpError(400, 'That line belongs to a different month than this transaction.');
     }
-    const write = () => prisma.allocationAssignment.upsert({
-      where: { expenseId: expense.id },
-      update: { allocationId: allocation.id },
-      create: { expenseId: expense.id, allocationId: allocation.id },
+    await prisma.$transaction(async (tx) => {
+      // Locking the line means a concurrent group change or delete either finishes first (and is
+      // seen here) or waits until this pin exists (and then removes it), never in between.
+      const [line] = await tx.$queryRaw`SELECT "group" FROM "BudgetAllocation" WHERE id = ${owned.id} FOR UPDATE`;
+      if (!line) throw NOT_FOUND_ALLOCATION;
+      if (!EXPENSE_GROUPS.includes(line.group)) {
+        throw new HttpError(400, 'Savings and investment lines do not take spending. Choose a fixed or variable line.');
+      }
+      // One statement, so concurrent first-time pins for the same transaction can't both insert.
+      await tx.$executeRaw`
+        INSERT INTO "AllocationAssignment" ("id", "expenseId", "allocationId")
+        VALUES (${crypto.randomUUID()}, ${expense.id}, ${owned.id})
+        ON CONFLICT ("expenseId") DO UPDATE SET "allocationId" = EXCLUDED."allocationId"`;
     });
-    // Two first-time assignments racing both try to insert; the loser retries as an update.
-    await write().catch(error => (error?.code === 'P2002' ? write() : Promise.reject(error)));
-    await respondWithMonth(res, userId, allocation.plan.year, allocation.plan.month);
+    await respondWithMonth(res, userId, owned.plan.year, owned.plan.month);
   } catch (error) {
     handleError(res, error, 'planner.assignTransaction');
   }

@@ -90,7 +90,9 @@ test('a transaction can back at most one salary record, one allocation and one i
   } }), isUniqueViolation);
 });
 
-test('deleting a transaction in History: salary history stays, the assignment and the investment go with it', async () => {
+// Changed in the Phase 4 review (finding 3): a salary record is "received" only while a transaction
+// backs it, so deleting that transaction now puts the record back to pending instead of keeping it.
+test('deleting a transaction in History: the salary record goes back to pending, the assignment and the investment go with it', async () => {
   const user = await createUser();
   const s = await seedPlanner(user.id);
   for (const tx of [s.salaryTx, s.rentTx, s.goldTx]) {
@@ -98,7 +100,10 @@ test('deleting a transaction in History: salary history stays, the assignment an
   }
   const salary = await prisma.monthlySalary.findFirst({ where: { userId: user.id } });
   assert.equal(salary.expenseId, null);
-  assert.equal(salary.receivedAmount.toFixed(2), '15000.00');
+  assert.equal(salary.receivedAt, null);
+  assert.equal(salary.receivedAmount.toFixed(2), '0.00');
+  assert.equal(salary.label, 'Salary');
+  assert.equal(salary.expectedAmount.toFixed(2), '15000.00');
   assert.equal(await prisma.allocationAssignment.count(), 0);
   assert.equal(await prisma.investmentTransaction.count(), 0);
   assert.equal(await prisma.budgetAllocation.count({ where: { planId: s.plan.id } }), 2);

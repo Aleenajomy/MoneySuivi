@@ -57,15 +57,21 @@ export const ALLOCATION_PRESETS = {
   ],
 }
 
-// Shows paise only when there are any, so ₹4,999.50 is never rounded up to ₹5,000.
+const EXACT_AMOUNT = /^-?\d+(\.\d{1,2})?$/
+
+// Shows paise only when there are any, so ₹4,999.50 is never rounded up to ₹5,000. Very large
+// totals arrive from the API as exact decimal strings; Intl formats those without going through
+// a float, so no paisa is lost on screen either.
 export const formatAmount = (amount) => {
-  const n = Number(amount) || 0
+  const exact = typeof amount === 'string' && EXACT_AMOUNT.test(amount)
+  const value = exact ? amount : (Number(amount) || 0)
+  const hasPaise = exact ? !/^-?\d+(\.00?)?$/.test(amount) : !Number.isInteger(value)
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
-    minimumFractionDigits: Number.isInteger(n) ? 0 : 2,
+    minimumFractionDigits: hasPaise ? 2 : 0,
     maximumFractionDigits: 2,
-  }).format(n)
+  }).format(value)
 }
 
 // Mirrors the backend rule: non-negative, at most two decimal places.
@@ -99,11 +105,21 @@ export const todayInput = () => {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
-// Default "received on" date: the pay day in that month, clamped to its length and to today.
-export const defaultReceivedDate = ({ year, month }, payDay) => {
-  const last = new Date(year, month, 0).getDate()
-  const day = Math.min(payDay || 1, last)
-  const candidate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+// The dates income for this month can be recorded on: within the month (the server rejects any
+// other) and not in the future. `max` is null while the month hasn't started.
+export const receivedDateRange = ({ year, month }) => {
+  const mm = String(month).padStart(2, '0')
+  const min = `${year}-${mm}-01`
+  const end = `${year}-${mm}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`
   const today = todayInput()
-  return candidate > today ? today : candidate
+  return { min, max: today < min ? null : (end < today ? end : today) }
+}
+
+// Default "received on" date: the pay day in that month, clamped to the allowed range.
+export const defaultReceivedDate = (period, payDay) => {
+  const { min, max } = receivedDateRange(period)
+  if (!max) return ''
+  const day = `${min.slice(0, 8)}${String(Math.min(payDay || 1, 31)).padStart(2, '0')}`
+  if (day > max) return max
+  return day < min ? min : day
 }
