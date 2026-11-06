@@ -73,6 +73,7 @@ fails and Render keeps serving the previous version.
 | `20261019000100_sync_db_push_tables` | Creates `LedgerContact`, `LedgerEntry`, `PushSubscription`, `FcmToken`, their indexes and foreign keys **only if missing**; sets the `Expense.paymentMethod` default to `'UPI'` (matches the schema). | None for existing data. Rehearsed on a `db push` database with data: row counts unchanged. |
 | `20261019000200_password_reset_and_session_version` | Adds `User.tokenVersion INT DEFAULT 0` and a `PasswordResetToken` table. | Additive. Old code ignores both, so rolling back the code stays safe. |
 | `20261106000100_salary_planner` | Creates the Salary Planner tables (`IncomeSource`, `MonthlySalary`, `BudgetPlan`, `BudgetAllocation`, `AllocationAssignment`, `SavingsGoal`, `SavingsContribution`, `InvestmentPlan`, `InvestmentTransaction`) with `DECIMAL(14,2)` amounts, indexes, foreign keys and CHECK constraints. No existing table is altered. | Additive. Rehearsed on a seeded database: existing rows checksum-identical before and after. To undo, drop the nine tables (no existing data references them) and delete the migration row. |
+| `20261107000100_planner_incentive_kind` | Widens the `kind` CHECK constraint on `IncomeSource` and `MonthlySalary` to allow `INCENTIVE`. | None: only replaces two constraints on planner tables; every existing row already satisfies the wider rule. |
 
 Both scenarios were rehearsed locally against databases built the way production was, with
 seeded data:

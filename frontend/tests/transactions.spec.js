@@ -23,7 +23,7 @@ test.describe('Transaction Management UI & Functions', () => {
 
     // Switch to Income
     await incomeBtn.click();
-    await expect(page.getByRole('button', { name: 'Salary' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Salary', exact: true })).toBeVisible();
 
     // Switch to Transfer
     await transferBtn.click();

@@ -3,7 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   Home, Clock, WalletCards, CreditCard, Plus, BookOpen, TrendingUp,
   BarChart3, WalletIcon, BellIcon, UserCircle, LogOut, Settings,
-  Sun, Moon, ChevronLeft, ChevronRight, X, HandCoins, Download, Share2, Repeat
+  Sun, Moon, ChevronLeft, ChevronRight, X, HandCoins, Download, Share2, Repeat, PiggyBank
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useNotification } from '../context/NotificationContext'
@@ -20,6 +20,8 @@ const mobileNavItems = [
   { path: '/emis', icon: CreditCard, label: 'EMI' },
   { path: '/ledger', icon: BookOpen, label: 'Ledger' },
   { path: '/networth', icon: TrendingUp, label: 'Net Worth' },
+  // A short visible label keeps six tabs on one line at 320px; assistive tech gets the full name.
+  { path: '/planner', icon: PiggyBank, label: 'Planner', ariaLabel: 'Salary Planner' },
 ]
 
 const sidebarNavItems = [
@@ -31,6 +33,7 @@ const sidebarNavItems = [
   { path: '/networth', icon: WalletCards, label: 'Net Worth' },
   { path: '/analytics', icon: BarChart3, label: 'Analytics' },
   { path: '/budgets', icon: WalletIcon, label: 'Budgets' },
+  { path: '/planner', icon: PiggyBank, label: 'Salary Planner' },
   { path: '/notifications', icon: BellIcon, label: 'Alerts' },
   { path: '/ledger', icon: HandCoins, label: 'Ledger' },
   { path: '/profile', icon: Settings, label: 'Profile' },
@@ -289,14 +292,14 @@ export default function Layout() {
           aria-label="Mobile Bottom Navigation"
         >
           <div className="flex items-center justify-between w-full h-[60px] px-1 sm:px-2 max-w-lg mx-auto">
-            {mobileNavItems.map(({ path, icon: Icon, label }) => {
+            {mobileNavItems.map(({ path, icon: Icon, label, ariaLabel }) => {
               const isActive = isMobileItemActive(path)
               return (
                 <button
                   key={path}
                   onClick={() => navigate(path)}
                   className="flex-1 flex flex-col items-center justify-center py-1.5 px-0.5 rounded-xl transition-all duration-150 select-none outline-none focus:outline-none focus-visible:outline-none focus:ring-0 active:scale-95 group relative border-none bg-transparent"
-                  aria-label={label}
+                  aria-label={ariaLabel || label}
                   aria-current={isActive ? 'page' : undefined}
                 >
                   <div
