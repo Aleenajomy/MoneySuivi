@@ -38,10 +38,23 @@ const nextRunAfter = (anchor, current, type) => {
   return next;
 };
 
+/** First scheduled date (index >= 1) on or after `target`; never one already passed. */
+const firstOccurrenceOnOrAfter = (anchor, type, target) => {
+  const a = new Date(anchor);
+  const t = new Date(target);
+  const estimate = type === 'monthly'
+    ? (t.getUTCFullYear() - a.getUTCFullYear()) * 12 + (t.getUTCMonth() - a.getUTCMonth()) - 1
+    : Math.floor((t - a) / (7 * DAY_MS)) - 1;
+  let i = Math.max(estimate, 1);
+  let date = occurrence(a, type, i);
+  while (date < t) date = occurrence(a, type, ++i);
+  return date;
+};
+
 // Calendar date "today" in the app timezone, as UTC midnight (how date-only values are stored).
 const todayInTimezone = (timezone, now = new Date()) => {
   const ymd = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
   return new Date(`${ymd}T00:00:00.000Z`);
 };
 
-module.exports = { addMonthsClamped, firstRunDate, nextRunAfter, todayInTimezone, DAY_MS };
+module.exports = { addMonthsClamped, firstRunDate, firstOccurrenceOnOrAfter, nextRunAfter, todayInTimezone, DAY_MS };
