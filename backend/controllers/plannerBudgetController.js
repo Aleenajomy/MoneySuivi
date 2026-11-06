@@ -23,6 +23,45 @@ const allocationData = (body) => {
   return data;
 };
 
+// A Savings line may track one of the user's goals and an Investment line one of their investments.
+const LINKS = [
+  { field: 'savingsGoalId', group: 'SAVINGS', model: 'savingsGoal', label: 'A savings goal can only be linked to a Savings line' },
+  { field: 'investmentPlanId', group: 'INVESTMENT', model: 'investmentPlan', label: 'An investment can only be linked to an Investment line' },
+];
+
+/**
+ * Applies the link fields of a create/update to `data`. A link must point at the user's own goal or
+ * investment, sit on a line of the matching group, and be used by only one line per month, so that
+ * month's contributions are never counted on two lines. Moving a line to another group drops a link
+ * that no longer fits. The plan row is locked so two lines can't claim the same goal concurrently.
+ */
+const applyLinks = async (tx, userId, planId, existing, body, data) => {
+  const group = data.group ?? existing?.group;
+  for (const link of LINKS) {
+    const requested = body[link.field];
+    if (group !== link.group) {
+      if (requested) throw new HttpError(400, link.label);
+      if (existing?.[link.field]) data[link.field] = null;
+      continue;
+    }
+    if (requested === undefined) continue;
+    if (requested === null) {
+      data[link.field] = null;
+      continue;
+    }
+    await tx.$queryRaw`SELECT id FROM "BudgetPlan" WHERE id = ${planId} FOR UPDATE`;
+    const owned = await tx[link.model].findFirst({ where: { id: requested, userId }, select: { id: true } });
+    if (!owned) throw new HttpError(404, link.field === 'savingsGoalId' ? 'Savings goal not found' : 'Investment not found');
+    const taken = await tx.budgetAllocation.findFirst({
+      where: { planId, [link.field]: requested, ...(existing && { id: { not: existing.id } }) },
+      select: { name: true },
+    });
+    if (taken) throw new HttpError(409, `Already tracked by "${taken.name}" this month.`, 'DUPLICATE_LINK');
+    data[link.field] = requested;
+  }
+  return data;
+};
+
 // Savings and investment lines never take spending, so pins on a line that moves into one of those
 // groups are removed in the same transaction as the move.
 const dropPinsOffSpendingLines = (tx, allocationIds) => tx.allocationAssignment.deleteMany({
@@ -102,8 +141,10 @@ const updateBudget = withDuplicateNameGuard(async (req, res) => {
   await prisma.$transaction(async (tx) => {
     if (req.body.note !== undefined) await tx.budgetPlan.update({ where: { id: plan.id }, data: { note: req.body.note || null } });
     for (const edit of edits) {
-      const { count } = await tx.budgetAllocation.updateMany({ where: { id: edit.id, planId: plan.id }, data: allocationData(edit) });
-      if (count !== 1) throw NOT_FOUND_ALLOCATION;
+      const existing = await tx.budgetAllocation.findFirst({ where: { id: edit.id, planId: plan.id } });
+      if (!existing) throw NOT_FOUND_ALLOCATION;
+      const data = await applyLinks(tx, userId, plan.id, existing, edit, allocationData(edit));
+      await tx.budgetAllocation.update({ where: { id: existing.id }, data });
     }
     await dropPinsOffSpendingLines(tx, edits.map(e => e.id));
   });
@@ -117,9 +158,14 @@ const addAllocation = withDuplicateNameGuard(async (req, res) => {
     const last = await prisma.budgetAllocation.aggregate({ where: { planId: plan.id }, _max: { sortOrder: true } });
     sortOrder = (last._max.sortOrder ?? -1) + 1;
   }
-  const allocation = await prisma.budgetAllocation.create({
-    data: { planId: plan.id, recurring: true, matchCategories: [], ...allocationData({ ...req.body, sortOrder }) },
-  });
+  const allocation = await prisma.$transaction(async (tx) => tx.budgetAllocation.create({
+    data: {
+      planId: plan.id,
+      recurring: true,
+      matchCategories: [],
+      ...(await applyLinks(tx, req.user.id, plan.id, null, req.body, allocationData({ ...req.body, sortOrder }))),
+    },
+  }));
   await respondWithMonth(res, req.user.id, plan.year, plan.month, 201, { allocationId: allocation.id });
 }, 'planner.addAllocation');
 
@@ -127,7 +173,8 @@ const addAllocation = withDuplicateNameGuard(async (req, res) => {
 const updateAllocation = withDuplicateNameGuard(async (req, res) => {
   const allocation = await findAllocation(req.user.id, req.params.allocationId);
   await prisma.$transaction(async (tx) => {
-    await tx.budgetAllocation.update({ where: { id: allocation.id }, data: allocationData(req.body) });
+    const data = await applyLinks(tx, req.user.id, allocation.planId, allocation, req.body, allocationData(req.body));
+    await tx.budgetAllocation.update({ where: { id: allocation.id }, data });
     await dropPinsOffSpendingLines(tx, [allocation.id]);
   });
   await respondWithMonth(res, req.user.id, allocation.plan.year, allocation.plan.month);
@@ -155,11 +202,11 @@ const getSpending = async (req, res) => {
 const findSpendingTransaction = async (userId, expenseId) => {
   const expense = await prisma.expense.findFirst({
     where: { id: expenseId, userId },
-    select: { id: true, type: true, category: true, expenseDate: true, investmentTransaction: { select: { id: true } } },
+    select: { id: true, type: true, category: true, expenseDate: true },
   });
   if (!expense) throw new HttpError(404, 'Transaction not found');
   // Income, transfers and investments never count as spending, so pinning them would be meaningless.
-  if (expense.type !== 'expense' || expense.investmentTransaction || String(expense.category).trim().toLowerCase() === 'investment') {
+  if (expense.type !== 'expense' || planner.isInvestmentCategory(expense.category)) {
     throw new HttpError(400, 'Only spending transactions can be assigned to a budget line');
   }
   return expense;

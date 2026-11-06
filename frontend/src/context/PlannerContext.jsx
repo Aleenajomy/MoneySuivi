@@ -14,6 +14,8 @@ export function PlannerProvider({ children }) {
   const [period, setPeriod] = useState(currentPeriod)
   const [month, setMonth] = useState(EMPTY_MONTH)
   const [incomeSources, setIncomeSources] = useState([])
+  const [goals, setGoals] = useState([])
+  const [investments, setInvestments] = useState({ plans: [], summary: null })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const requestId = useRef(0)
@@ -28,6 +30,8 @@ export function PlannerProvider({ children }) {
     if (lastUserId.current) {
       setMonth(EMPTY_MONTH)
       setIncomeSources([])
+      setGoals([])
+      setInvestments({ plans: [], summary: null })
       setUps.current = new Map()
     }
     lastUserId.current = user.id
@@ -52,8 +56,10 @@ export function PlannerProvider({ children }) {
     setLoading(true)
     setError('')
     try {
-      const [overview] = await Promise.all([
+      const [overview, goalsRes, investRes] = await Promise.all([
         api.get('/planner/overview', { params: target }),
+        api.get('/planner/goals', { params: target }),
+        api.get('/planner/investments', { params: target }),
         loadSources(),
       ])
       let data = overview.data
@@ -67,7 +73,11 @@ export function PlannerProvider({ children }) {
         }
         data = await setUps.current.get(key)
       }
-      if (id === requestId.current) applyMonth(data)
+      if (id === requestId.current) {
+        applyMonth(data)
+        setGoals(goalsRes.data.goals)
+        setInvestments({ plans: investRes.data.plans, summary: investRes.data.summary })
+      }
     } catch (err) {
       if (id === requestId.current && err.status !== 401) setError(err.message || 'Could not load your planner')
     } finally {
@@ -159,6 +169,62 @@ export function PlannerProvider({ children }) {
       : api.delete(`/planner/transactions/${expenseId}/assignment`)), allocationId ? 'Moved to the chosen line' : 'Back to automatic matching'))
   }, [mutate, applyMonth])
 
+  // Goals and investments feed the month (linked lines, saved and invested totals), so every change
+  // re-reads the whole month rather than patching one list.
+  const saveGoal = useCallback(async (id, values) => {
+    await mutate(() => (id ? api.put(`/planner/goals/${id}`, values) : api.post('/planner/goals', values)), id ? 'Goal updated' : 'Goal created')
+    await refresh()
+  }, [mutate, refresh])
+
+  const archiveGoal = useCallback(async (id, archived) => {
+    await mutate(() => api.patch(`/planner/goals/${id}/archive`, { archived }), archived ? 'Goal archived' : 'Goal restored')
+    await refresh()
+  }, [mutate, refresh])
+
+  const deleteGoal = useCallback(async (id) => {
+    await mutate(() => api.delete(`/planner/goals/${id}`), 'Goal deleted')
+    await refresh()
+  }, [mutate, refresh])
+
+  const addContribution = useCallback(async (goalId, values) => {
+    await mutate(() => api.post(`/planner/goals/${goalId}/contributions`, values), values.type === 'WITHDRAWAL' ? 'Withdrawal recorded' : 'Money added to goal')
+    await refresh()
+  }, [mutate, refresh])
+
+  const deleteContribution = useCallback(async (contributionId) => {
+    await mutate(() => api.delete(`/planner/goals/contributions/${contributionId}`), 'Entry removed')
+    await refresh()
+  }, [mutate, refresh])
+
+  const getContributions = useCallback(async (goalId) => (await api.get(`/planner/goals/${goalId}/contributions`)).data.contributions, [])
+
+  const saveInvestment = useCallback(async (id, values) => {
+    await mutate(() => (id ? api.put(`/planner/investments/${id}`, values) : api.post('/planner/investments', values)), id ? 'Investment updated' : 'Investment added')
+    await refresh()
+  }, [mutate, refresh])
+
+  const setInvestmentActive = useCallback(async (id, active) => {
+    await mutate(() => api.patch(`/planner/investments/${id}/active`, { active }), active ? 'Investment resumed' : 'Investment paused')
+    await refresh()
+  }, [mutate, refresh])
+
+  const deleteInvestment = useCallback(async (id, deleteTransactions = false) => {
+    await mutate(() => api.delete(`/planner/investments/${id}`, { params: deleteTransactions ? { deleteTransactions: true } : {} }), 'Investment deleted')
+    await refresh()
+  }, [mutate, refresh])
+
+  const addInvestmentTx = useCallback(async (planId, values) => {
+    await mutate(() => api.post(`/planner/investments/${planId}/transactions`, values), values.type === 'REDEEM' ? 'Redemption recorded' : 'Investment recorded')
+    await refresh()
+  }, [mutate, refresh])
+
+  const deleteInvestmentTx = useCallback(async (txId) => {
+    await mutate(() => api.delete(`/planner/investments/transactions/${txId}`), 'Investment transaction deleted')
+    await refresh()
+  }, [mutate, refresh])
+
+  const getInvestmentTxs = useCallback(async (planId) => (await api.get(`/planner/investments/${planId}/transactions`)).data.transactions, [])
+
   const startPlan = useCallback(async () => {
     await mutate(() => api.post('/planner/budgets', period), 'Plan created for this month')
     await refresh()
@@ -170,6 +236,8 @@ export function PlannerProvider({ children }) {
       saveIncomeSource, setSourceActive, deleteIncomeSource, addOneOffIncome, updateSalary,
       receiveSalary, undoSalary, deleteSalary, getLinkCandidates, getSalaryHistory,
       saveAllocation, deleteAllocation, copyRecurring, assignTransaction,
+      goals, saveGoal, archiveGoal, deleteGoal, addContribution, deleteContribution, getContributions,
+      investments, saveInvestment, setInvestmentActive, deleteInvestment, addInvestmentTx, deleteInvestmentTx, getInvestmentTxs,
     }}>
       {children}
     </PlannerContext.Provider>

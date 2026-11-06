@@ -3,7 +3,20 @@ const { config } = require('../config/env');
 const { todayInTimezone } = require('../utils/recurrence');
 const calc = require('../utils/plannerCalculations');
 
+const { normalizeAccountType } = require('../utils/accountBalances');
+
 const { toPaise, toApiAmount } = calc;
+
+// Mirrors the Add Transaction form: the account follows the payment method, and "Other" lands in
+// the Other (net banking) balance row. Used for every transaction the planner creates.
+const accountTypeForPayment = (paymentMethod) => {
+  const m = String(paymentMethod || '').trim().toLowerCase();
+  if (m === 'cash') return 'Cash';
+  if (m === 'credit card') return 'Credit Card';
+  if (m === 'upi' || m === 'wallet') return 'UPI';
+  if (m === 'debit card') return 'Debit Card';
+  return normalizeAccountType('Net Banking');
+};
 
 // Transaction dates are stored as UTC midnight of the chosen calendar day, so a calendar month
 // is exactly this UTC range.
@@ -32,8 +45,8 @@ const SALARY_INCLUDE = {
   incomeSource: { select: { payDay: true, active: true } },
 };
 
-const isInvestment = (expense) => Boolean(expense.investmentTransaction)
-  || String(expense.category || '').trim().toLowerCase() === 'investment';
+const isInvestmentCategory = (category) => String(category || '').trim().toLowerCase() === 'investment';
+const isInvestment = (expense) => Boolean(expense.investmentTransaction) || isInvestmentCategory(expense.category);
 
 /**
  * A salary record is backed by its transaction only while that transaction is a non-investment
@@ -122,11 +135,16 @@ const serializeSummary = (summary, unplannedByCategory) => {
   };
 };
 
-const serializeAllocation = (allocation, actualPaise, transactionCount) => {
+const serializeAllocation = (allocation, spentPaise, transactionCount, linkedNet) => {
   const plannedPaise = toPaise(allocation.plannedAmount);
-  // Savings and investment actuals come from goals and investment plans (Phase 5), not from
-  // category matching, so they are reported as not tracked rather than as zero.
-  const tracked = calc.EXPENSE_GROUPS.includes(allocation.group);
+  // Fixed/variable lines are measured by matched spending. A savings line is measured by the net
+  // contributions to its linked goal this month, an investment line by the net buys of its linked
+  // investment; without a link there is nothing to measure, so it reports "not tracked", not zero.
+  const isSpending = calc.EXPENSE_GROUPS.includes(allocation.group);
+  const linkId = allocation.group === 'SAVINGS' ? allocation.savingsGoalId
+    : allocation.group === 'INVESTMENT' ? allocation.investmentPlanId : null;
+  const tracked = isSpending || Boolean(linkId);
+  const actualPaise = isSpending ? spentPaise : (linkedNet.get(linkId) || 0n);
   return {
     id: allocation.id,
     planId: allocation.planId,
@@ -179,7 +197,7 @@ const getMonth = async (userId, year, month, { includeSpending = false } = {}, d
       where: { userId, expenseDate: range, type: { in: ['income', 'expense'] } },
       select: {
         id: true, type: true, title: true, category: true, amount: true, expenseDate: true, paymentMethod: true,
-        investmentTransaction: { select: { id: true } }, allocationAssignment: { select: { allocationId: true } },
+        investmentTransaction: { select: { id: true, planId: true } }, allocationAssignment: { select: { allocationId: true } },
       },
       orderBy: [{ expenseDate: 'desc' }, { createdAt: 'desc' }],
     }),
@@ -188,7 +206,7 @@ const getMonth = async (userId, year, month, { includeSpending = false } = {}, d
       select: { id: true, amount: true, paidAt: true, emi: { select: { title: true } } },
       orderBy: { paidAt: 'desc' },
     }),
-    db.savingsContribution.findMany({ where: { goal: { userId }, date: range }, select: { type: true, amount: true } }),
+    db.savingsContribution.findMany({ where: { goal: { userId }, date: range }, select: { goalId: true, type: true, amount: true } }),
   ]);
 
   const allocations = plan?.allocations || [];
@@ -199,7 +217,9 @@ const getMonth = async (userId, year, month, { includeSpending = false } = {}, d
       title: t.title,
       category: t.category,
       amountPaise: toPaise(t.amount),
-      isInvestment: Boolean(t.investmentTransaction),
+      // The category decides, exactly as in Analytics: a buy recategorised in History is no longer
+      // an investment anywhere, and nothing is counted as both.
+      isInvestment: false,
       assignedAllocationId: t.allocationAssignment?.allocationId,
     })),
     emiPayments.map(p => ({ id: p.id, amountPaise: toPaise(p.amount) })),
@@ -210,6 +230,11 @@ const getMonth = async (userId, year, month, { includeSpending = false } = {}, d
   );
   const counts = new Map();
   matched.resolved.forEach(r => r.allocationId && counts.set(r.allocationId, (counts.get(r.allocationId) || 0) + 1));
+  // Net this month per linked goal and per linked investment, keyed by their ids.
+  const linkedNet = new Map();
+  const addNet = (id, value) => linkedNet.set(id, (linkedNet.get(id) || 0n) + value);
+  contributions.forEach(c => addNet(c.goalId, c.type === 'WITHDRAWAL' ? -toPaise(c.amount) : toPaise(c.amount)));
+  transactions.filter(t => t.investmentTransaction && isInvestmentCategory(t.category)).forEach(t => addNet(t.investmentTransaction.planId, t.type === 'income' ? -toPaise(t.amount) : toPaise(t.amount)));
   const savingsNet = calc.sumPaise(contributions.map(c => (c.type === 'WITHDRAWAL' ? -toPaise(c.amount) : toPaise(c.amount))));
   const summary = calc.buildMonthSummary({
     income: calc.summarizeIncome(incomeInput(salaries)),
@@ -226,7 +251,7 @@ const getMonth = async (userId, year, month, { includeSpending = false } = {}, d
       year: plan.year,
       month: plan.month,
       note: plan.note,
-      allocations: allocations.map(a => serializeAllocation(a, matched.byAllocation.get(a.id) ?? 0n, counts.get(a.id) || 0)),
+      allocations: allocations.map(a => serializeAllocation(a, matched.byAllocation.get(a.id) ?? 0n, counts.get(a.id) || 0, linkedNet)),
     } : null,
     salaries: salaries.map(serializeSalary),
     summary: serializeSummary(summary, plan ? matched.unplannedByCategory : []),
@@ -290,6 +315,8 @@ const initializeMonth = (userId, year, month) => prisma.$transaction(async (tx) 
 });
 
 module.exports = {
+  accountTypeForPayment,
+  isInvestmentCategory,
   isValidSalaryLink,
   isReceived,
   resetInvalidSalaryLinks,

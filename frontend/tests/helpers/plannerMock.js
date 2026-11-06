@@ -14,6 +14,10 @@ export async function setupPlannerMock(page, options = {}) {
     candidates: options.candidates || [],
     // Spending items: { id, title, category, amount, date, source?, autoLine?, autoBy?, pinned? }.
     spending: (options.spending || []).map(s => ({ source: 'TRANSACTION', ...s })),
+    goals: [],
+    contributions: [],
+    investments: [],
+    investmentTxs: [],
     requests: [],
     failOverview: Boolean(options.failOverview),
     overviewDelayMs: options.overviewDelayMs || 0,
@@ -182,6 +186,51 @@ export async function setupPlannerMock(page, options = {}) {
       const spend = state.spending.find(s => s.id === m[1]);
       spend.pinned = method === 'DELETE' ? undefined : body.allocationId;
       return json(route, 200, monthBody(Number(spend.date.slice(0, 4)), Number(spend.date.slice(5, 7))));
+    }
+    const goalBody = (g) => {
+      const net = state.contributions.filter(c => c.goalId === g.id).reduce((t, c) => t + (c.type === 'WITHDRAWAL' ? -paise(c.amount) : paise(c.amount)), 0);
+      const saved = paise(g.initialAmount || 0) + net;
+      const target = paise(g.targetAmount);
+      return {
+        ...g, savedAmount: rupees(saved), remainingAmount: rupees(Math.max(target - saved, 0)), progress: Math.round((saved * 100) / target),
+        reached: saved >= target, thisMonthAmount: rupees(net), requiredMonthly: null, monthsLeft: null, overdue: false,
+      };
+    };
+    const investBody = () => {
+      const plans = state.investments.map((p) => {
+        const total = state.investmentTxs.filter(t => t.planId === p.id).reduce((t, x) => t + (x.type === 'REDEEM' ? -paise(x.amount) : paise(x.amount)), 0);
+        return { ...p, investedTotal: rupees(total), thisMonthAmount: rupees(total), thisMonthProgress: paise(p.monthlyPlannedAmount) ? Math.round((total * 100) / paise(p.monthlyPlannedAmount)) : null, transactionCount: state.investmentTxs.filter(t => t.planId === p.id).length };
+      });
+      const planned = state.investments.filter(p => p.active).reduce((t, p) => t + paise(p.monthlyPlannedAmount), 0);
+      const invested = plans.reduce((t, p) => t + paise(p.thisMonthAmount), 0);
+      return { success: true, plans, summary: { plannedThisMonth: rupees(planned), investedThisMonth: rupees(invested), unlinkedThisMonth: 0, totalThisMonth: rupees(invested), totalInvested: rupees(invested), progress: null } };
+    };
+    if (path === '/goals' && method === 'GET') return json(route, 200, { success: true, goals: state.goals.map(goalBody) });
+    if (path === '/goals' && method === 'POST') {
+      const goal = { id: uuid(), archived: false, initialAmount: 0, monthlyContribution: null, targetDate: null, note: null, ...body };
+      state.goals.push(goal);
+      return json(route, 201, { success: true, goal: goalBody(goal) });
+    }
+    m = /^\/goals\/([^/]+)\/contributions$/.exec(path);
+    if (m && method === 'POST') {
+      const goal = goalBody(state.goals.find(g => g.id === m[1]));
+      if (body.type === 'WITHDRAWAL' && paise(body.amount) > paise(goal.savedAmount)) {
+        return json(route, 409, { success: false, message: 'That would take the goal below ₹0. Withdraw at most what is saved.', code: 'INSUFFICIENT_SAVED' });
+      }
+      state.contributions.push({ id: uuid(), goalId: m[1], ...body });
+      return json(route, 201, { success: true, goal: goalBody(state.goals.find(g => g.id === m[1])) });
+    }
+    if (m && method === 'GET') return json(route, 200, { success: true, contributions: state.contributions.filter(c => c.goalId === m[1]) });
+    if (path === '/investments' && method === 'GET') return json(route, 200, investBody());
+    if (path === '/investments' && method === 'POST') {
+      const plan = { id: uuid(), active: true, note: null, monthlyPlannedAmount: 0, ...body };
+      state.investments.push(plan);
+      return json(route, 201, { ...investBody(), investmentId: plan.id });
+    }
+    m = /^\/investments\/([^/]+)\/transactions$/.exec(path);
+    if (m && method === 'POST') {
+      state.investmentTxs.push({ id: uuid(), planId: m[1], ...body });
+      return json(route, 201, investBody());
     }
     if (method === 'GET' && path === '/salaries/history') return json(route, 200, { success: true, history: [] });
     return json(route, 404, { success: false, message: 'Route not found' });
