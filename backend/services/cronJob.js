@@ -105,6 +105,55 @@ const checkDueEMIs = async (now = new Date()) => {
   return { reminders: upcomingEMIs.length };
 };
 
+const BILL_REMINDER_CATEGORY = 'Bill Reminder';
+const REMINDER_DEDUP_MS = 20 * 60 * 60 * 1000;
+
+/**
+ * A heads-up the day before a recurring bill is added automatically, so the account it is paid from
+ * can be topped up. Identical bills (same title, amount and account) share one reminder. Each one is
+ * sent at most once a day, even when the job runs twice or on two instances: the check and the
+ * in-app record happen inside one transaction holding a lock on that reminder.
+ */
+const checkUpcomingBills = async (now = new Date()) => {
+  const tomorrow = new Date(todayInTimezone(config.timezone, now).getTime() + DAY_MS);
+  const due = await prisma.expense.findMany({
+    where: { recurring: true, type: 'expense', recurringType: { in: ['weekly', 'monthly'] }, nextRunDate: { gte: tomorrow, lt: new Date(tomorrow.getTime() + DAY_MS) } },
+    select: { userId: true, title: true, amount: true, paymentMethod: true },
+  });
+  const groups = new Map();
+  due.forEach((bill) => {
+    const key = `${bill.userId}\u0000${bill.title}\u0000${bill.amount}\u0000${bill.paymentMethod || ''}`;
+    groups.set(key, { ...bill, count: (groups.get(key)?.count || 0) + 1 });
+  });
+
+  let sent = 0;
+  for (const bill of groups.values()) {
+    const amount = `₹${Number(bill.amount).toLocaleString('en-IN')}`;
+    const what = bill.count > 1 ? `${bill.count} payments of ${bill.title} (${amount} each)` : `${bill.title} (${amount})`;
+    const body = `${what} will be added tomorrow${bill.paymentMethod ? ` from ${bill.paymentMethod}` : ''}.`;
+    try {
+      const created = await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`bill-reminder:${bill.userId}:${body}`}))`;
+        const already = await tx.notification.findFirst({
+          where: { userId: bill.userId, category: BILL_REMINDER_CATEGORY, message: body, createdAt: { gte: new Date(now.getTime() - REMINDER_DEDUP_MS) } },
+          select: { id: true },
+        });
+        if (already) return null;
+        return tx.notification.create({ data: { userId: bill.userId, category: BILL_REMINDER_CATEGORY, message: body, type: 'info' } });
+      });
+      if (!created) continue;
+      sent += 1;
+      // The in-app record is already saved above; this only delivers the push.
+      notificationService.sendToUser(bill.userId, {
+        title: '🧾 Bill tomorrow', body, category: BILL_REMINDER_CATEGORY, type: 'info', data: { url: '/planner?tab=bills' }, saveInApp: false,
+      }).catch(err => logger.error('[Cron] Bill reminder push failed', { error: err.message }));
+    } catch (error) {
+      logger.error('[Cron] Bill reminder failed', { error: error.message });
+    }
+  }
+  return { due: due.length, sent };
+};
+
 const sendDailySummaries = async (now = new Date()) => {
   // Expense dates are stored as UTC midnight of the calendar day, so "today" is that one day.
   const today = todayInTimezone(config.timezone, now);
@@ -149,6 +198,7 @@ const start = () => {
   tasks.push(cron.schedule('0 0 * * *', async () => {
     await tracked('recurring', processRecurring)();
     await tracked('emi-reminders', checkDueEMIs)();
+    await tracked('bill-reminders', checkUpcomingBills)();
   }, options));
   tasks.push(cron.schedule('0 21 * * *', tracked('daily-summary', sendDailySummaries), options));
   logger.info(`[Cron] Scheduler started (timezone ${config.timezone})`);
@@ -156,4 +206,4 @@ const start = () => {
 
 const stop = () => tasks.splice(0).forEach(t => t.stop());
 
-module.exports = { processRecurring, checkDueEMIs, sendDailySummaries, runOccurrence, start, stop };
+module.exports = { processRecurring, checkDueEMIs, checkUpcomingBills, sendDailySummaries, runOccurrence, start, stop };

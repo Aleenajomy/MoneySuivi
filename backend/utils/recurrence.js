@@ -44,4 +44,4 @@ const todayInTimezone = (timezone, now = new Date()) => {
   return new Date(`${ymd}T00:00:00.000Z`);
 };
 
-module.exports = { addMonthsClamped, firstRunDate, nextRunAfter, todayInTimezone, DAY_MS };
+module.exports = { addMonthsClamped, occurrence, firstRunDate, nextRunAfter, todayInTimezone, DAY_MS };

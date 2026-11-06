@@ -106,11 +106,11 @@ test.describe('Planner: savings goals and investments', () => {
     await expect(page.getByTestId('allocation-card')).toContainText('Tracks Emergency Fund');
   });
 
-  test('six planner tabs scroll sideways at 320px without page overflow', async ({ page }) => {
+  test('the planner tabs scroll sideways at 320px without page overflow', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 640 });
     await setupPlannerMock(page);
     await page.goto('/#/planner');
-    for (const name of ['Goals', 'Invest', 'Overview']) {
+    for (const name of ['Goals', 'Invest', 'Bills', 'Overview']) {
       await page.getByRole('tab', { name }).click();
       await expect(page.getByRole('tab', { name })).toHaveAttribute('aria-selected', 'true');
       await expect(page.getByRole('tab', { name })).toBeInViewport({ ratio: 1 });
