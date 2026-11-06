@@ -206,6 +206,11 @@ export async function setupPlannerMock(page, options = {}) {
       const invested = plans.reduce((t, p) => t + paise(p.thisMonthAmount), 0);
       return { success: true, plans, summary: { plannedThisMonth: rupees(planned), investedThisMonth: rupees(invested), unlinkedThisMonth: 0, totalThisMonth: rupees(invested), totalInvested: rupees(invested), progress: null } };
     };
+    if (path === '/report' && method === 'GET') {
+      const m = monthBody(year, month);
+      const kpis = { income: m.summary.income.received, expectedIncome: m.summary.income.expected, plannedExpenses: m.summary.plan.plannedExpenses, expenses: 0, savingsNet: 0, investmentNet: 0, available: m.summary.income.received, budgetUtilization: null, savingsRate: null };
+      return json(route, 200, { success: true, year, month, kpis, trend: [], categories: [], lines: [], goals: [], insights: [], ...(options.report || {}) });
+    }
     if (path === '/bills' && method === 'GET') return json(route, 200, { success: true, year, month, ...state.bills });
     if (path === '/goals' && method === 'GET') return json(route, 200, { success: true, goals: state.goals.map(goalBody) });
     if (path === '/goals' && method === 'POST') {

@@ -296,3 +296,39 @@ before a recurring bill is added. It goes in-app, and as a push notification to 
   transaction holding a lock on that message, so two runs can't both send it.
 - A bill created after midnight that is due the next day gets no reminder.
 - The existing EMI reminders are unchanged.
+
+## Monthly report and insights
+
+`GET /report?year=&month=&months=` (default: the current month and 6 months) is **read-only**.
+Every figure comes from the same month calculation as `/overview`, so the report cannot disagree
+with the other tabs.
+
+| Field | Meaning |
+|---|---|
+| `kpis` | Actual `income`, `expenses`, `savingsNet`, `investmentNet` and `available`, the same values as `summary.actual` in `/overview`. Also `expectedIncome`, `plannedExpenses`, `budgetUtilization` (actual spending as a % of planned spending) and `savingsRate` (`savingsNet` as a % of income received). Each percentage is `null` when there is nothing to divide by. |
+| `trend[]` | One entry per month for the last `months` months (2–12), ending at the selected month: expected and actual income, actual and planned spending, savings, investments, available, and `hasPlan`. |
+| `categories[]` | This month's spending by category, EMI payments included, largest first, each with its share of total spending and last month's amount. |
+| `lines[]` | Planned vs actual amount and `utilization` for each FIXED or VARIABLE line. |
+| `goals[]` | Active savings goals with saved amount, target and progress. |
+| `insights[]` | `{ id, tone, text }`, where `tone` is `critical`, `warning`, `positive` or `info`. |
+
+**Insights.** Each insight quotes the numbers it is based on. It only appears when its inputs
+exist, so a month with nothing recorded has none. The rules:
+
+- **Overdue EMIs.** Current month only.
+- **Over-allocation.** Planned amounts exceed expected income.
+- **Lines over plan.** At most 2.
+- **Category change vs last month.** Both months must have spending, both amounts must be at least
+  ₹500, and the change must be at least 20% and at least ₹200. At most 2.
+- **Spending outside the plan.**
+- **Fixed costs as a share of income.** Uses received income when spending has started; otherwise
+  planned fixed costs against expected income.
+- **Savings rate.** Only when there is income received and money saved. In the current month, if
+  goals exist but nothing has been saved yet, says so instead.
+- **Unallocated income.**
+- **"You could add up to ₹X to a goal."** Current month only, and only for a goal linked to a
+  Savings line that isn't reached yet. X is the smaller of unallocated income and actual available
+  money, rounded down to ₹100. This means the suggestion is always covered both by the plan and by
+  money still in hand.
+- **Goals behind schedule.** The monthly amount needed to reach the target exceeds the planned
+  monthly contribution. A goal past its target date is also reported.

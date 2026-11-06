@@ -9,6 +9,7 @@ const budget = require('../controllers/plannerBudgetController');
 const goals = require('../controllers/plannerGoalController');
 const investments = require('../controllers/plannerInvestmentController');
 const bills = require('../controllers/plannerBillsController');
+const report = require('../controllers/plannerReportController');
 
 const PAYMENT_METHODS = ['UPI', 'Cash', 'Credit Card', 'Debit Card', 'Net Banking', 'Other'];
 const YEAR = { min: 2000, max: 2100 };
@@ -183,6 +184,10 @@ router.put('/transactions/:expenseId/assignment', v.uuidParam('expenseId'),
 router.delete('/transactions/:expenseId/assignment', v.uuidParam('expenseId'), validate, budget.clearAssignment);
 
 router.get('/bills', optionalPeriodQuery, validate, bills.getBills);
+router.get('/report', [
+  ...optionalPeriodQuery,
+  query('months').optional().isInt({ min: 2, max: 12 }).withMessage('months must be between 2 and 12').toInt(),
+], validate, report.getReport);
 
 router.get('/goals', optionalPeriodQuery, validate, goals.listGoals);
 router.post('/goals', goalRules(false), validate, goals.createGoal);

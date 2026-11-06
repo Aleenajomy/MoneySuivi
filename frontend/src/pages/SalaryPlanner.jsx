@@ -14,6 +14,7 @@ import SpendingPanel from '../components/planner/SpendingPanel'
 import GoalsPanel from '../components/planner/GoalsPanel'
 import InvestmentsPanel from '../components/planner/InvestmentsPanel'
 import BillsPanel from '../components/planner/BillsPanel'
+import { CategoryBreakdown, GoalsProgress, InsightsCard, PlannedVsActual, TrendChart } from '../components/planner/ReportCharts'
 import { formatAmount, periodLabel } from '../utils/planner'
 
 const TABS = [
@@ -26,13 +27,14 @@ const TABS = [
   { id: 'bills', label: 'Bills' },
 ]
 
-function Overview({ month, onOpen }) {
+function Overview({ month, report, onOpen }) {
   const { summary, plan, salaries } = month
   const hasIncome = salaries.length > 0
   const hasAllocations = plan.allocations.length > 0
   return (
     <div className="space-y-5">
-      <PlannerSummary summary={summary} />
+      <PlannerSummary summary={summary} kpis={report?.kpis} />
+      <InsightsCard insights={report?.insights} />
       {!hasIncome && (
         <div className="card p-4 flex items-start gap-3">
           <Info size={18} className="text-sky-500 flex-shrink-0 mt-0.5" aria-hidden="true" />
@@ -44,6 +46,10 @@ function Overview({ month, onOpen }) {
         </div>
       )}
       {(hasIncome || hasAllocations) && <DistributionChart summary={summary} allocations={plan.allocations} />}
+      <TrendChart trend={report?.trend} />
+      <PlannedVsActual lines={report?.lines} />
+      <CategoryBreakdown categories={report?.categories} />
+      <GoalsProgress goals={report?.goals} />
       {hasIncome && !hasAllocations && (
         <EmptyState icon={CalendarPlus} title="Nothing allocated yet"
           description={`${formatAmount(summary.income.expected)} is expected and none of it is planned.`}
@@ -69,7 +75,7 @@ function LoadingState() {
 }
 
 export default function SalaryPlanner() {
-  const { period, setPeriod, month, loading, error, refresh, startPlan } = usePlanner()
+  const { period, setPeriod, month, report, loading, error, refresh, startPlan } = usePlanner()
   const [params, setParams] = useSearchParams()
   const tab = TABS.some(t => t.id === params.get('tab')) ? params.get('tab') : 'overview'
   const focusLine = params.get('line')
@@ -126,7 +132,7 @@ export default function SalaryPlanner() {
                 : tab === 'goals' ? <GoalsPanel />
                   : tab === 'invest' ? <InvestmentsPanel />
                     : tab === 'bills' ? <BillsPanel />
-                : <Overview month={month} onOpen={openTab} />
+                : <Overview month={month} report={report} onOpen={openTab} />
         ) : null}
       </div>
     </div>

@@ -17,6 +17,7 @@ export function PlannerProvider({ children }) {
   const [goals, setGoals] = useState([])
   const [investments, setInvestments] = useState({ plans: [], summary: null })
   const [bills, setBills] = useState(null)
+  const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const requestId = useRef(0)
@@ -34,6 +35,7 @@ export function PlannerProvider({ children }) {
       setGoals([])
       setInvestments({ plans: [], summary: null })
       setBills(null)
+      setReport(null)
       setUps.current = new Map()
     }
     lastUserId.current = user.id
@@ -58,11 +60,12 @@ export function PlannerProvider({ children }) {
     setLoading(true)
     setError('')
     try {
-      const [overview, goalsRes, investRes, billsRes] = await Promise.all([
+      const [overview, goalsRes, investRes, billsRes, reportRes] = await Promise.all([
         api.get('/planner/overview', { params: target }),
         api.get('/planner/goals', { params: target }),
         api.get('/planner/investments', { params: target }),
         api.get('/planner/bills', { params: target }),
+        api.get('/planner/report', { params: target }),
         loadSources(),
       ])
       let data = overview.data
@@ -81,6 +84,7 @@ export function PlannerProvider({ children }) {
         setGoals(goalsRes.data.goals)
         setInvestments({ plans: investRes.data.plans, summary: investRes.data.summary })
         setBills(billsRes.data)
+        setReport(reportRes.data)
       }
     } catch (err) {
       if (id === requestId.current && err.status !== 401) setError(err.message || 'Could not load your planner')
@@ -247,7 +251,7 @@ export function PlannerProvider({ children }) {
       receiveSalary, undoSalary, deleteSalary, getLinkCandidates, getSalaryHistory,
       saveAllocation, deleteAllocation, copyRecurring, assignTransaction,
       goals, saveGoal, archiveGoal, deleteGoal, addContribution, deleteContribution, getContributions,
-      bills, payEmi,
+      bills, payEmi, report,
       investments, saveInvestment, setInvestmentActive, deleteInvestment, addInvestmentTx, deleteInvestmentTx, getInvestmentTxs,
     }}>
       {children}
