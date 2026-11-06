@@ -31,7 +31,8 @@ mailService.sendEmail = async (message) => {
   return { success: true, messageId: `test-${sentMail.length}` };
 };
 
-const TABLES = ['LoginEvent', 'PasswordResetToken', 'LedgerEntry', 'LedgerContact', 'EMIPayment', 'EMI', 'Expense', 'Budget',
+const TABLES = ['AllocationAssignment', 'BudgetAllocation', 'BudgetPlan', 'MonthlySalary', 'IncomeSource',
+  'SavingsContribution', 'SavingsGoal', 'InvestmentTransaction', 'InvestmentPlan', 'LoginEvent', 'PasswordResetToken', 'LedgerEntry', 'LedgerContact', 'EMIPayment', 'EMI', 'Expense', 'Budget',
   'Asset', 'Liability', 'Notification', 'PushSubscription', 'FcmToken', 'User'];
 
 const resetDb = async () => {

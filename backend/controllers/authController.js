@@ -108,6 +108,12 @@ const resetAllData = async (req, res) => {
     await prisma.$transaction([
       prisma.ledgerEntry.deleteMany({ where: { userId } }),
       prisma.ledgerContact.deleteMany({ where: { userId } }),
+      // Planner children (allocations, assignments, contributions, investment transactions) go by cascade.
+      prisma.budgetPlan.deleteMany({ where: { userId } }),
+      prisma.monthlySalary.deleteMany({ where: { userId } }),
+      prisma.incomeSource.deleteMany({ where: { userId } }),
+      prisma.savingsGoal.deleteMany({ where: { userId } }),
+      prisma.investmentPlan.deleteMany({ where: { userId } }),
       prisma.eMIPayment.deleteMany({ where: { emi: { userId } } }),
       prisma.eMI.deleteMany({ where: { userId } }),
       prisma.expense.deleteMany({ where: { userId } }),
