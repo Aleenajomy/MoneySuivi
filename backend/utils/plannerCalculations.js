@@ -84,42 +84,78 @@ const summarizePlan = (allocations) => {
 
 const normalizeCategory = (category) => String(category || '').trim().toLowerCase();
 
+// Words too common in line names to identify one ("Other Bills", "Personal Savings").
+const GENERIC_WORDS = new Set([
+  'and', 'the', 'for', 'other', 'others', 'bill', 'bills', 'misc', 'miscellaneous', 'personal',
+  'expense', 'expenses', 'fund', 'funds', 'monthly', 'payment', 'payments', 'general',
+]);
+const words = (text) => String(text || '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+const nameKeywords = (name) => [...new Set(words(name).filter(w => w.length >= 3 && !GENERIC_WORDS.has(w)))];
+
+const MATCHED_BY = { ASSIGNED: 'ASSIGNED', NAME: 'NAME', CATEGORY: 'CATEGORY', UNPLANNED: 'UNPLANNED' };
+
 /**
- * Splits a month's spending across allocations so that each transaction is counted exactly once:
- * an explicit assignment wins, then the first FIXED/VARIABLE allocation (by sortOrder) whose
- * matchCategories include the transaction's category, otherwise it is "unplanned".
+ * Splits a month's spending across allocations so that each transaction is counted exactly once.
+ * Rules, first match wins:
+ *   1. ASSIGNED - the user pinned the transaction to a line in this plan;
+ *   2. NAME     - the title contains a distinctive word from a line's name ("Mess" -> "Mess / Food");
+ *                 the line with the most matching words wins, then the lower sortOrder;
+ *   3. CATEGORY - the first line (by sortOrder) whose matchCategories include the category;
+ *   4. UNPLANNED.
+ * Only FIXED and VARIABLE lines take spending automatically; an assignment from another month's
+ * plan (the transaction's date was edited) is ignored rather than trusted.
  *
- * allocations: [{ id, group, matchCategories, sortOrder }]
- * spending:    [{ id, category, amountPaise, assignedAllocationId? }]
+ * allocations: [{ id, group, name, matchCategories, sortOrder }]
+ * spending:    [{ id, title?, category, amountPaise, assignedAllocationId? }]
  */
 const matchSpending = (allocations, spending) => {
   const byAllocation = new Map(allocations.map(a => [a.id, 0]));
-  const categoryOwner = new Map();
-  [...allocations]
+  const ordered = [...allocations]
     .filter(a => EXPENSE_GROUPS.includes(a.group))
-    .sort((a, b) => (a.sortOrder - b.sortOrder) || String(a.id).localeCompare(String(b.id)))
-    .forEach(a => (a.matchCategories || []).forEach((c) => {
-      const key = normalizeCategory(c);
-      if (key && !categoryOwner.has(key)) categoryOwner.set(key, a.id);
-    }));
+    .sort((a, b) => (a.sortOrder - b.sortOrder) || String(a.id).localeCompare(String(b.id)));
+  const categoryOwner = new Map();
+  ordered.forEach(a => (a.matchCategories || []).forEach((c) => {
+    const key = normalizeCategory(c);
+    if (key && !categoryOwner.has(key)) categoryOwner.set(key, a.id);
+  }));
+  const keywords = ordered.map(a => ({ id: a.id, keywords: nameKeywords(a.name) })).filter(k => k.keywords.length);
+
+  const byName = (title) => {
+    const titleWords = new Set(words(title));
+    let best = null;
+    keywords.forEach((k) => {
+      const score = k.keywords.filter(w => titleWords.has(w)).length;
+      if (score > 0 && (!best || score > best.score)) best = { id: k.id, score };
+    });
+    return best?.id;
+  };
+
+  const resolve = (s) => {
+    if (s.assignedAllocationId && byAllocation.has(s.assignedAllocationId)) return [s.assignedAllocationId, MATCHED_BY.ASSIGNED];
+    const named = s.title ? byName(s.title) : undefined;
+    if (named) return [named, MATCHED_BY.NAME];
+    const categorized = categoryOwner.get(normalizeCategory(s.category));
+    if (categorized) return [categorized, MATCHED_BY.CATEGORY];
+    return [null, MATCHED_BY.UNPLANNED];
+  };
 
   const unplannedByCategory = new Map();
   let unplanned = 0;
-  spending.forEach((s) => {
-    const owner = (s.assignedAllocationId && byAllocation.has(s.assignedAllocationId))
-      ? s.assignedAllocationId
-      : categoryOwner.get(normalizeCategory(s.category));
-    if (owner) {
-      byAllocation.set(owner, assertSafe(byAllocation.get(owner) + s.amountPaise));
+  const resolved = spending.map((s) => {
+    const [allocationId, matchedBy] = resolve(s);
+    if (allocationId) {
+      byAllocation.set(allocationId, assertSafe(byAllocation.get(allocationId) + s.amountPaise));
     } else {
       unplanned = assertSafe(unplanned + s.amountPaise);
       const label = s.category || 'Other';
       unplannedByCategory.set(label, assertSafe((unplannedByCategory.get(label) || 0) + s.amountPaise));
     }
+    return { id: s.id, allocationId, matchedBy };
   });
 
   return {
     byAllocation,
+    resolved,
     unplanned,
     unplannedByCategory: [...unplannedByCategory].map(([category, paise]) => ({ category, paise })).sort((a, b) => b.paise - a.paise),
   };
@@ -133,7 +169,7 @@ const matchSpending = (allocations, spending) => {
  * - everything else is ordinary income or spending.
  * EMI payments live in EMIPayment, not Expense, so they are added as spending here.
  *
- * transactions: [{ id, type, category, amountPaise, isInvestment?, assignedAllocationId? }]
+ * transactions: [{ id, type, title?, category, amountPaise, isInvestment?, assignedAllocationId? }]
  * emiPayments:  [{ id, amountPaise }]
  */
 const classifyActuals = (transactions, emiPayments = []) => {
@@ -147,7 +183,7 @@ const classifyActuals = (transactions, emiPayments = []) => {
     } else if (t.type === 'income') {
       income = assertSafe(income + t.amountPaise);
     } else {
-      spending.push({ id: t.id, category: t.category, amountPaise: t.amountPaise, assignedAllocationId: t.assignedAllocationId });
+      spending.push({ id: t.id, title: t.title, category: t.category, amountPaise: t.amountPaise, assignedAllocationId: t.assignedAllocationId });
     }
   });
   emiPayments.forEach(p => spending.push({ id: `emi:${p.id}`, category: EMI_CATEGORY, amountPaise: p.amountPaise }));
@@ -189,6 +225,7 @@ module.exports = {
   INCOME_KINDS,
   MAX_PLANNER_AMOUNT,
   EMI_CATEGORY,
+  MATCHED_BY,
   toPaise,
   fromPaise,
   paiseToDecimalString,
@@ -196,6 +233,7 @@ module.exports = {
   percentOf,
   summarizeIncome,
   summarizePlan,
+  nameKeywords,
   matchSpending,
   classifyActuals,
   buildMonthSummary,

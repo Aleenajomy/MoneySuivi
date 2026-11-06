@@ -2,12 +2,12 @@ import { Pencil, Trash2, Repeat } from 'lucide-react'
 import { formatAmount } from '../../utils/planner'
 
 const meterColor = (pct) => {
-  if (pct >= 100) return 'bg-red-500'
+  if (pct > 100) return 'bg-red-500'
   if (pct >= 80) return 'bg-amber-500'
   return 'bg-emerald-500'
 }
 
-export default function AllocationCard({ allocation, onEdit, onDelete, onToggleRecurring }) {
+export default function AllocationCard({ allocation, onEdit, onDelete, onToggleRecurring, onShowSpending }) {
   const tracked = allocation.actualAmount !== null
   const pct = allocation.utilization ?? 0
   const over = tracked && allocation.remainingAmount < 0
@@ -34,7 +34,10 @@ export default function AllocationCard({ allocation, onEdit, onDelete, onToggleR
             <div className={`h-full rounded-full ${meterColor(pct)}`} style={{ width: `${Math.min(pct, 100)}%` }} />
           </div>
           <p className="flex justify-between text-[11px] mt-1 dark:text-gray-400 text-slate-500">
-            <span>Spent {formatAmount(allocation.actualAmount)}</span>
+            <button type="button" onClick={() => onShowSpending(allocation.id)} className="hover:text-sky-500 underline-offset-2 hover:underline"
+              aria-label={`Show ${allocation.transactionCount} transactions counted toward ${allocation.name}`}>
+              Spent {formatAmount(allocation.actualAmount)} · {allocation.transactionCount} item{allocation.transactionCount === 1 ? '' : 's'}
+            </button>
             <span className={over ? 'text-red-500 font-semibold' : ''}>
               {over ? `${formatAmount(-allocation.remainingAmount)} over` : `${formatAmount(allocation.remainingAmount)} left`}
             </span>
