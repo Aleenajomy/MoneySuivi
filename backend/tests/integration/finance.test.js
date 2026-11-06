@@ -62,6 +62,42 @@ test('recurring transactions keep their account fields (regression: everything l
   assert.equal(updated.nextRunDate.toISOString().slice(0, 10), '2026-11-15');
 });
 
+// Regression: the History edit form resends the whole schedule on every save, and the server used
+// to reset nextRunDate to one period after the original date, so the next run re-created every
+// past occurrence.
+const editForm = (user, id, body) => request(app).put(`/api/expenses/${id}`).set(auth(user))
+  .send({ title: 'Rent', amount: 15000, category: 'Bills', type: 'expense', accountType: 'UPI', paymentMethod: 'UPI', expenseDate: '2026-05-05', recurring: true, recurringType: 'monthly', ...body });
+
+test('editing a recurring payment never makes the scheduler re-create past occurrences', async () => {
+  const user = await createUser();
+  const rent = (await tx(user, { title: 'Rent', amount: 15000, category: 'Bills', type: 'expense', accountType: 'UPI', paymentMethod: 'UPI', expenseDate: '2026-05-05', recurring: true, recurringType: 'monthly' })).body.expense;
+  await processRecurring(new Date('2026-11-06T12:00:00Z'));
+  const count = () => prisma.expense.count({ where: { userId: user.id } });
+  assert.equal(await count(), 7);
+  const scheduled = (await prisma.expense.findUnique({ where: { id: rent.id } })).nextRunDate.toISOString().slice(0, 10);
+  assert.equal(scheduled, '2026-12-05');
+
+  // Only the amount changed (the form still sends the date and schedule).
+  assert.equal((await editForm(user, rent.id, { amount: 16000 })).status, 200);
+  assert.equal((await prisma.expense.findUnique({ where: { id: rent.id } })).nextRunDate.toISOString().slice(0, 10), '2026-12-05');
+  await processRecurring(new Date('2026-11-07T12:00:00Z'));
+  assert.equal(await count(), 7);
+
+  // Moving the payment day keeps already-recorded months: the next run is the first new date after them.
+  await editForm(user, rent.id, { amount: 16000, expenseDate: '2026-05-10' });
+  assert.equal((await prisma.expense.findUnique({ where: { id: rent.id } })).nextRunDate.toISOString().slice(0, 10), '2026-12-10');
+  await processRecurring(new Date('2026-11-08T12:00:00Z'));
+  assert.equal(await count(), 7);
+
+  // Stopping and resuming starts again from today instead of back-filling.
+  await editForm(user, rent.id, { recurring: false });
+  await editForm(user, rent.id, { amount: 16000, expenseDate: '2026-05-10' });
+  const resumed = (await prisma.expense.findUnique({ where: { id: rent.id } })).nextRunDate;
+  assert.ok(resumed >= new Date(new Date().toISOString().slice(0, 10)));
+  await processRecurring(new Date());
+  assert.equal(await count(), 7);
+});
+
 test('recurring transfers keep from/to accounts', async () => {
   const user = await createUser();
   await prisma.expense.create({ data: {
