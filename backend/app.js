@@ -48,6 +48,7 @@ app.use('/api/export', require('./routes/export'));
 app.use('/api/emis', require('./routes/emis'));
 app.use('/api/networth', require('./routes/networth'));
 app.use('/api/ledger', require('./routes/ledger'));
+app.use('/api/planner', require('./routes/planner'));
 app.use('/api/support', require('./routes/support'));
 
 app.use((req, res) => res.status(404).json({ success: false, message: 'Route not found' }));

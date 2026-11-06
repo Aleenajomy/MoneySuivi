@@ -8,6 +8,7 @@ import { NotificationProvider } from './context/NotificationContext'
 import { EMIProvider } from './context/EMIContext'
 import { NetWorthProvider } from './context/NetWorthContext'
 import { LedgerProvider } from './context/LedgerContext'
+import { PlannerProvider } from './context/PlannerContext'
 import Login from './pages/auth/Login'
 import Register from './pages/auth/Register'
 import ResetPassword from './pages/auth/ResetPassword'
@@ -21,6 +22,7 @@ import Notifications from './pages/Notifications'
 import EMITracker from './pages/EMITracker'
 import NetWorth from './pages/NetWorth'
 import Ledger from './pages/Ledger'
+import SalaryPlanner from './pages/SalaryPlanner'
 import Recurring from './pages/Recurring'
 import Layout from './components/Layout'
 
@@ -44,6 +46,7 @@ export default function App() {
               <NetWorthProvider>
                 <LedgerProvider>
                 <EMIProvider>
+                <PlannerProvider>
                   <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
                 <Toaster
                   position="top-center"
@@ -66,12 +69,14 @@ export default function App() {
                     <Route path="recurring" element={<Recurring />} />
                     <Route path="networth" element={<NetWorth />} />
                     <Route path="ledger" element={<Ledger />} />
+                    <Route path="planner" element={<SalaryPlanner />} />
                     <Route path="profile" element={<Profile />} />
                     <Route path="add" element={<AddExpense />} />
                     <Route path="edit/:id" element={<AddExpense />} />
                   </Route>
                 </Routes>
                   </HashRouter>
+                </PlannerProvider>
                 </EMIProvider>
                 </LedgerProvider>
               </NetWorthProvider>

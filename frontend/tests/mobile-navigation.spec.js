@@ -10,18 +10,18 @@ test.describe('Mobile Bottom Navigation UI', () => {
     await page.waitForLoadState('networkidle');
   });
 
-  test('should display exactly 5 navigation items in the correct order', async ({ page }) => {
+  test('should display exactly 6 navigation items in the correct order', async ({ page }) => {
     const bottomNav = page.locator('nav[aria-label="Mobile Bottom Navigation"]');
     await expect(bottomNav).toBeVisible();
 
     const buttons = bottomNav.locator('button');
-    await expect(buttons).toHaveCount(5);
+    await expect(buttons).toHaveCount(6);
 
     const labels = await buttons.evaluateAll((btns) =>
       btns.map((b) => b.querySelector('span')?.textContent?.trim())
     );
 
-    expect(labels).toEqual(['Home', 'History', 'EMI', 'Ledger', 'Net Worth']);
+    expect(labels).toEqual(['Home', 'History', 'EMI', 'Ledger', 'Net Worth', 'Planner']);
   });
 
   test('should NOT include Add, Alerts, or Profile in the mobile bottom navigation', async ({ page }) => {
@@ -46,7 +46,7 @@ test.describe('Mobile Bottom Navigation UI', () => {
     expect(fabBox.y + fabBox.height).toBeLessThanOrEqual(navBox.y + 1);
   });
 
-  test('should highlight active route correctly for all 5 destinations and update on navigation', async ({ page }) => {
+  test('should highlight active route correctly for all 6 destinations and update on navigation', async ({ page }) => {
     const bottomNav = page.locator('nav[aria-label="Mobile Bottom Navigation"]');
 
     // 1. Initially on Home (/)
@@ -81,6 +81,13 @@ test.describe('Mobile Bottom Navigation UI', () => {
     await expect(page).toHaveURL(/#\/networth/);
     await expect(netWorthBtn).toHaveAttribute('aria-current', 'page');
     await expect(ledgerBtn).not.toHaveAttribute('aria-current', 'page');
+
+    // 6. Navigate to Salary Planner (short visible label, full accessible name)
+    const plannerBtn = bottomNav.getByRole('button', { name: 'Salary Planner' });
+    await plannerBtn.click();
+    await expect(page).toHaveURL(/#\/planner/);
+    await expect(plannerBtn).toHaveAttribute('aria-current', 'page');
+    await expect(netWorthBtn).not.toHaveAttribute('aria-current', 'page');
   });
 
   test('should have no black borders or outlines around nav buttons', async ({ page }) => {
@@ -124,6 +131,10 @@ test.describe('Mobile Bottom Navigation UI', () => {
       expect(spanBox).not.toBeNull();
       // Should be single line height (< 20px)
       expect(spanBox.height).toBeLessThan(22);
+
+      const plannerBox = await bottomNav.getByRole('button', { name: 'Salary Planner' }).locator('span').boundingBox();
+      expect(plannerBox.height).toBeLessThan(22);
+      expect(plannerBox.x + plannerBox.width).toBeLessThanOrEqual(vp.width);
 
       // Check horizontal overflow of window
       const hasHorizontalScroll = await page.evaluate(() => {

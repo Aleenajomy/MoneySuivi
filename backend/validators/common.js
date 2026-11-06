@@ -7,11 +7,11 @@ const PASSWORD_MAX = 72;
 
 const hasAtMostTwoDecimals = (value) => /^-?\d+(\.\d{1,2})?$/.test(String(value).trim());
 
-const amount = (field, { optional = false, min = 0.01, allowZero = false } = {}) => {
+const amount = (field, { optional = false, min = 0.01, allowZero = false, max = MAX_AMOUNT } = {}) => {
   let chain = body(field);
   chain = optional ? chain.optional({ values: 'null' }) : chain.exists({ values: 'falsy' }).withMessage(`${field} is required`).bail();
   return chain
-    .isFloat({ min: allowZero ? 0 : min, max: MAX_AMOUNT }).withMessage(`${field} must be a number between ${allowZero ? 0 : min} and ${MAX_AMOUNT}`).bail()
+    .isFloat({ min: allowZero ? 0 : min, max }).withMessage(`${field} must be a number between ${allowZero ? 0 : min} and ${max}`).bail()
     .custom(hasAtMostTwoDecimals).withMessage(`${field} can have at most 2 decimal places`)
     .toFloat();
 };
