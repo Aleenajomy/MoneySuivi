@@ -162,7 +162,7 @@ test('A: a salary already in History is linked; nothing is added and income is c
   assert.equal(month.position.receivedIncome, 15000);
 });
 
-test('A2: a salary in History with a different amount is offered first and Record new is refused until confirmed', async () => {
+test('A2: a salary in History with a different amount is offered first, and the planner cannot record a second one', async () => {
   const { user, p } = await seedUser();
   const { salary } = await setUpMonth(p);
   await addTx(user, { title: 'Bonus', amount: 900, type: 'income', category: 'Other', expenseDate: iso(now, 2) });
@@ -173,10 +173,8 @@ test('A2: a salary in History with a different amount is offered first and Recor
   assert.equal(candidates[0].id, income.id, 'closest amount first');
   assert.equal(candidates[0].matchesExpected, false);
 
-  const blocked = await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 15000, receivedAt: iso(now, 1), paymentMethod: 'UPI' });
-  assert.equal(blocked.status, 409);
-  assert.equal(blocked.body.code, 'POSSIBLE_DUPLICATE');
-  assert.deepEqual(blocked.body.candidates.map(c => c.id), [income.id]);
+  const refused = await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 15000, receivedAt: iso(now, 1), paymentMethod: 'UPI', confirmDuplicate: true });
+  assert.equal(refused.status, 400);
   assert.deepEqual(await snapshot(user), start);
 
   assert.equal((await p.post(`/salaries/${salary.id}/receive`, { mode: 'link', expenseId: income.id })).status, 200);
@@ -203,30 +201,14 @@ test('A3: October salary paid on 5 November stays October income; the balance mo
   assert.equal(paidMonth.receivedIncome, 0, 'not counted again in the month it arrived');
 });
 
-test('A3b: Record new for last month\'s salary dates the transaction on the real received day', async () => {
-  const { user, p } = await seedUser();
-  const { salary } = await setUpMonth(p, prev);
-  const start = await snapshot(user);
-  const res = await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 15000, receivedAt: iso(now, 5), paymentMethod: 'UPI' });
-  assert.equal(res.status, 200, JSON.stringify(res.body));
-  const created = await prisma.expense.findUnique({ where: { id: res.body.salary.expenseId } });
-  assert.equal(created.expenseDate.toISOString().slice(0, 10), iso(now, 5));
-  assert.deepEqual(diffBalances(start.balances, await balances(user)), onlyChange('upiBalance', 15000));
-  assert.equal((await p.get(`/overview?${q(prev)}`)).body.position.receivedIncome, 15000);
-  assert.equal((await p.get(`/overview?${q(now)}`)).body.position.receivedIncome, 0);
-});
-
-// ---------------------------------------------------------------- C: Record new
-
-test('C: Record new tapped five times at once adds exactly one income to the chosen account', async () => {
+test('C: asking the planner to create income is refused every time, even five taps at once', async () => {
   const { user, p } = await seedUser();
   const { salary } = await setUpMonth(p);
   const start = await snapshot(user);
   const results = await Promise.all(Array.from({ length: 5 }, () =>
     p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 15000, receivedAt: iso(now, 1), paymentMethod: 'UPI' })));
-  assert.deepEqual(results.map(r => r.status).sort(), [200, 409, 409, 409, 409]);
-  assert.equal(await prisma.expense.count({ where: { userId: user.id } }), start.history.length + 1);
-  assert.deepEqual(diffBalances(start.balances, await balances(user)), onlyChange('upiBalance', 15000));
+  assert.deepEqual(results.map(r => r.status), [400, 400, 400, 400, 400]);
+  assert.deepEqual(await snapshot(user), start);
 });
 
 test('C2: Record new without a chosen account is refused and changes nothing', async () => {
@@ -241,25 +223,16 @@ test('C2: Record new without a chosen account is refused and changes nothing', a
   assert.deepEqual(await snapshot(user), start);
 });
 
-test('C3: Undo keeps the money unless the user explicitly deletes the transaction', async () => {
+test('C3: undo never deletes the transaction; that is done in History', async () => {
   const { user, p } = await seedUser();
   const { salary } = await setUpMonth(p);
+  const income = await addTx(user, { title: 'Salary credit', amount: 15000, type: 'income', category: 'Salary', accountType: 'Cash', paymentMethod: 'Cash', expenseDate: iso(now, 1) });
   const start = await snapshot(user);
-  await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 15000, receivedAt: iso(now, 1), paymentMethod: 'Cash' });
-  const recorded = await snapshot(user);
-  assert.deepEqual(diffBalances(start.balances, recorded.balances), onlyChange('cashBalance', 15000));
-
-  await p.post(`/salaries/${salary.id}/undo`, {});
-  assert.deepEqual(await snapshot(user), recorded);
-
-  await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 15000, receivedAt: iso(now, 1), paymentMethod: 'Cash', confirmDuplicate: true });
-  const twice = await snapshot(user);
-  assert.deepEqual(diffBalances(recorded.balances, twice.balances), onlyChange('cashBalance', 15000), 'a confirmed second income is the user\'s explicit choice');
-  await p.post(`/salaries/${salary.id}/undo`, { deleteTransaction: true });
-  assert.deepEqual(diffBalances(twice.balances, await balances(user)), onlyChange('cashBalance', -15000));
+  await p.post(`/salaries/${salary.id}/receive`, { mode: 'link', expenseId: income.id });
+  assert.equal((await p.post(`/salaries/${salary.id}/undo`, { deleteTransaction: true })).status, 400);
+  assert.equal((await p.post(`/salaries/${salary.id}/undo`, {})).status, 200);
+  assert.deepEqual(await snapshot(user), start);
 });
-
-// ---------------------------------------------------------------- D: Already in my balance
 
 test('D: Already in my balance counts as received income with no transaction', async () => {
   const { user, p } = await seedUser();
@@ -279,7 +252,7 @@ test('D: Already in my balance counts as received income with no transaction', a
   assert.equal(month.position.expectedIncome, 15000);
   assert.equal(month.position.receivedIncome, 15000);
 
-  await p.post(`/salaries/${salary.id}/undo`, { deleteTransaction: true });
+  await p.post(`/salaries/${salary.id}/undo`, {});
   assert.deepEqual(await snapshot(user), start, 'undo has no transaction to delete');
   assert.equal((await p.get(`/overview?${q(now)}`)).body.salaries[0].status, 'PENDING');
 });
@@ -359,34 +332,15 @@ test('E3: editing a linked expense so it is no longer that payment removes the l
 
 // ---------------------------------------------------------------- F: separate expenses, one record each
 
-test('F: salary and mess on the same day stay two transactions; recording a line adds exactly one', async () => {
-  const { user, p } = await seedUser();
-  const { salary, view } = await setUpMonth(p);
-  const mess = view.plan.allocations.find(l => l.name === 'Mess / Food');
-  const start = await snapshot(user);
-
-  await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 15000, receivedAt: iso(now, 1), paymentMethod: 'UPI' });
-  const record = () => p.post(`/budgets/allocations/${mess.id}/record`, { amount: 2500, date: iso(now, 1), paymentMethod: 'UPI' });
-  const results = await Promise.all([record(), record(), record()]);
-  assert.deepEqual(results.map(r => r.status).sort(), [200, 200, 201]);
-  assert.equal(new Set(results.map(r => r.body.expenseId)).size, 1, 'repeats return the one transaction');
-
-  assert.equal(await prisma.expense.count({ where: { userId: user.id } }), start.history.length + 2);
-  assert.deepEqual(diffBalances(start.balances, await balances(user)), onlyChange('upiBalance', 12500));
-  const month = (await p.get(`/overview?${q(now)}`)).body;
-  assert.equal(month.plan.allocations.find(l => l.id === mess.id).actualAmount, 2500);
-  assert.equal(month.position.actualExpenses, 2500);
-});
-
-test('F2: an EMI line cannot record spending, and recording needs an account and a date in the month', async () => {
+test('F: plan lines can no longer record spending; actual expenses are added in History only', async () => {
   const { user, p } = await seedUser();
   const { view } = await setUpMonth(p);
-  const emiLine = view.plan.allocations.find(l => l.name === 'EMI');
-  const travel = view.plan.allocations.find(l => l.name === 'Travel');
   const start = await snapshot(user);
-  assert.equal((await p.post(`/budgets/allocations/${emiLine.id}/record`, { amount: 2000, date: iso(now, 3), paymentMethod: 'UPI' })).body.code, 'EMI_LINE');
-  assert.equal((await p.post(`/budgets/allocations/${travel.id}/record`, { amount: 200, date: iso(now, 3) })).status, 400);
-  assert.equal((await p.post(`/budgets/allocations/${travel.id}/record`, { amount: 200, date: iso(prev, 3), paymentMethod: 'UPI' })).status, 400);
+  for (const name of ['Mess / Food', 'EMI', 'Travel']) {
+    const line = view.plan.allocations.find(l => l.name === name);
+    const res = await p.post(`/budgets/allocations/${line.id}/record`, { amount: 2500, date: iso(now, 1), paymentMethod: 'UPI' });
+    assert.equal(res.status, 404, name);
+  }
   assert.deepEqual(await snapshot(user), start);
 });
 
@@ -477,9 +431,9 @@ const populatePlanner = async (user, emi, p) => {
   await p.post(`/budgets/${planId}/allocations`, { group: 'VARIABLE', name: 'Gym', plannedAmount: 800 });
   await p.put(`/budgets/${planId}`, { savingsPercent: 35 });
   await p.post('/salaries', { ...now, label: 'Bonus', kind: 'BONUS', expectedAmount: 2000 });
-  await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 15000, receivedAt: iso(now, 1), paymentMethod: 'UPI' });
-  const mess = view.plan.allocations.find(l => l.name === 'Mess / Food');
-  await p.post(`/budgets/allocations/${mess.id}/record`, { amount: 2500, date: iso(now, 2), paymentMethod: 'Cash' });
+  const income = await addTx(user, { title: 'Salary credit', amount: 15000, type: 'income', category: 'Salary', expenseDate: iso(now, 1) });
+  await p.post(`/salaries/${salary.id}/receive`, { mode: 'link', expenseId: income.id });
+  await addTx(user, { title: 'Mess', amount: 2500, category: 'Food', accountType: 'Cash', paymentMethod: 'Cash', expenseDate: iso(now, 2) });
   await api(user).patch(`/api/emis/${emi.id}/pay`, { paidAt: iso(now, 3) });
   const historyEmi = await addTx(user, { title: 'Phone EMI', amount: 2000, expenseDate: iso(now, 3) });
   const payment = (await p.get(`/overview?${q(now)}`)).body.emi.payments[0];
@@ -504,7 +458,7 @@ test('R1: resetting this month restores defaults and pending salary; money, Hist
   assert.deepEqual(month.salaries.map(s => [s.label, s.status]), [['Salary', 'PENDING']]);
   assert.equal(month.emi.payments[0].linkedTransaction, null);
   assert.equal(await prisma.allocationAssignment.count(), 0);
-  // The recorded salary and mess expense are still real transactions, now counted as other income / spending.
+  // The salary and mess expense in History are untouched, now counted as other income / spending.
   assert.equal(month.position.receivedIncome, 15000);
   assert.equal(month.position.actualExpenses, 6500);
 

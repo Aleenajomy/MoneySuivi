@@ -298,3 +298,26 @@ test('classifyActuals: an expense linked to an EMI payment is counted once, as t
   assert.equal(r.expenses, 400000n);
   assert.deepEqual(r.spending.map(s => s.id), ['b', 'emi:p']);
 });
+
+test('salaryBudget: salary → fixed → budget → savings → remaining, with the allowance kept out', () => {
+  const r = calc.salaryBudget({
+    salaryAmount: '15000', allowanceAmount: '2560', rentAmount: '2500', emiAmount: '4100',
+    emergencySavingsAmount: '2000', generalSavingsAmount: '2000', shoppingAmount: '1500', travelAmount: '1000', foodAmount: '1000',
+  });
+  assert.equal(r.afterFixed, 840000n);
+  assert.equal(r.extraBalance, 90000n);
+  assert.equal(r.plannedSavings, 400000n);
+  assert.equal(r.plannedExpenses, 1010000n);
+  assert.equal(r.incomeWithAllowance, 1756000n);
+  assert.equal(r.plannedSavings + r.plannedExpenses + r.moneyRemaining, r.salary);
+  assert.deepEqual(Object.values(r.breakdown).map(b => b.percent), [44, 23, 27, 6]);
+
+  const over = calc.salaryBudget({ salaryAmount: 1000, rentAmount: 600, foodAmount: 500 });
+  assert.equal(over.extraBalance, 0n);
+  assert.equal(over.overBudget, 10000n);
+  assert.equal(over.moneyRemaining, 0n);
+
+  const empty = calc.salaryBudget({});
+  assert.equal(empty.overBudget, 0n);
+  assert.equal(empty.breakdown.fixed.percent, null, 'no fake 0% without a salary');
+});

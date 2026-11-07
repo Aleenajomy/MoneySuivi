@@ -25,6 +25,14 @@ const tx = (user, body) => request(app).post('/api/expenses').set(auth(user)).se
 const q = ({ year, month }) => `year=${year}&month=${month}`;
 const incomeCount = (user) => prisma.expense.count({ where: { userId: user.id, type: 'income' } });
 
+// Income is recorded in History (Add Transaction) and then linked; the planner never creates it.
+const receiveViaHistory = async (user, p, salary, amount = 15000, day = iso(now, 1), method = 'UPI') => {
+  const income = (await tx(user, { title: 'Salary credit', amount, type: 'income', category: 'Salary', accountType: method, paymentMethod: method, expenseDate: day })).body.expense;
+  const res = await p.post(`/salaries/${salary.id}/receive`, { mode: 'link', expenseId: income.id });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  return { income, res };
+};
+
 const setUpSalary = async (user, amount = 15000) => {
   const p = api(user);
   const source = (await p.post('/income-sources', { name: 'Salary', kind: 'SALARY', expectedAmount: amount, payDay: 1 })).body.incomeSource;
@@ -67,7 +75,7 @@ test('income sources: create, list, update, pause and delete, with pending recor
 test('deleting a source keeps its received history but drops pending months', async () => {
   const user = await createUser();
   const { p, source, salary } = await setUpSalary(user);
-  await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 15000, receivedAt: iso(now, 1) });
+  await receiveViaHistory(user, p, salary);
   await p.post('/salaries/initialize', next);
   assert.equal(await prisma.monthlySalary.count({ where: { userId: user.id } }), 2);
 
@@ -90,56 +98,28 @@ test('expected salary is never assumed received', async () => {
   assert.equal(await incomeCount(user), 0);
 });
 
-test('marking salary received creates exactly one income transaction in the chosen account', async () => {
+test('the planner never creates income: "create" is refused and nothing is added', async () => {
   const user = await createUser();
   const { p, salary } = await setUpSalary(user);
-  const res = await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: '14999.99', receivedAt: iso(now, 1), paymentMethod: 'Net Banking' });
-  assert.equal(res.status, 200);
-  assert.equal(res.body.salary.status, 'PARTIAL');
-  assert.equal(res.body.salary.receivedAmount, 14999.99);
-
-  const income = await prisma.expense.findMany({ where: { userId: user.id, type: 'income' } });
-  assert.equal(income.length, 1);
-  assert.equal(income[0].amount, 14999.99);
-  assert.equal(income[0].category, 'Salary');
-  assert.equal(income[0].accountType, 'Bank');
-  assert.equal(income[0].expenseDate.toISOString().slice(0, 10), iso(now, 1));
-  const balances = (await request(app).get('/api/expenses/balances').set(auth(user))).body.balances;
-  assert.equal(balances.netBankingBalance, 14999.99);
-
-  const again = await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 15000, receivedAt: iso(now, 1) });
-  assert.equal(again.status, 409);
-  assert.equal(again.body.code, 'ALREADY_RECEIVED');
-  assert.equal(await incomeCount(user), 1);
+  const before = (await request(app).get('/api/expenses/balances').set(auth(user))).body.balances;
+  const attempts = await Promise.all([
+    p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: '14999.99', receivedAt: iso(now, 1), paymentMethod: 'Net Banking' }),
+    p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 15000, receivedAt: iso(now, 1), paymentMethod: 'UPI', confirmDuplicate: true }),
+    p.post(`/salaries/${salary.id}/receive`, { receivedAmount: 15000, receivedAt: iso(now, 1), paymentMethod: 'UPI' }),
+  ]);
+  for (const res of attempts) assert.equal(res.status, 400, JSON.stringify(res.body));
+  assert.equal(await incomeCount(user), 0);
+  assert.deepEqual((await request(app).get('/api/expenses/balances').set(auth(user))).body.balances, before);
+  assert.equal((await prisma.monthlySalary.findUnique({ where: { id: salary.id } })).receivedAt, null);
 });
 
-test('concurrent "received" taps create one transaction; the rest roll back', async () => {
+test('concurrent "received" taps link once; the rest get 409 and nothing is created', async () => {
   const user = await createUser();
   const { p, salary } = await setUpSalary(user);
-  const results = await Promise.all(Array.from({ length: 5 }, () =>
-    p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 15000, receivedAt: iso(now, 1) })));
+  const income = (await tx(user, { title: 'Salary credit', amount: 15000, type: 'income', category: 'Salary', expenseDate: iso(now, 1) })).body.expense;
+  const results = await Promise.all(Array.from({ length: 5 }, () => p.post(`/salaries/${salary.id}/receive`, { mode: 'link', expenseId: income.id })));
   assert.deepEqual(results.map(r => r.status).sort(), [200, 409, 409, 409, 409]);
   assert.equal(await incomeCount(user), 1);
-});
-
-test('a failure part-way through receiving leaves no orphan transaction', async () => {
-  const user = await createUser();
-  const { p, salary } = await setUpSalary(user);
-  const original = prisma.$transaction;
-  // Fail the claim step after the income transaction has been created inside the same transaction.
-  prisma.$transaction = (fn, opts) => original.call(prisma, (t) => fn(new Proxy(t, {
-    get: (target, key) => (key === 'monthlySalary'
-      ? new Proxy(target.monthlySalary, { get: (d, m) => (m === 'updateMany' ? async () => { throw new Error('boom'); } : d[m]) })
-      : target[key]),
-  })), opts);
-  try {
-    const res = await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 15000, receivedAt: iso(now, 1) });
-    assert.equal(res.status, 500);
-  } finally {
-    prisma.$transaction = original;
-  }
-  assert.equal(await incomeCount(user), 0);
-  assert.equal((await prisma.monthlySalary.findUnique({ where: { id: salary.id } })).receivedAt, null);
 });
 
 test('linking an income already recorded in History does not create another one', async () => {
@@ -183,10 +163,10 @@ test('only the user\'s own income transactions can be linked', async () => {
   assert.equal((await prisma.monthlySalary.findUnique({ where: { id: salary.id } })).receivedAt, null);
 });
 
-test('undo keeps the transaction unless asked to delete it', async () => {
+test('undo only changes the planner record; the transaction is never deleted from here', async () => {
   const user = await createUser();
   const { p, salary } = await setUpSalary(user);
-  await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 15000, receivedAt: iso(now, 1) });
+  await receiveViaHistory(user, p, salary);
   const undone = await p.post(`/salaries/${salary.id}/undo`, {});
   assert.equal(undone.body.salary.status, 'PENDING');
   assert.equal(await incomeCount(user), 1);
@@ -195,22 +175,25 @@ test('undo keeps the transaction unless asked to delete it', async () => {
   // The kept transaction can now be linked back instead of recording a second one.
   const [kept] = (await p.get(`/salaries/${salary.id}/candidates`)).body.candidates;
   await p.post(`/salaries/${salary.id}/receive`, { mode: 'link', expenseId: kept.id });
-  await p.post(`/salaries/${salary.id}/undo`, { deleteTransaction: true });
-  assert.equal(await incomeCount(user), 0);
+  const refused = await p.post(`/salaries/${salary.id}/undo`, { deleteTransaction: true });
+  assert.equal(refused.status, 400);
+  assert.equal(await incomeCount(user), 1);
+  assert.equal((await p.post(`/salaries/${salary.id}/undo`, { deleteTransaction: false })).status, 200);
+  assert.equal(await incomeCount(user), 1);
   assert.equal((await p.del(`/salaries/${salary.id}`)).status, 200);
 });
 
 test('received records cannot be deleted until undone', async () => {
   const user = await createUser();
   const { p, salary } = await setUpSalary(user);
-  await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 15000, receivedAt: iso(now, 1) });
+  await receiveViaHistory(user, p, salary);
   assert.equal((await p.del(`/salaries/${salary.id}`)).status, 409);
 });
 
 test('salary history totals each month', async () => {
   const user = await createUser();
   const { p, salary } = await setUpSalary(user);
-  await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 15000, receivedAt: iso(now, 1) });
+  await receiveViaHistory(user, p, salary);
   await p.post('/salaries', { ...now, label: 'Bonus', kind: 'BONUS', expectedAmount: '2500.25' });
   await p.post('/salaries/initialize', next);
   const history = (await p.get(`/salaries/history?months=3&${q(next)}`)).body.history;
@@ -272,7 +255,7 @@ test('actuals: transfers, investments and savings stay out of spending; EMIs cou
     { group: 'FIXED', name: 'Loan', plannedAmount: 2000, matchCategories: ['EMI'] },
     { group: 'VARIABLE', name: 'Food', plannedAmount: 1000, matchCategories: ['Food'] },
   ]);
-  await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 15000, receivedAt: iso(now, 1) });
+  await receiveViaHistory(user, p, salary);
   await tx(user, { title: 'Rent', amount: 3500, type: 'expense', category: 'Bills' });
   await tx(user, { title: 'Lunch', amount: 1200.75, type: 'expense', category: 'Food' });
   await tx(user, { title: 'Movie', amount: 300, type: 'expense', category: 'Entertainment' });
@@ -382,7 +365,7 @@ test('a user cannot see or change another user\'s planner data', async () => {
     a.del(`/income-sources/${source.id}`),
     a.put(`/salaries/${salary.id}`, { expectedAmount: 1 }),
     a.get(`/salaries/${salary.id}/candidates`),
-    a.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 1, receivedAt: iso(now) }),
+    a.post(`/salaries/${salary.id}/receive`, { mode: 'alreadyInBalance', receivedAmount: 1, receivedAt: iso(now) }),
     a.post(`/salaries/${salary.id}/undo`, {}),
     a.del(`/salaries/${salary.id}`),
     a.put(`/budgets/${planId}`, { note: 'x' }),
@@ -430,12 +413,12 @@ test('invalid amounts, dates, months and pay days are rejected', async () => {
     p.get('/overview?year=2026&month=13'),
     p.get('/budgets?year=2026'),
     p.post('/budgets', { year: 2026, month: 0 }),
-    p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 0, receivedAt: iso(now) }),
-    p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 100, receivedAt: 'yesterday' }),
-    p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 100 }),
+    p.post(`/salaries/${salary.id}/receive`, { mode: 'alreadyInBalance', receivedAmount: 0, receivedAt: iso(now) }),
+    p.post(`/salaries/${salary.id}/receive`, { mode: 'alreadyInBalance', receivedAmount: 100, receivedAt: 'yesterday' }),
+    p.post(`/salaries/${salary.id}/receive`, { mode: 'alreadyInBalance', receivedAmount: 100 }),
     p.post(`/salaries/${salary.id}/receive`, { mode: 'link' }),
     p.post(`/salaries/${salary.id}/receive`, { mode: 'magic' }),
-    p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 100, receivedAt: iso(now), paymentMethod: 'Bitcoin' }),
+    p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 100, receivedAt: iso(now), paymentMethod: 'UPI' }),
     p.post(`/budgets/${planId}/allocations`, { group: 'FIXED', name: 'Rent', plannedAmount: -5 }),
     p.post(`/budgets/${planId}/allocations`, { group: 'LUXURY', name: 'Rent', plannedAmount: 5 }),
     p.post(`/budgets/${planId}/allocations`, { group: 'FIXED', name: 'Rent', plannedAmount: 5, matchCategories: 'Bills' }),

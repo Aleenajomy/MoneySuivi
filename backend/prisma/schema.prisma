@@ -301,6 +301,17 @@ model BudgetPlan {
   month       Int // 1-12
   note        String?            @db.VarChar(500)
   savingsPercent Int             @default(20)
+  // The simple monthly salary plan. Planning figures only: none of them is a transaction, and none
+  // is read by balances, History, EMIs or Net Worth. Null until the month's plan is set up.
+  salaryAmount           Decimal? @db.Decimal(14, 2)
+  allowanceAmount        Decimal? @db.Decimal(14, 2)
+  rentAmount             Decimal? @db.Decimal(14, 2)
+  emiAmount              Decimal? @db.Decimal(14, 2)
+  emergencySavingsAmount Decimal? @db.Decimal(14, 2)
+  generalSavingsAmount   Decimal? @db.Decimal(14, 2)
+  shoppingAmount         Decimal? @db.Decimal(14, 2)
+  travelAmount           Decimal? @db.Decimal(14, 2)
+  foodAmount             Decimal? @db.Decimal(14, 2)
   allocations BudgetAllocation[]
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
