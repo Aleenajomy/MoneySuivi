@@ -1,6 +1,6 @@
 const prisma = require('../lib/prisma');
 const { HttpError, handleError } = require('../utils/http');
-const { toPaise, toApiAmount, paiseToNumber, paiseToDecimalString, sumPaise } = require('../utils/plannerCalculations');
+const { toPaise, toApiAmount, paiseToDecimalString, sumPaise } = require('../utils/plannerCalculations');
 const planner = require('../services/plannerService');
 
 const NOT_FOUND_SOURCE = new HttpError(404, 'Income source not found');
@@ -9,8 +9,6 @@ const ALREADY_RECEIVED = new HttpError(409, 'This income is already marked as re
 const ALREADY_LINKED = new HttpError(409, 'That transaction is already linked to another income record.', 'TRANSACTION_ALREADY_LINKED');
 
 const decimal = (value) => paiseToDecimalString(toPaise(value));
-
-const transactionCategoryFor = (kind) => (kind === 'OTHER' ? 'Other' : 'Salary');
 
 const WRONG_MONTH = new HttpError(400, 'The income must be dated in this record\'s month or the month after it.', 'WRONG_MONTH');
 
@@ -191,17 +189,17 @@ const updateSalary = async (req, res) => {
 };
 
 /**
- * Marks income as received in exactly one of three ways the user chose explicitly:
- *   link             - an income transaction already in History backs it; nothing is created;
- *   alreadyInBalance - the money is already reflected in their balances; nothing is created;
- *   create           - one new income transaction is recorded.
+ * Marks income as received without ever creating a transaction (income is recorded in Add
+ * Transaction):
+ *   link             - an income transaction already in History backs it;
+ *   alreadyInBalance - the money is already reflected in the user's balances.
  * The conditional claim only succeeds while the record is unreceived, so a double tap or a
- * concurrent request rolls back instead of creating a second income transaction.
+ * concurrent request gets 409.
  */
 const receiveSalary = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { mode, expenseId, receivedAmount, receivedAt, paymentMethod, note, confirmDuplicate } = req.body;
+    const { mode, expenseId, receivedAmount, receivedAt } = req.body;
 
     const record = await prisma.$transaction(async (tx) => {
       const existing = await findSalary(userId, req.params.id, tx);
@@ -230,39 +228,7 @@ const receiveSalary = async (req, res) => {
       } else {
         const receivedOn = calendarDay(receivedAt);
         if (!planner.inReceivedWindow(receivedOn, existing)) throw WRONG_MONTH;
-        if (mode === 'alreadyInBalance') {
-          claim = { receivedAmount: decimal(receivedAmount), receivedAt: receivedOn, countedInBalance: true };
-        } else {
-          // The likeliest way to double a balance is recording a salary that is already in History
-          // under a slightly different amount or date, so that has to be confirmed explicitly.
-          if (!confirmDuplicate) {
-            const lookalikes = await tx.expense.findMany({
-              where: { ...unlinkedIncomeWhere(userId, existing), category: { equals: transactionCategoryFor(existing.kind), mode: 'insensitive' } },
-              select: CANDIDATE_SELECT,
-              orderBy: { expenseDate: 'desc' },
-              take: 5,
-            });
-            if (lookalikes.length) {
-              throw new HttpError(409, 'An income transaction that may be this salary is already in History. Link it instead, or confirm to record another one.', 'POSSIBLE_DUPLICATE', {
-                candidates: lookalikes.map(c => ({ ...c, amount: toApiAmount(toPaise(c.amount)) })),
-              });
-            }
-          }
-          const transaction = await tx.expense.create({
-            data: {
-              userId,
-              title: existing.label,
-              amount: paiseToNumber(toPaise(receivedAmount)),
-              category: transactionCategoryFor(existing.kind),
-              type: 'income',
-              accountType: planner.accountTypeForPayment(paymentMethod),
-              paymentMethod,
-              note: note || null,
-              expenseDate: receivedOn,
-            },
-          });
-          claim = { receivedAmount: decimal(transaction.amount), receivedAt: transaction.expenseDate, expenseId: transaction.id };
-        }
+        claim = { receivedAmount: decimal(receivedAmount), receivedAt: receivedOn, countedInBalance: true };
       }
 
       const claimed = await tx.monthlySalary.updateMany({
@@ -287,12 +253,8 @@ const undoReceived = async (req, res) => {
     const record = await prisma.$transaction(async (tx) => {
       const existing = await findSalary(userId, req.params.id, tx);
       if (!existing.receivedAt && !existing.expenseId) throw new HttpError(400, 'This income is not marked as received');
+      // Only the planner record changes; the linked transaction stays in History.
       await tx.monthlySalary.update({ where: { id: existing.id }, data: STALE_RESET });
-      // Only a transaction that still backs the record is deleted; one the user has since turned into
-      // something else in History is left alone.
-      if (req.body.deleteTransaction && planner.isReceived(existing) && existing.expenseId) {
-        await tx.expense.deleteMany({ where: { id: existing.expenseId, userId } });
-      }
       return tx.monthlySalary.findUnique({ where: { id: existing.id }, include: planner.SALARY_INCLUDE });
     });
     res.json({ success: true, salary: planner.serializeSalary(record) });

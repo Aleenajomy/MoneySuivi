@@ -10,8 +10,9 @@ const goals = require('../controllers/plannerGoalController');
 const investments = require('../controllers/plannerInvestmentController');
 const bills = require('../controllers/plannerBillsController');
 const emi = require('../controllers/plannerEmiController');
+const salaryPlan = require('../controllers/plannerSalaryPlanController');
+const { SALARY_PLAN_FIELDS } = require('../utils/plannerCalculations');
 
-const PAYMENT_METHODS = ['UPI', 'Cash', 'Credit Card', 'Debit Card', 'Net Banking', 'Other'];
 const YEAR = { min: 2000, max: 2100 };
 
 const yearMonthQuery = [
@@ -92,14 +93,6 @@ const investmentRules = (optional) => [
   v.text('note', { max: 500 }),
 ];
 
-const investmentTxRules = [
-  body('type').isIn(['BUY', 'REDEEM']).withMessage('type must be BUY or REDEEM'),
-  money('amount', { allowZero: false }),
-  strictDate('date'),
-  body('paymentMethod').optional({ values: 'null' }).isIn(PAYMENT_METHODS).withMessage(`paymentMethod must be one of: ${PAYMENT_METHODS.join(', ')}`),
-  v.text('note', { max: 300 }),
-];
-
 const optionalPeriodQuery = [
   query('year').optional().isInt(YEAR).withMessage('year must be between 2000 and 2100').toInt(),
   query('month').if(query('year').exists()).exists().withMessage('month is required with year').bail()
@@ -129,36 +122,33 @@ const allocationRules = (prefix, optional) => [
   linkId(`${prefix}investmentPlanId`),
 ];
 
-// There is no default mode and no default account: the user always chooses how the money is
-// counted, and which balance a new transaction lands in.
-const RECEIVE_MODES = ['link', 'alreadyInBalance', 'create'];
-const notLink = body('mode').isIn(['alreadyInBalance', 'create']);
+// The planner never creates a transaction: salary is recorded in Add Transaction, and here it can
+// only be linked to that transaction or marked as already in the balance.
+const RECEIVE_MODES = ['link', 'alreadyInBalance'];
 const receiveRules = [
-  body('mode').isIn(RECEIVE_MODES).withMessage(`mode must be one of: ${RECEIVE_MODES.join(', ')}`),
+  body('mode').isIn(RECEIVE_MODES).withMessage(`mode must be one of: ${RECEIVE_MODES.join(', ')}. Record new income in Add Transaction.`),
   body('expenseId').if(body('mode').equals('link')).isUUID().withMessage('expenseId is required to link a transaction'),
-  money('receivedAmount', { allowZero: false, when: notLink }),
-  body('receivedAt').if(notLink).exists({ values: 'falsy' }).withMessage('receivedAt is required').bail()
+  money('receivedAmount', { allowZero: false, when: body('mode').equals('alreadyInBalance') }),
+  body('receivedAt').if(body('mode').equals('alreadyInBalance')).exists({ values: 'falsy' }).withMessage('receivedAt is required').bail()
     // Strict: an impossible day such as 2026-02-30 is rejected rather than rolled into March.
     .matches(/^\d{4}-\d{2}-\d{2}/).withMessage('receivedAt must be a date like 2026-11-01').bail()
     .isISO8601({ strict: true, strictSeparator: true }).withMessage('receivedAt must be a valid date'),
-  body('paymentMethod').if(body('mode').equals('create')).exists({ values: 'falsy' }).withMessage('Choose the account the money arrived in').bail()
-    .isIn(PAYMENT_METHODS).withMessage(`paymentMethod must be one of: ${PAYMENT_METHODS.join(', ')}`),
-  body('confirmDuplicate').optional().isBoolean({ strict: true }).withMessage('confirmDuplicate must be true or false'),
-  v.text('note', { max: 500 }),
 ];
 
-const recordRules = [
-  money('amount', { allowZero: false }),
-  strictDate('date'),
-  body('paymentMethod').exists({ values: 'falsy' }).withMessage('Choose the account you paid from').bail()
-    .isIn(PAYMENT_METHODS).withMessage(`paymentMethod must be one of: ${PAYMENT_METHODS.join(', ')}`),
-  name('title'),
-  v.text('note', { max: 500 }),
+const salaryPlanPeriod = [
+  body('year').exists().withMessage('year is required').bail().isInt(YEAR).withMessage('year must be between 2000 and 2100').toInt(),
+  body('month').exists().withMessage('month is required').bail().isInt({ min: 1, max: 12 }).withMessage('month must be between 1 and 12').toInt(),
 ];
 
 router.use(protect);
 
 router.get('/overview', yearMonthQuery, validate, budget.getOverview);
+
+// The simple monthly salary plan: planning figures only.
+router.get('/salary-plan', yearMonthQuery, validate, salaryPlan.getPlan);
+router.post('/salary-plan/init', salaryPlanPeriod, validate, salaryPlan.initPlan);
+router.put('/salary-plan', [...salaryPlanPeriod, ...SALARY_PLAN_FIELDS.map(f => money(f, { optional: true }))], validate, salaryPlan.updatePlan);
+router.post('/salary-plan/reset', salaryPlanPeriod, validate, salaryPlan.resetPlan);
 
 // Resetting everything is destructive for planner data, so the client must echo a confirmation word.
 router.post('/reset', [
@@ -185,7 +175,8 @@ router.post('/salaries', [...yearMonthBody, name('label', { required: true }), k
 router.put('/salaries/:id', v.uuidParam(), [money('expectedAmount', { optional: true }), name('label')], validate, income.updateSalary);
 router.get('/salaries/:id/candidates', v.uuidParam(), validate, income.getLinkCandidates);
 router.post('/salaries/:id/receive', v.uuidParam(), receiveRules, validate, income.receiveSalary);
-router.post('/salaries/:id/undo', v.uuidParam(), body('deleteTransaction').optional().isBoolean({ strict: true }).withMessage('deleteTransaction must be true or false'), validate, income.undoReceived);
+// Undo only changes the planner record; transactions are deleted in History, never from here.
+router.post('/salaries/:id/undo', v.uuidParam(), body('deleteTransaction').optional().custom(value => value !== true).withMessage('Delete the transaction in History instead'), validate, income.undoReceived);
 router.delete('/salaries/:id', v.uuidParam(), validate, income.deleteSalary);
 
 router.get('/budgets', yearMonthQuery, validate, budget.getBudget);
@@ -195,7 +186,6 @@ router.put('/budgets/allocations/:allocationId', v.uuidParam('allocationId'), al
 router.delete('/budgets/allocations/:allocationId', v.uuidParam('allocationId'), validate, budget.deleteAllocation);
 router.post('/budgets/:id/copy-recurring', v.uuidParam(), validate, budget.copyRecurring);
 router.post('/budgets/:id/allocations', v.uuidParam(), allocationRules('', false), validate, budget.addAllocation);
-router.post('/budgets/allocations/:allocationId/record', v.uuidParam('allocationId'), recordRules, validate, budget.recordExpense);
 router.post('/budgets/:id/default-lines', v.uuidParam(), validate, budget.addDefaultLines);
 router.put('/budgets/:id', v.uuidParam(), [
   v.text('note', { max: 500 }),
@@ -227,11 +217,9 @@ router.post('/goals/:id/contributions', v.uuidParam(), contributionRules, valida
 
 router.get('/investments', optionalPeriodQuery, validate, investments.listInvestments);
 router.post('/investments', investmentRules(false), validate, investments.createInvestment);
-router.delete('/investments/transactions/:txId', v.uuidParam('txId'), validate, investments.deleteTransaction);
 router.put('/investments/:id', v.uuidParam(), investmentRules(true), validate, investments.updateInvestment);
 router.patch('/investments/:id/active', v.uuidParam(), body('active').isBoolean({ strict: true }).withMessage('active must be true or false'), validate, investments.setInvestmentActive);
-router.delete('/investments/:id', v.uuidParam(), query('deleteTransactions').optional().isIn(['true', 'false']), validate, investments.deleteInvestment);
+router.delete('/investments/:id', v.uuidParam(), validate, investments.deleteInvestment);
 router.get('/investments/:id/transactions', v.uuidParam(), validate, investments.listTransactions);
-router.post('/investments/:id/transactions', v.uuidParam(), investmentTxRules, validate, investments.addTransaction);
 
 module.exports = router;

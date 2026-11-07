@@ -9,22 +9,18 @@ const shift = ({ year, month }, by) => {
   const i = year * 12 + (month - 1) + by;
   return { year: Math.floor(i / 12), month: (i % 12) + 1 };
 };
-const dayInMonth = (day = 1) => `${monthInput(thisMonth)}-${String(day).padStart(2, '0')}`;
 
-const addSalarySource = async (page, amount = '15000') => {
-  await page.getByRole('button', { name: 'Add salary' }).click();
-  const dialog = page.getByRole('dialog');
-  await dialog.getByLabel('Name').fill('Acme salary');
-  await dialog.getByLabel('Expected monthly amount (₹)').fill(amount);
-  await dialog.getByLabel('Pay day (optional)').fill('1');
-  await dialog.getByRole('button', { name: 'Save' }).click();
-  await expect(page.getByTestId('salary-record')).toContainText('Acme salary');
+const escape = (text) => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+const field = (page, name) => page.getByRole('spinbutton', { name: new RegExp(`^${escape(name)}`) });
+const setAmount = async (page, name, value) => {
+  const input = field(page, name);
+  await input.fill(String(value));
+  await input.press('Enter');
 };
-
-const historySalary = (amount, id = '11111111-1111-4111-8111-111111111111') => ({
-  id, title: 'Salary credit', amount, category: 'Salary',
-  expenseDate: `${dayInMonth(1)}T00:00:00.000Z`, paymentMethod: 'UPI', matchesExpected: amount === 15000,
-});
+const noMoneyTouched = (mock) => {
+  expect(mock.moneyWrites).toEqual([]);
+  expect(mock.otherPlannerCalls).toEqual([]);
+};
 
 test.describe('Salary Planner', () => {
   test.beforeEach(async ({ page }) => {
@@ -32,273 +28,162 @@ test.describe('Salary Planner', () => {
     await setupApiMocks(page, { loggedIn: true });
   });
 
-  test('opens from the mobile nav and shows the four sections with the default expenses', async ({ page }) => {
+  test('shows the four sections and the default plan with the agreed calculation', async ({ page }) => {
     const mock = await setupPlannerMock(page);
     await page.goto('/#/');
-    const nav = page.locator('nav[aria-label="Mobile Bottom Navigation"]');
-    await nav.getByRole('button', { name: 'Salary Planner' }).click();
-
+    await page.locator('nav[aria-label="Mobile Bottom Navigation"]').getByRole('button', { name: 'Salary Planner' }).click();
     await expect(page).toHaveURL(/#\/planner$/);
-    for (const name of ['Monthly Overview', 'Salary & Other Income', 'Monthly Expenses', 'Savings Suggestion']) {
-      await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
+
+    for (const name of ['A. Monthly Salary', 'B. Fixed Expenses', 'C. Monthly Budget (from ₹8,400)', 'D. Savings Summary']) {
+      await expect(page.getByRole('heading', { name })).toBeVisible();
     }
-    for (const gone of ['Invest', 'Goals', 'Spending', 'Bills', 'Budget']) {
-      await expect(page.getByRole('tab', { name: gone })).toHaveCount(0);
+    await expect(field(page, 'Salary')).toHaveValue('15000');
+    await expect(field(page, 'Company mess allowance')).toHaveValue('2560');
+    await expect(field(page, 'EMI')).toHaveValue('4100');
+    await expect(field(page, 'Room rent')).toHaveValue('2500');
+    await expect(page.getByTestId('income-with-allowance')).toContainText('Total Income + Allowance');
+    await expect(page.getByTestId('income-with-allowance')).toContainText('₹17,560');
+    await expect(page.getByTestId('after-fixed')).toContainText('₹8,400');
+    await expect(page.getByTestId('extra-balance')).toContainText('₹900');
+    await expect(page.getByTestId('budget-total')).toContainText('₹8,400');
+    await expect(page.getByTestId('planned-savings')).toContainText('₹4,000');
+    await expect(page.getByTestId('planned-expenses')).toContainText('₹10,100');
+    await expect(page.getByTestId('money-remaining')).toContainText('₹900');
+    const bar = page.getByTestId('salary-breakdown');
+    await expect(bar).toContainText('Where your ₹15,000 goes');
+    for (const text of ['₹6,600', '44%', '₹3,500', '23%', '₹4,000', '27%', '₹900', '6%']) await expect(bar).toContainText(text);
+
+    for (const gone of ['Mark received', 'Record', 'Add source', 'Invest', 'Goals', 'Reset planner']) {
+      await expect(page.getByRole('button', { name: gone, exact: true })).toHaveCount(0);
     }
-    await expect(page.getByTestId('planner-month')).toHaveValue(monthInput(thisMonth));
-
-    const lines = page.getByTestId('expense-line');
-    await expect(lines).toHaveText([/Rent.*₹2,500/, /EMI/, /Mess \/ Food/, /Travel/, /Other Personal/]);
-    const setUp = mock.requests.filter(r => r.method === 'POST' && r.path === '/budgets');
-    expect(setUp).toHaveLength(1);
-    expect(setUp[0].body).toEqual({ ...thisMonth, defaults: true });
-    expect(mock.transactionsCreated).toBe(0);
+    await expect(page.getByText('Total Received')).toHaveCount(0);
+    // Set-up is idempotent (development mode may send it twice); it still makes one plan.
+    expect(mock.requests.filter(r => r.path === '/salary-plan/init').every(r => r.body.month === thisMonth.month)).toBe(true);
+    expect(Object.keys(mock.plans)).toEqual([`${thisMonth.year}-${thisMonth.month}`]);
+    noMoneyTouched(mock);
   });
 
-  test('expected and received income are shown separately; planning never records a transaction', async ({ page }) => {
+  test('editing amounts saves the plan, recalculates, and never touches money', async ({ page }) => {
     const mock = await setupPlannerMock(page);
     await page.goto('/#/planner');
-    await addSalarySource(page);
-
-    const planned = page.getByTestId('planned-position');
-    const actual = page.getByTestId('actual-position');
-    await expect(planned).toContainText('Expected income');
-    await expect(planned).toContainText('₹15,000');
-    await expect(planned).toContainText('₹12,500');
-    await expect(actual).toContainText('Received income');
-    await expect(actual).toContainText('₹15,000 still expected');
-
-    await page.getByRole('button', { name: 'Edit Rent' }).click();
-    const dialog = page.getByRole('dialog');
-    await dialog.getByLabel('Planned amount (₹)').fill('3000');
-    await dialog.getByRole('button', { name: 'Save' }).click();
-    await expect(planned).toContainText('₹12,000');
-    await expect(page.getByTestId('suggested-savings')).toContainText('₹2,400');
-    expect(mock.transactionsCreated).toBe(0);
+    await setAmount(page, 'Travel', 800);
+    await expect(page.getByRole('status')).toContainText('Saved');
+    await expect(page.getByTestId('extra-balance')).toContainText('₹1,100');
+    await setAmount(page, 'Room rent', 3000);
+    await expect(page.getByTestId('after-fixed')).toContainText('₹7,900');
+    await expect(page.getByTestId('extra-balance')).toContainText('₹600');
+    expect(mock.requests.filter(r => r.method === 'PUT').map(r => r.body)).toEqual([
+      { ...thisMonth, travelAmount: '800' },
+      { ...thisMonth, rentAmount: '3000' },
+    ]);
+    noMoneyTouched(mock);
   });
 
-  test('Mark received preselects nothing and Record new needs an account', async ({ page }) => {
+  test('the allowance changes only "Total Income + Allowance", never the budget', async ({ page }) => {
     const mock = await setupPlannerMock(page);
     await page.goto('/#/planner');
-    await addSalarySource(page);
-    await page.getByRole('button', { name: 'Mark received' }).click();
-
-    const dialog = page.getByRole('dialog');
-    for (const name of ['Link existing income', 'Already in my balance', 'Record new']) {
-      await expect(dialog.getByRole('radio', { name: new RegExp(name) })).not.toBeChecked();
-    }
-    await expect(dialog.getByRole('button', { name: 'Choose an option' })).toBeDisabled();
-
-    await dialog.getByRole('radio', { name: /Record new/ }).check();
-    await expect(dialog.getByLabel('Received in')).toHaveValue('');
-    await dialog.getByLabel('Amount received (₹)').fill('14500');
-    await dialog.getByRole('button', { name: 'Record ₹14,500' }).click();
-    await expect(dialog.getByText('Choose the account the money arrived in')).toBeVisible();
-    expect(mock.requests.some(r => r.path.endsWith('/receive'))).toBe(false);
-
-    await dialog.getByLabel('Received in').selectOption('UPI');
-    await expect(dialog.getByTestId('receive-effect')).toContainText('Adds ₹14,500 to UPI');
-    await dialog.getByRole('button', { name: 'Record ₹14,500' }).click();
-
-    await expect(page.getByTestId('salary-record')).toContainText('Partly received');
-    const call = mock.requests.find(r => r.path.endsWith('/receive'));
-    expect(call.body).toMatchObject({ mode: 'create', receivedAmount: '14500', paymentMethod: 'UPI', confirmDuplicate: false });
-    expect(mock.transactionsCreated).toBe(1);
+    await setAmount(page, 'Company mess allowance', 3000);
+    await expect(page.getByTestId('income-with-allowance')).toContainText('₹18,000');
+    await expect(page.getByTestId('after-fixed')).toContainText('₹8,400');
+    await expect(page.getByTestId('money-remaining')).toContainText('₹900');
+    noMoneyTouched(mock);
   });
 
-  test('a salary in History with a different amount can be linked, and creates nothing', async ({ page }) => {
-    const candidate = historySalary(14850);
-    const mock = await setupPlannerMock(page, { candidates: [candidate] });
-    await page.goto('/#/planner');
-    await addSalarySource(page);
-    await page.getByRole('button', { name: 'Mark received' }).click();
-
-    const dialog = page.getByRole('dialog');
-    await expect(dialog.getByRole('radio', { name: /Link existing income \(1\)/ })).not.toBeChecked();
-    await dialog.getByRole('radio', { name: /Already in my balance/ }).check();
-    await expect(dialog.getByTestId('history-hint')).toContainText('1 unlinked income transaction is in History');
-    await dialog.getByRole('radio', { name: /Link existing income/ }).check();
-    await dialog.getByRole('radio', { name: /Salary credit/ }).check();
-    await dialog.getByRole('button', { name: 'Link transaction' }).click();
-
-    await expect(page.getByTestId('salary-record')).toContainText('Partly received');
-    expect(mock.requests.find(r => r.path.endsWith('/receive')).body).toEqual({ mode: 'link', expenseId: candidate.id });
-    expect(mock.transactionsCreated).toBe(0);
-  });
-
-  test('Record new warns about a possible duplicate and offers to link it instead', async ({ page }) => {
-    const lookalike = historySalary(14850);
-    const mock = await setupPlannerMock(page, { duplicates: [lookalike] });
-    await page.goto('/#/planner');
-    await addSalarySource(page);
-    await page.getByRole('button', { name: 'Mark received' }).click();
-    const dialog = page.getByRole('dialog');
-    await dialog.getByRole('radio', { name: /Record new/ }).check();
-    await dialog.getByLabel('Received in').selectOption('UPI');
-    await dialog.getByRole('button', { name: 'Record ₹15,000' }).click();
-
-    const warning = dialog.getByTestId('possible-duplicate');
-    await expect(warning).toContainText('may already be in History');
-    expect(mock.transactionsCreated).toBe(0);
-    await warning.getByRole('button', { name: 'Link this' }).click();
-    await dialog.getByRole('button', { name: 'Link transaction' }).click();
-    await expect(page.getByTestId('salary-record')).toContainText('Partly received');
-    expect(mock.requests.filter(r => r.path.endsWith('/receive')).at(-1).body).toEqual({ mode: 'link', expenseId: lookalike.id });
-    expect(mock.transactionsCreated).toBe(0);
-  });
-
-  test('Already in my balance counts the salary as received without a transaction', async ({ page }) => {
+  test('allocating more than is left shows the over-budget amount instead of a balance', async ({ page }) => {
     const mock = await setupPlannerMock(page);
     await page.goto('/#/planner');
-    await addSalarySource(page);
-    await page.getByRole('button', { name: 'Mark received' }).click();
-    const dialog = page.getByRole('dialog');
-    await dialog.getByRole('radio', { name: /Already in my balance/ }).check();
-    await expect(dialog.getByLabel('Received in')).toHaveCount(0);
-    await expect(dialog.getByTestId('receive-effect')).toContainText('No transaction is added');
-    await dialog.getByRole('button', { name: 'Mark received' }).click();
-
-    await expect(page.getByTestId('salary-record')).toContainText('already in balance, no transaction');
-    await expect(page.getByTestId('actual-position')).toContainText('₹15,000');
-    expect(mock.requests.find(r => r.path.endsWith('/receive')).body).toMatchObject({ mode: 'alreadyInBalance', receivedAmount: '15000' });
-    expect(mock.transactionsCreated).toBe(0);
+    await setAmount(page, 'Shopping / personal needs', 2500);
+    const warning = page.getByTestId('over-budget');
+    await expect(warning).toContainText('Over budget by ₹100');
+    await expect(page.getByTestId('extra-balance')).toHaveCount(0);
+    await expect(page.getByTestId('money-remaining')).toContainText('₹0');
+    await setAmount(page, 'Shopping / personal needs', 2400);
+    await expect(page.getByTestId('extra-balance')).toContainText('₹0');
+    await expect(warning).toHaveCount(0);
+    noMoneyTouched(mock);
   });
 
-  test('recording a planned expense asks for the account and adds one transaction', async ({ page }) => {
+  test('invalid amounts are not saved', async ({ page }) => {
     const mock = await setupPlannerMock(page);
     await page.goto('/#/planner');
-    await page.getByRole('button', { name: 'Record a payment for Rent' }).click();
-    const dialog = page.getByRole('dialog');
-    await expect(dialog.getByLabel('Amount paid (₹)')).toHaveValue('2500');
-    await dialog.getByRole('button', { name: 'Record expense' }).click();
-    await expect(dialog.getByText('Choose the account you paid from')).toBeVisible();
-    await dialog.getByLabel('Paid from').selectOption('Cash');
-    await expect(dialog.getByTestId('record-effect')).toContainText('taken from Cash');
-    await dialog.getByRole('button', { name: 'Record expense' }).click();
-
-    await expect(page.getByTestId('expense-line').filter({ hasText: 'Rent' })).toContainText('Spent ₹2,500');
-    expect(mock.requests.filter(r => r.path.endsWith('/record')).map(r => r.body)).toEqual([{ amount: '2500', date: expect.any(String), paymentMethod: 'Cash' }]);
-    expect(mock.transactionsCreated).toBe(1);
-    await expect(page.getByRole('button', { name: 'Record a payment for EMI' })).toHaveCount(0);
+    await setAmount(page, 'Salary', '15000.555');
+    await expect(page.getByRole('alert')).toContainText('at most 2 decimals');
+    await setAmount(page, 'Salary', '');
+    await expect(page.getByRole('alert')).toContainText('Salary is required');
+    expect(mock.requests.filter(r => r.method === 'PUT')).toHaveLength(0);
   });
 
-  test('an EMI payment that looks duplicated in History is counted once only after linking', async ({ page }) => {
-    const mock = await setupPlannerMock(page, {
-      emiPayments: [{ id: 'aaaaaaaa-0000-4000-8000-000000000001', title: 'Phone EMI', amount: 2000, paidAt: `${dayInMonth(3)}T10:00:00.000Z` }],
-      emiCandidates: [{ id: 'bbbbbbbb-0000-4000-8000-000000000001', title: 'Phone EMI', amount: 2000, date: `${dayInMonth(3)}T00:00:00.000Z`, category: 'Bills', paymentMethod: 'UPI', sameAmount: true, daysApart: 0 }],
-      spending: [{ id: 'bbbbbbbb-0000-4000-8000-000000000001', title: 'Phone EMI', category: 'Bills', amount: 2000, date: dayInMonth(3) }],
-    });
+  test('EMI offers the Loans & EMIs total but only changes the plan', async ({ page }) => {
+    const mock = await setupPlannerMock(page, { emiTrackerTotal: 4100 });
     await page.goto('/#/planner');
-    const block = page.getByTestId('emi-payments');
-    await expect(block).toContainText('1 payment may be counted twice');
-    await expect(page.getByTestId('actual-position')).toContainText('₹4,000');
-
-    await block.getByRole('button', { name: 'Already in History?' }).click();
-    const dialog = page.getByRole('dialog');
-    await dialog.getByRole('radio', { name: /Phone EMI/ }).check();
-    await dialog.getByRole('button', { name: 'Link as same payment' }).click();
-
-    await expect(block).toContainText('Counted once');
-    await expect(page.getByTestId('actual-position')).toContainText('₹2,000');
-    expect(mock.transactionsCreated).toBe(0);
-    await block.getByRole('button', { name: 'Unlink Phone EMI payment' }).click();
-    await expect(page.getByTestId('actual-position')).toContainText('₹4,000');
+    await setAmount(page, 'EMI', 3000);
+    const useTracker = page.getByRole('button', { name: /Loans & EMIs total is ₹4,100/ });
+    await expect(useTracker).toBeVisible();
+    await useTracker.click();
+    await expect(field(page, 'EMI')).toHaveValue('4100');
+    await expect(useTracker).toHaveCount(0);
+    noMoneyTouched(mock);
   });
 
-  test('the savings suggestion is a calculation with an editable share', async ({ page }) => {
+  test('reset to my default plan asks first and restores the defaults', async ({ page }) => {
     const mock = await setupPlannerMock(page);
     await page.goto('/#/planner');
-    await addSalarySource(page);
-    await expect(page.getByTestId('suggested-savings')).toContainText('₹2,500');
-    await expect(page.getByTestId('suggested-savings')).toContainText('of ₹12,500 planned remaining');
-    await expect(page.getByTestId('actual-savings')).toContainText('₹0');
-    await expect(page.getByTestId('savings-note')).toContainText('never creates a transaction');
-
-    await page.getByLabel('Savings %').fill('150');
-    await page.getByRole('button', { name: 'Update' }).click();
-    await expect(page.getByText('Use a whole number from 0 to 100')).toBeVisible();
-    await page.getByLabel('Savings %').fill('30');
-    await page.getByRole('button', { name: 'Update' }).click();
-    await expect(page.getByTestId('suggested-savings')).toContainText('₹3,750');
-    expect(mock.requests.find(r => r.method === 'PUT' && r.body.savingsPercent !== undefined).body).toEqual({ savingsPercent: 30 });
-    expect(mock.transactionsCreated).toBe(0);
+    await setAmount(page, 'Salary', 20000);
+    await expect(page.getByTestId('after-fixed')).toContainText('₹13,400');
+    await page.getByRole('button', { name: 'Reset to my default plan' }).click();
+    await expect(page.getByText('no transaction or balance is touched')).toBeVisible();
+    await page.getByRole('button', { name: 'Reset', exact: true }).click();
+    await expect(field(page, 'Salary')).toHaveValue('15000');
+    await expect(page.getByTestId('after-fixed')).toContainText('₹8,400');
+    noMoneyTouched(mock);
   });
 
-  test('Reset planner offers this month or everything, and everything needs RESET typed', async ({ page }) => {
+  test('a new month copies the previous one; a past month is created only when asked', async ({ page }) => {
     const mock = await setupPlannerMock(page);
     await page.goto('/#/planner');
-    await addSalarySource(page);
-    await page.getByRole('button', { name: 'Edit Rent' }).click();
-    await page.getByRole('dialog').getByLabel('Planned amount (₹)').fill('4000');
-    await page.getByRole('dialog').getByRole('button', { name: 'Save' }).click();
-    await expect(page.getByTestId('expense-line').first()).toContainText('₹4,000');
-
-    await page.getByRole('button', { name: 'Reset planner' }).click();
-    let dialog = page.getByRole('dialog');
-    await expect(dialog.getByTestId('reset-kept')).toContainText('Transactions in History, account balances, EMIs');
-    await expect(dialog.getByRole('button', { name: 'Choose an option' })).toBeDisabled();
-    await dialog.getByRole('radio', { name: /only/ }).check();
-    await dialog.getByRole('button', { name: /^Reset .* \d{4}$/ }).click();
-    await expect(page.getByTestId('expense-line').first()).toContainText('₹2,500');
-    await expect(page.getByTestId('salary-record')).toContainText('Acme salary');
-    expect(mock.requests.find(r => r.path === '/reset').body).toEqual({ scope: 'month', ...thisMonth });
-
-    await page.getByRole('button', { name: 'Reset planner' }).click();
-    dialog = page.getByRole('dialog');
-    await dialog.getByRole('radio', { name: /whole planner/ }).check();
-    const confirm = dialog.getByRole('button', { name: 'Reset whole planner' });
-    await expect(confirm).toBeDisabled();
-    await dialog.getByLabel('Type RESET to confirm').fill('reset');
-    await expect(confirm).toBeDisabled();
-    await dialog.getByLabel('Type RESET to confirm').fill('RESET');
-    await confirm.click();
-    await expect(page.getByTestId('salary-record')).toHaveCount(0);
-    await expect(page.getByTestId('expense-line').first()).toContainText('₹2,500');
-    expect(mock.requests.filter(r => r.path === '/reset').at(-1).body).toEqual({ scope: 'all', confirm: 'RESET' });
-    expect(mock.transactionsCreated).toBe(0);
-  });
-
-  test('month selector loads other months; a past month is not set up without asking', async ({ page }) => {
-    const mock = await setupPlannerMock(page);
-    await page.goto('/#/planner');
-    await expect(page.getByTestId('expense-line').first()).toBeVisible();
+    await setAmount(page, 'Travel', 1200);
+    await expect(page.getByRole('status')).toContainText('Saved');
 
     await page.getByRole('button', { name: 'Next month' }).click();
-    const next = shift(thisMonth, 1);
-    await expect(page.getByTestId('planner-month')).toHaveValue(monthInput(next));
-    await expect.poll(() => mock.requests.some(r => r.method === 'POST' && r.path === '/budgets' && r.body.month === next.month && r.body.year === next.year)).toBe(true);
+    await expect(page.getByTestId('planner-month')).toHaveValue(monthInput(shift(thisMonth, 1)));
+    await expect(field(page, 'Travel')).toHaveValue('1200');
 
-    const past = shift(thisMonth, -3);
-    await page.getByTestId('planner-month').fill(monthInput(past));
+    await page.getByTestId('planner-month').fill(monthInput(shift(thisMonth, -3)));
     await expect(page.getByText(/No plan for/)).toBeVisible();
-    expect(mock.requests.some(r => r.method === 'POST' && r.path === '/budgets' && r.body.month === past.month && r.body.year === past.year)).toBe(false);
-
-    await page.getByRole('button', { name: 'Start plan for this month' }).click();
-    await expect(page.getByTestId('expense-line').first()).toBeVisible();
+    await page.getByRole('button', { name: 'Create plan for this month' }).click();
+    await expect(field(page, 'Salary')).toHaveValue('15000');
+    noMoneyTouched(mock);
   });
 
   test('shows a loading state, then recovers from an API error with Try again', async ({ page }) => {
-    const mock = await setupPlannerMock(page, { failOverview: true, overviewDelayMs: 1500 });
+    const mock = await setupPlannerMock(page, { failLoad: true, loadDelayMs: 1500 });
     await page.goto('/#/planner');
     await expect(page.getByLabel('Loading planner')).toBeVisible();
     await expect(page.getByRole('alert')).toContainText('Could not load');
-    mock.failOverview = false;
+    mock.failLoad = false;
     await page.getByRole('button', { name: 'Try again' }).click();
-    await expect(page.getByTestId('monthly-overview')).toBeVisible();
+    await expect(field(page, 'Salary')).toHaveValue('15000');
   });
 
-  for (const vp of [{ width: 320, height: 568 }, { width: 1280, height: 800 }]) {
-    test(`has no horizontal overflow at ${vp.width}px`, async ({ page }) => {
+  test('very large and fractional amounts are shown to the paisa', async ({ page }) => {
+    await setupPlannerMock(page);
+    await page.goto('/#/planner');
+    const shown = await page.evaluate(async () => {
+      const { formatAmount } = await import('/src/utils/planner.js');
+      return [formatAmount('90999999999999.09'), formatAmount(4999.5), formatAmount(15000), formatAmount('12.30')];
+    });
+    expect(shown).toEqual(['₹9,09,99,99,99,99,999.09', '₹4,999.50', '₹15,000', '₹12.30']);
+  });
+
+  for (const vp of [{ width: 320, height: 640 }, { width: 1280, height: 800 }]) {
+    test(`has no horizontal overflow at ${vp.width}px, even over budget`, async ({ page }) => {
       await page.setViewportSize(vp);
-      await setupPlannerMock(page, {
-        emiPayments: [{ id: 'aaaaaaaa-0000-4000-8000-000000000002', title: 'A rather long two-wheeler loan EMI', amount: 2000, paidAt: `${dayInMonth(3)}T10:00:00.000Z` }],
-      });
+      await setupPlannerMock(page);
       await page.goto('/#/planner');
-      await addSalarySource(page);
-      await expect(page.getByTestId('emi-payments')).toBeVisible();
+      await expect(page.getByTestId('salary-breakdown')).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
-      await page.getByRole('button', { name: 'Mark received' }).click();
-      await page.getByRole('dialog').getByRole('radio', { name: /Record new/ }).check();
+      await setAmount(page, 'Shopping / personal needs', 99999999);
+      await expect(page.getByTestId('over-budget')).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
     });
   }

@@ -120,20 +120,19 @@ test('finding 2: an income outside the record\'s month and the month after canno
   assert.equal((await p.post(`/salaries/${salary.id}/receive`, { mode: 'link', expenseId: ok.id })).status, 200);
 });
 
-test('finding 2: a new income must be received in the record\'s month or the next; the calendar day is what counts', async () => {
+test('finding 2: "already in balance" must be dated in the record\'s month or the next; the calendar day is what counts', async () => {
   const user = await createUser();
   const { p, salary } = await setUpSalary(user);
   for (const receivedAt of [iso(prev, 28), iso(afterNext, 1), '1999-01-01']) {
-    const res = await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 15000, receivedAt });
+    const res = await p.post(`/salaries/${salary.id}/receive`, { mode: 'alreadyInBalance', receivedAmount: 15000, receivedAt });
     assert.equal(res.status, 400, receivedAt);
   }
-  assert.equal(await prisma.expense.count({ where: { userId: user.id } }), 0);
 
   // An offset that would be the previous day in UTC still means the 1st of this month.
-  const res = await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 15000, receivedAt: `${iso(now, 1)}T00:30:00+05:30` });
+  const res = await p.post(`/salaries/${salary.id}/receive`, { mode: 'alreadyInBalance', receivedAmount: 15000, receivedAt: `${iso(now, 1)}T00:30:00+05:30` });
   assert.equal(res.status, 200, JSON.stringify(res.body));
-  const created = await prisma.expense.findFirst({ where: { userId: user.id } });
-  assert.equal(created.expenseDate.toISOString(), `${iso(now, 1)}T00:00:00.000Z`);
+  assert.equal(res.body.salary.receivedAt, `${iso(now, 1)}T00:00:00.000Z`);
+  assert.equal(await prisma.expense.count({ where: { userId: user.id } }), 0);
 });
 
 // ---------------------------------------------------------------- finding 3
@@ -191,7 +190,8 @@ test('finding 3: deleting a linked income in History resets the salary and its t
   assert.equal(month.salaries[0].status, 'PENDING');
   assert.equal(month.summary.income.received, 0);
   // It can be received again straight away.
-  assert.equal((await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 15000, receivedAt: iso(now, 2) })).status, 200);
+  const again = await tx(user, { title: 'Salary credit', amount: 15000, type: 'income', category: 'Salary', expenseDate: iso(now, 2) });
+  assert.equal((await p.post(`/salaries/${salary.id}/receive`, { mode: 'link', expenseId: again.id })).status, 200);
 });
 
 test('finding 3: a stale "received" row is shown as pending and can be re-received, deleted or undone safely', async () => {
@@ -205,12 +205,13 @@ test('finding 3: a stale "received" row is shown as pending and can be re-receiv
   assert.equal(month.salaries[0].expenseId, null);
   assert.equal(month.income.received, 0);
 
-  // Undo with deleteTransaction must not delete a transaction that no longer backs the record.
-  assert.equal((await p.post(`/salaries/${salary.id}/undo`, { deleteTransaction: true })).status, 200);
+  // Undo clears the stale row and never deletes the transaction.
+  assert.equal((await p.post(`/salaries/${salary.id}/undo`, {})).status, 200);
   assert.ok(await prisma.expense.findUnique({ where: { id: income.id } }));
 
   await prisma.monthlySalary.update({ where: { id: salary.id }, data: { receivedAt: new Date(), expenseId: income.id, receivedAmount: '15000' } });
-  const again = await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 15000, receivedAt: iso(now, 1) });
+  const fresh = await tx(user, { title: 'Salary credit', amount: 15000, type: 'income', category: 'Salary', expenseDate: iso(now, 1) });
+  const again = await p.post(`/salaries/${salary.id}/receive`, { mode: 'link', expenseId: fresh.id });
   assert.equal(again.status, 200, JSON.stringify(again.body));
   assert.equal(again.body.salary.status, 'RECEIVED');
   assert.notEqual(again.body.salary.expenseId, income.id);
@@ -301,7 +302,7 @@ test('impossible or partial dates are rejected instead of rolling into the next 
   const user = await createUser();
   const { p, salary } = await setUpSalary(user);
   for (const receivedAt of [`${now.year}-02-30`, `${iso(now).slice(0, 7)}`, `${iso(now).slice(0, 7)}-32`, 'yesterday']) {
-    const res = await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 100, receivedAt });
+    const res = await p.post(`/salaries/${salary.id}/receive`, { mode: 'alreadyInBalance', receivedAmount: 100, receivedAt });
     assert.equal(res.status, 400, receivedAt);
   }
   assert.equal(await prisma.expense.count({ where: { userId: user.id } }), 0);

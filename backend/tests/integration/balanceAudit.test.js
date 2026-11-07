@@ -14,6 +14,7 @@ const shift = ({ year, month }, by) => {
   return { year: Math.floor(i / 12), month: (i % 12) + 1 };
 };
 const prev = shift(now, -1);
+const next = shift(now, 1);
 const iso = ({ year, month }, day = 5) => `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 const q = ({ year, month }) => `year=${year}&month=${month}`;
 
@@ -154,45 +155,48 @@ test('6. Lend/Borrow, Net Worth items and category budgets never change balances
   await audit('Lend/Borrow, Net Worth, budgets');
 });
 
-test('7. Salary Planner: planning, linking and "already in balance" change nothing; recording changes exactly one row', async () => {
+test('7. Salary Planner: planning, editing, copying and resetting the salary plan never change a balance', async () => {
+  const sp = (path, body, method = 'post') => ok(call(method, a(`/salary-plan${path}`), body));
+  const first = await sp('/init', now);
+  assert.equal(first.summary.afterFixed, 15000 - 2500 - first.plan.emiAmount);
+  await audit('salary plan set up');
+  await sp('', { ...now, salaryAmount: 15000, allowanceAmount: 2560, rentAmount: 2500, emiAmount: 4100 }, 'put');
+  await sp('', { ...now, emergencySavingsAmount: 2500, shoppingAmount: 9000 }, 'put');
+  const over = await ok(call('get', a(`/salary-plan?${q(now)}`)));
+  assert.ok(over.summary.overBudget > 0);
+  await audit('salary plan edited, over budget');
+  await sp('/init', next);
+  await sp('', { ...next, travelAmount: 50 }, 'put');
+  await sp('/reset', now);
+  await audit('salary plan copied to next month and reset');
+});
+
+test('7b. salary records: linking and "already in balance" change nothing; the planner refuses to create or delete money', async () => {
   await ok(call('post', a('/income-sources'), { name: 'Salary', kind: 'SALARY', expectedAmount: 15000 }));
   const month = await ok(call('post', a('/budgets'), { ...now, defaults: true }));
   const salary = month.salaries[0];
-  const lines = Object.fromEntries(month.plan.allocations.map(l => [l.name, l]));
-  await ok(call('put', a(`/budgets/allocations/${lines.Rent.id}`), { plannedAmount: 3000 }));
-  await ok(call('put', a(`/budgets/${month.plan.id}`), { savingsPercent: 30 }));
-  await ok(call('post', a(`/budgets/${month.plan.id}/default-lines`)));
-  await audit('planner set up and edited');
+  const withLines = await ok(call('post', a(`/budgets/${month.plan.id}/default-lines`)));
+  const lines = Object.fromEntries(withLines.plan.allocations.map(l => [l.name, l]));
 
-  // The salary is already in History with a slightly different amount: linking it adds nothing.
+  // The salary is recorded in History (the only place income is added), then linked.
   const inHistory = await addTx({ title: 'Salary credit', amount: 14850, type: 'income', category: 'Salary', accountType: 'UPI', paymentMethod: 'UPI', expenseDate: iso(now, 1) });
   move('UPI', 14850);
   await audit('salary entered in History');
-  const refused = await call('post', a(`/salaries/${salary.id}/receive`), { mode: 'create', receivedAmount: 15000, receivedAt: iso(now, 1), paymentMethod: 'UPI' });
-  assert.equal(refused.body.code, 'POSSIBLE_DUPLICATE');
-  await audit('duplicate Record new refused');
+  const refused = await Promise.all([1, 2, 3].map(() => call('post', a(`/salaries/${salary.id}/receive`), { mode: 'create', receivedAmount: 15000, receivedAt: iso(now, 1), paymentMethod: 'UPI' })));
+  assert.deepEqual(refused.map(r => r.status), [400, 400, 400]);
+  await audit('planner "create income" refused');
   await ok(call('post', a(`/salaries/${salary.id}/receive`), { mode: 'link', expenseId: inHistory.id }));
   await audit('salary linked');
 
-  // A one-off allowance already reflected in the balance: no transaction.
-  const allowance = (await ok(call('post', a('/salaries'), { ...now, label: 'Allowance', kind: 'ALLOWANCE', expectedAmount: 1500 }))).salary;
-  await ok(call('post', a(`/salaries/${allowance.id}/receive`), { mode: 'alreadyInBalance', receivedAmount: 1500, receivedAt: iso(now, 2) }));
+  const allowance = (await ok(call('post', a('/salaries'), { ...now, label: 'Allowance', kind: 'ALLOWANCE', expectedAmount: 2560 }))).salary;
+  await ok(call('post', a(`/salaries/${allowance.id}/receive`), { mode: 'alreadyInBalance', receivedAmount: 2560, receivedAt: iso(now, 2) }));
   await audit('allowance marked already in balance');
 
-  // A bonus recorded new into Cash, tapped three times at once.
-  const bonus = (await ok(call('post', a('/salaries'), { ...now, label: 'Bonus', kind: 'BONUS', expectedAmount: 2500.5 }))).salary;
-  const taps = await Promise.all([1, 2, 3].map(() => call('post', a(`/salaries/${bonus.id}/receive`), { mode: 'create', receivedAmount: 2500.5, receivedAt: iso(now, 3), paymentMethod: 'Cash' })));
-  assert.deepEqual(taps.map(t => t.status).sort(), [200, 409, 409]);
-  move('Cash', 2500.5);
-  await audit('bonus recorded once into Cash');
+  const record = await call('post', a(`/budgets/allocations/${lines['Mess / Food'].id}/record`), { amount: 2500, date: iso(now, 4), paymentMethod: 'Debit Card' });
+  assert.equal(record.status, 404);
+  await audit('planner "record expense" refused');
 
-  // Recording a planned expense, also tapped three times.
-  const record = () => call('post', a(`/budgets/allocations/${lines['Mess / Food'].id}/record`), { amount: 2500, date: iso(now, 4), paymentMethod: 'Debit Card' });
-  await Promise.all([record(), record(), record()]);
-  move('Debit Card', -2500);
-  await audit('mess recorded once from Debit Card');
-
-  // EMI paid in the tracker and also added in History, then linked: History counts it once, the link changes nothing.
+  // EMI paid in the tracker and also added in History, then linked: History counts it once.
   const emi = await prisma.eMI.findFirst({ where: { userId: user.id, title: 'Phone EMI' } });
   await ok(call('patch', `/api/emis/${emi.id}/pay`, { paidAt: iso(now, 6) }));
   const emiInHistory = await addTx({ title: 'Phone EMI', amount: 2000, type: 'expense', category: 'Bills', accountType: 'UPI', paymentMethod: 'UPI', expenseDate: iso(now, 6) });
@@ -201,19 +205,13 @@ test('7. Salary Planner: planning, linking and "already in balance" change nothi
   await ok(call('put', a(`/emi-payments/${payment.id}/link`), { expenseId: emiInHistory.id }));
   await audit('EMI paid, added in History and linked');
 
-  // Undo: without deleting keeps the money; with delete removes exactly the bonus.
-  await ok(call('post', a(`/salaries/${allowance.id}/undo`), { deleteTransaction: true }));
-  await audit('undo "already in balance" (nothing to delete)');
+  assert.equal((await call('post', a(`/salaries/${salary.id}/undo`), { deleteTransaction: true })).status, 400);
   await ok(call('post', a(`/salaries/${salary.id}/undo`), {}));
-  await audit('undo linked salary, transaction kept');
-  await ok(call('post', a(`/salaries/${bonus.id}/undo`), { deleteTransaction: true }));
-  move('Cash', -2500.5);
-  await audit('undo bonus with delete');
+  await ok(call('post', a(`/salaries/${allowance.id}/undo`), {}));
+  await audit('undo (transactions kept)');
 
-  // Last month's salary paid this month.
-  await ok(call('post', a('/salaries'), { ...prev, label: 'Last month salary', kind: 'SALARY', expectedAmount: 15000 }));
-  const late = (await ok(call('get', a(`/overview?${q(prev)}`)))).salaries.find(s => s.label === 'Last month salary');
-  await ok(call('post', a(`/salaries/${late.id}/receive`), { mode: 'create', receivedAmount: 15000, receivedAt: iso(now, 5), paymentMethod: 'Net Banking', confirmDuplicate: true }));
+  // Last month's salary, paid this month, recorded in History under Net Banking.
+  await addTx({ title: 'Last month salary', amount: 15000, type: 'income', category: 'Salary', accountType: 'Net Banking', paymentMethod: 'Net Banking', expenseDate: iso(now, 5) });
   move('Other', 15000);
   await audit('last month salary received this month into Net Banking');
 });

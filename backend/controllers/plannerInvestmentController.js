@@ -3,10 +3,9 @@ const { HttpError, handleError } = require('../utils/http');
 const calc = require('../utils/plannerCalculations');
 const planner = require('../services/plannerService');
 
-const { toPaise, toApiAmount, paiseToDecimalString, paiseToNumber, sumPaise } = calc;
+const { toPaise, toApiAmount, paiseToDecimalString, sumPaise } = calc;
 
 const NOT_FOUND_PLAN = new HttpError(404, 'Investment not found');
-const NOT_FOUND_TX = new HttpError(404, 'Investment transaction not found');
 
 // Category the rest of MoneySuivi already treats as investment (Analytics, the planner summary).
 const INVESTMENT_CATEGORY = 'Investment';
@@ -167,9 +166,8 @@ const setInvestmentActive = async (req, res) => {
 };
 
 /**
- * Deleting an investment that has transactions would orphan real money movements, so it is refused
- * unless the caller also asks to delete those transactions (which removes them from History and
- * balances in the same step). Pausing is the non-destructive alternative.
+ * An investment with transactions can't be deleted from the planner: that would orphan or remove
+ * real money movements. Pause it, or delete its transactions in History first.
  */
 const deleteInvestment = async (req, res) => {
   try {
@@ -178,11 +176,9 @@ const deleteInvestment = async (req, res) => {
       // Locked so a buy recorded at the same moment can't slip in after the check and be orphaned.
       await lockPlan(tx, plan.id);
       const linked = await tx.investmentTransaction.findMany({ where: { planId: plan.id }, select: { expenseId: true } });
-      if (linked.length && req.query.deleteTransactions !== 'true') {
-        throw new HttpError(409, 'This investment has transactions. Pause it instead, or delete it together with its transactions.', 'HAS_TRANSACTIONS');
+      if (linked.length) {
+        throw new HttpError(409, 'This investment has transactions. Pause it instead, or delete its transactions in History first.', 'HAS_TRANSACTIONS');
       }
-      const expenseIds = linked.map(l => l.expenseId).filter(Boolean);
-      if (expenseIds.length) await tx.expense.deleteMany({ where: { id: { in: expenseIds }, userId: req.user.id } });
       await tx.investmentPlan.delete({ where: { id: plan.id } });
     });
     await respond(res, req.user.id);
@@ -207,64 +203,8 @@ const listTransactions = async (req, res) => {
   }
 };
 
-/**
- * Records a buy or redemption as exactly one Investment-category transaction plus its investment
- * record, together or not at all. The transaction moves the account balance like any other; the
- * planner keeps it out of income and spending, so it is never counted twice.
- */
-const addTransaction = async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const plan = await findPlan(userId, req.params.id);
-    const { type, amount, date, paymentMethod, note } = req.body;
-    const method = paymentMethod || 'Net Banking';
-    const day = calendarDay(date);
-    await prisma.$transaction(async (tx) => {
-      await lockPlan(tx, plan.id);
-      const current = await tx.investmentPlan.findUnique({ where: { id: plan.id }, select: { active: true } });
-      if (!current) throw NOT_FOUND_PLAN;
-      // A paused investment takes no new money, but what is in it can still be taken out.
-      if (!current.active && type === 'BUY') throw new HttpError(409, 'This investment is paused. Resume it to record a new investment.', 'PAUSED');
-      const expense = await tx.expense.create({
-        data: {
-          userId,
-          title: plan.name,
-          amount: paiseToNumber(toPaise(amount)),
-          category: INVESTMENT_CATEGORY,
-          type: type === 'REDEEM' ? 'income' : 'expense',
-          accountType: planner.accountTypeForPayment(method),
-          paymentMethod: method,
-          note: note || null,
-          expenseDate: day,
-        },
-      });
-      await tx.investmentTransaction.create({
-        data: { planId: plan.id, type, amount: decimal(amount), date: day, note: note || null, expenseId: expense.id },
-      });
-    });
-    await respond(res, userId, 201);
-  } catch (error) {
-    handleError(res, error, 'planner.addInvestmentTransaction');
-  }
-};
-
-// Deleting the transaction removes it from History and balances; the investment record goes with
-// it through the foreign key cascade.
-const deleteTransaction = async (req, res) => {
-  try {
-    const row = await prisma.investmentTransaction.findFirst({ where: { id: req.params.txId, plan: { userId: req.user.id } } });
-    if (!row) throw NOT_FOUND_TX;
-    await prisma.$transaction(async (tx) => {
-      if (row.expenseId) await tx.expense.deleteMany({ where: { id: row.expenseId, userId: req.user.id } });
-      await tx.investmentTransaction.deleteMany({ where: { id: row.id } });
-    });
-    await respond(res, req.user.id);
-  } catch (error) {
-    handleError(res, error, 'planner.deleteInvestmentTransaction');
-  }
-};
-
+// Read-only for money: buying, redeeming and deleting investment transactions happen in History.
 module.exports = {
   loadInvestments, listInvestments, createInvestment, updateInvestment, setInvestmentActive, deleteInvestment,
-  listTransactions, addTransaction, deleteTransaction,
+  listTransactions,
 };

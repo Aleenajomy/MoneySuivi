@@ -4,28 +4,54 @@ All endpoints are under `/api/planner`, need `Authorization: Bearer <token>`, an
 change the signed-in user's records. A record that belongs to someone else returns **404**, the
 same as one that doesn't exist.
 
-The simplified planner screen uses the overview, income, salary, budget, record and EMI-link
-endpoints. The spending-reassignment, savings-goal, investment and bills endpoints below are kept
-unchanged, and so are their records, but the screen no longer calls them.
+The Salary Planner screen uses only the **salary plan** endpoints below. The other endpoints are kept
+for existing data, and the screen no longer calls them.
 
-Only two planner actions add a transaction: `receive` with `mode: "create"`, and `record` on an
-expense line. Undo with `deleteTransaction: true` and the investment endpoints are the only ones
-that remove or add transactions otherwise. Every other endpoint leaves balances untouched.
+**The planner never creates, changes or deletes a transaction.** Salary and spending are recorded only
+in Add Transaction and History. The following were removed:
+- `receive` with `mode: "create"` (400);
+- `undo` with `deleteTransaction: true` (400);
+- `POST /budgets/allocations/:id/record` (404);
+- `POST /investments/:id/transactions` and `DELETE /investments/transactions/:txId` (404);
+- `DELETE /investments/:id?deleteTransactions=true` (an investment that has transactions now always returns 409).
 
-## Conventions
+## Salary plan
 
-- **Amounts.** Send numbers or strings with at most 2 decimals, from 0 up to 999,999,999,999.99.
-  Responses return rupees as JSON numbers, for example `15000.5`. The server stores them as
-  `DECIMAL(14,2)` and calculates in whole paise.
-- **Months.** `year` is 2000–2100 and `month` is 1–12. A month is its calendar month in UTC,
-  which is how transaction dates are stored.
-- **Errors.** Errors return `{ success: false, message, code? }`:
-  - 400: validation failed (the first error is in `message`, the full list in `errors`).
-  - 404: not found, or not yours.
-  - 409: conflict. `code` is `ALREADY_RECEIVED`, `TRANSACTION_ALREADY_LINKED` or
-    `DUPLICATE_ALLOCATION`.
-- **Planned vs actual.** Planned amounts are never counted as payments. Actual figures come only
-  from recorded transactions, EMI payments and savings contributions.
+The simple monthly plan: Salary → Fixed Expenses → Monthly Budget → Savings → Remaining. It is stored
+as nine planning figures on the month's `BudgetPlan` row. Nothing here is a transaction, and balances,
+History, EMIs, EMI payments, Lend/Borrow and Net Worth never read or change because of it.
+
+| Method | Path | Body | Notes |
+|---|---|---|---|
+| GET | `/salary-plan?year=&month=` | | Read-only. `plan` is `null` if the month isn't set up. Always returns `emiTrackerTotal`. |
+| POST | `/salary-plan/init` | `year`, `month` | Idempotent. Creates the month's plan as a copy of the latest earlier planned month; the very first month uses the default plan. 201 when created, else 200. |
+| PUT | `/salary-plan` | `year`, `month`, any of the fields | Saves the given figures (sets the month up first if needed). Each is ≥ 0 with at most 2 decimals. |
+| POST | `/salary-plan/reset` | `year`, `month` | Puts the month back to the default plan, with EMI from Loans & EMIs. |
+
+Fields: `salaryAmount`, `allowanceAmount`, `rentAmount`, `emiAmount`, `emergencySavingsAmount`,
+`generalSavingsAmount`, `shoppingAmount`, `travelAmount`, `foodAmount`.
+
+**Default plan:**
+- Salary ₹15,000 and company mess allowance ₹2,560.
+- Rent ₹2,500, and EMI = the total of the user's active fixed EMIs (`emiTrackerTotal`).
+- Emergency and general savings ₹2,000 each, shopping ₹1,500, travel ₹1,000, food ₹1,000.
+
+Editing `emiAmount` changes the plan only, never an EMI or its payments.
+
+`summary` (all in rupees, computed exactly in paise):
+
+| Field | Formula |
+|---|---|
+| `incomeWithAllowance` | salary + allowance ("Total Income + Allowance") |
+| `afterFixed` | salary − rent − EMI. **The allowance is never included**, because it pays for mess directly. |
+| `allocated` | emergency + general + shopping + travel + food |
+| `extraBalance` / `moneyRemaining` | `afterFixed − allocated`, or 0 when that is negative |
+| `overBudget` | `allocated − afterFixed` when positive, else 0 |
+| `plannedSavings` | emergency + general |
+| `plannedExpenses` | rent + EMI + shopping + travel + food |
+| `breakdown.{fixed,spending,savings,remaining}` | `{ amount, percent }`, where percent is the share of salary |
+
+Within budget, `plannedSavings + plannedExpenses + moneyRemaining = salary`.
 
 ## Month overview
 
@@ -151,8 +177,8 @@ An income source is income the user expects every month.
 | POST | `/salaries` | `year`, `month`, `label`, `expectedAmount`, `kind?` | One-off income for one month. |
 | PUT | `/salaries/:id` | `expectedAmount?`, `label?` | Changes this month only. |
 | GET | `/salaries/:id/candidates` | | Unlinked, non-investment income transactions dated in the record's month or the month after, closest to the expected amount first. `matchesExpected` flags exact amount matches. |
-| POST | `/salaries/:id/receive` | `{ mode: "link", expenseId }`, `{ mode: "alreadyInBalance", receivedAmount, receivedAt }` or `{ mode: "create", receivedAmount, receivedAt, paymentMethod, confirmDuplicate?, note? }` | See below. There is no default mode and no default account. |
-| POST | `/salaries/:id/undo` | `deleteTransaction?` (boolean) | Sets the record back to pending. The linked transaction is kept unless `deleteTransaction` is true. |
+| POST | `/salaries/:id/receive` | `{ mode: "link", expenseId }` or `{ mode: "alreadyInBalance", receivedAmount, receivedAt }` | Never creates a transaction. |
+| POST | `/salaries/:id/undo` | | Sets the record back to pending. The linked transaction is always kept (`deleteTransaction: true` returns 400). |
 | DELETE | `/salaries/:id` | | Pending records only. A received record returns 409 until it is undone. |
 
 How `receive` works. The received date may be in the record's (earning) month or the month after;
@@ -162,13 +188,7 @@ anything else returns 400 `WRONG_MONTH`. The record always stays in its earning 
   investment, and it can't already be linked to another record. Nothing is created.
 - `mode: "alreadyInBalance"` marks the record received with the given amount and date and sets
   `countedInBalance`. No transaction is created and no balance changes. Undo simply clears it.
-- `mode: "create"` adds one income transaction dated on `receivedAt`, so the balance moves on the
-  day the money arrived. `paymentMethod` is required and sets the account. Its category is Salary,
-  or Other for the `OTHER` kind. If an unlinked income of that category already exists in the
-  window, it returns 409 `POSSIBLE_DUPLICATE` with `candidates`, and creates nothing; send
-  `confirmDuplicate: true` only when the user confirms it is a different payment.
-- Each mode runs in one database transaction that only succeeds while the record is still pending.
-  A double tap or a second device gets 409, and nothing extra is created.
+- Each mode only succeeds while the record is still pending. A double tap or a second device gets 409.
 
 Each salary in a response has `receivedVia`: `TRANSACTION`, `ALREADY_IN_BALANCE` or `null`.
 
@@ -180,7 +200,6 @@ Each salary in a response has `receivedVia`: `TRANSACTION`, `ALREADY_IN_BALANCE`
 | POST | `/budgets` | `year`, `month`, `defaults?` | Sets up the month and is idempotent. It creates the plan if missing (201, else 200) and copies **only** the lines marked `recurring` from the latest earlier plan, and only when the plan is new. With `defaults: true`, a new plan with nothing to copy starts with the default lines (below). It also adds pending salary records. It never copies or creates transactions. |
 | PUT | `/budgets/:id` | `note?`, `savingsPercent?` (0-100), `allocations?: [{ id, ...fields }]` | Bulk edit. Either all of it is saved or none of it is. |
 | POST | `/budgets/:id/default-lines` | | Adds the default lines this plan doesn't already cover (by name or a distinctive word: "Rent / Accommodation" covers Rent). Returns `added`. |
-| POST | `/budgets/allocations/:allocationId/record` | `amount`, `date` (in the plan's month), `paymentMethod`, `title?`, `note?` | Records **one** spending transaction pinned to that line. 201 with `expenseId`. The same payment repeated on the same line within 15 seconds returns the first one (200, `repeated: true`). Not allowed on an EMI line (400 `EMI_LINE`). |
 | POST | `/budgets/:id/copy-recurring` | | Adds recurring lines from the latest earlier plan that this month doesn't have, matched by name. Lines already in this month aren't changed. Returns `copied`. |
 | POST | `/budgets/:id/allocations` | `group`, `name`, `plannedAmount`, `matchCategories?`, `recurring?` (default true), `sortOrder?` | `name` must be unique within the month (409). |
 | PUT | `/budgets/allocations/:allocationId` | any allocation field | Changes this month only. |
@@ -270,17 +289,13 @@ returns.
 | GET | `/investments?year=&month=` | | `{ plans, summary }` for the given month (default: current). |
 | POST | `/investments` | `name`, `category`, `monthlyPlannedAmount?`, `note?` | `category` is one of `GOLD`, `GOLD_ETF`, `MUTUAL_FUND`, `INDEX_FUND`, `STOCK`, `OTHER`. |
 | PUT | `/investments/:id` | any of the above | |
-| PATCH | `/investments/:id/active` | `active` (boolean) | A paused investment accepts no new buys (409 `PAUSED`); redemptions are still allowed. |
-| DELETE | `/investments/:id?deleteTransactions=true` | | Refused with 409 `HAS_TRANSACTIONS` while it has transactions, unless `deleteTransactions=true`, which also deletes them from History and balances. |
+| PATCH | `/investments/:id/active` | `active` (boolean) | |
+| DELETE | `/investments/:id` | | Refused with 409 `HAS_TRANSACTIONS` while it has any transactions; those are deleted in History. |
 | GET | `/investments/:id/transactions` | | Newest first, up to 200. |
-| POST | `/investments/:id/transactions` | `type` (`BUY` or `REDEEM`), `amount`, `date`, `paymentMethod?`, `note?` | See below. |
-| DELETE | `/investments/transactions/:txId` | | Deletes the transaction from History and balances, and the investment record with it. |
 
-Recording a buy or redemption creates **exactly one** transaction in History, in the same database
-transaction as the investment record:
+Existing investment transactions (recorded by the earlier planner) are read only:
 
-- A buy is an `expense` and a redemption an `income`, both in the **Investment** category, on the
-  account chosen by `paymentMethod`. Account balances change like for any transaction.
+- A buy is an `expense` and a redemption an `income`, both in the **Investment** category.
 - The planner counts them in `actual.investmentNet` only, never as income or spending.
 - The History transaction is the source of truth. Editing its amount or date shows up everywhere;
   changing it into a transfer or another category means it no longer counts as an investment.

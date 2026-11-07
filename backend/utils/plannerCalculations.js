@@ -276,6 +276,52 @@ const buildMonthSummary = ({ income, plan, actuals, savingsNet = 0n }) => {
   };
 };
 
+// The simple salary plan's fields, in screen order.
+const SALARY_PLAN_FIELDS = [
+  'salaryAmount', 'allowanceAmount', 'rentAmount', 'emiAmount',
+  'emergencySavingsAmount', 'generalSavingsAmount', 'shoppingAmount', 'travelAmount', 'foodAmount',
+];
+
+/**
+ * My Salary -> Fixed Expenses -> Monthly Budget -> Savings -> Remaining Money. Pure arithmetic on
+ * planned figures (BigInt paise); nothing here is a transaction or touches a balance.
+ * The company allowance pays for mess directly, so it is shown beside the salary but kept out of
+ * the budget entirely: it is never added to what can be spent, and mess is never an expense here.
+ * Extra balance is whatever the budget lines leave; when they ask for more than is left after the
+ * fixed expenses, it is reported as overBudget instead of a negative balance.
+ */
+const salaryBudget = (plan) => {
+  const v = Object.fromEntries(SALARY_PLAN_FIELDS.map(f => [f, toPaise(plan[f] ?? 0)]));
+  const fixedExpenses = v.rentAmount + v.emiAmount;
+  const plannedSavings = v.emergencySavingsAmount + v.generalSavingsAmount;
+  const spending = v.shoppingAmount + v.travelAmount + v.foodAmount;
+  const afterFixed = v.salaryAmount - fixedExpenses;
+  const allocated = plannedSavings + spending;
+  const extra = afterFixed - allocated;
+  const remaining = extra > 0n ? extra : 0n;
+  return {
+    salary: v.salaryAmount,
+    allowance: v.allowanceAmount,
+    incomeWithAllowance: v.salaryAmount + v.allowanceAmount,
+    fixedExpenses,
+    afterFixed,
+    allocated,
+    extraBalance: remaining,
+    overBudget: extra < 0n ? -extra : 0n,
+    plannedSavings,
+    spending,
+    plannedExpenses: fixedExpenses + spending,
+    moneyRemaining: remaining,
+    // Shares of the salary for the "where your salary goes" bar.
+    breakdown: {
+      fixed: { amount: fixedExpenses, percent: percentOf(fixedExpenses, v.salaryAmount) },
+      spending: { amount: spending, percent: percentOf(spending, v.salaryAmount) },
+      savings: { amount: plannedSavings, percent: percentOf(plannedSavings, v.salaryAmount) },
+      remaining: { amount: remaining, percent: percentOf(remaining, v.salaryAmount) },
+    },
+  };
+};
+
 const DEFAULT_SAVINGS_PERCENT = 20;
 
 // Rounded down to the paisa, and never negative: there is nothing to save from a shortfall.
@@ -306,6 +352,8 @@ const planPosition = ({ expectedIncome, receivedIncome, plannedExpenses, actualE
 };
 
 module.exports = {
+  SALARY_PLAN_FIELDS,
+  salaryBudget,
   DEFAULT_SAVINGS_PERCENT,
   planPosition,
   GROUPS,

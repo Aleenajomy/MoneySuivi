@@ -24,6 +24,20 @@ const planner = (user) => ({
 const balances = async (user) => (await request(app).get('/api/expenses/balances').set(auth(user))).body.balances;
 const expenseCount = (user) => prisma.expense.count({ where: { userId: user.id } });
 
+// Investment transactions as the earlier planner stored them. The planner can no longer create or
+// delete them, so they are seeded directly to keep testing how existing ones are read.
+const seedInvestmentTx = async (user, planId, { type, amount, date, paymentMethod = 'Net Banking' }) => {
+  const plan = await prisma.investmentPlan.findUnique({ where: { id: planId } });
+  const expense = await prisma.expense.create({
+    data: {
+      userId: user.id, title: plan.name, amount: Number(amount), category: 'Investment', type: type === 'REDEEM' ? 'income' : 'expense',
+      accountType: paymentMethod === 'UPI' ? 'UPI' : 'Net Banking', paymentMethod, expenseDate: new Date(`${date}T00:00:00.000Z`),
+    },
+  });
+  await prisma.investmentTransaction.create({ data: { planId, type, amount: String(amount), date: expense.expenseDate, expenseId: expense.id } });
+  return expense;
+};
+
 // ---------------------------------------------------------------- savings goals
 
 test('a goal tracks saved, remaining, progress and the monthly amount needed; no transaction is created', async () => {
@@ -106,16 +120,20 @@ test('archive, unarchive and delete; deleting unlinks the budget line but keeps 
 
 // ---------------------------------------------------------------- investments
 
-test('a buy creates exactly one Investment expense, kept out of spending; a redemption one income', async () => {
+test('existing buys and redemptions are reported and kept out of spending; the planner cannot add new ones', async () => {
   const user = await createUser();
   const p = planner(user);
   const res = await p.post('/investments', { name: 'Nifty Index Fund', category: 'INDEX_FUND', monthlyPlannedAmount: 2000 });
   assert.equal(res.status, 201);
   const planId = res.body.investmentId;
 
-  let inv = (await p.post(`/investments/${planId}/transactions`, { type: 'BUY', amount: 1500, date: iso(now, 3), paymentMethod: 'UPI' })).body;
-  inv = (await p.post(`/investments/${planId}/transactions`, { type: 'BUY', amount: '1000.50', date: iso(shift(now, -1), 3), paymentMethod: 'UPI' })).body;
-  inv = (await p.post(`/investments/${planId}/transactions`, { type: 'REDEEM', amount: 300, date: iso(now, 4), paymentMethod: 'Net Banking' })).body;
+  await seedInvestmentTx(user, planId, { type: 'BUY', amount: 1500, date: iso(now, 3), paymentMethod: 'UPI' });
+  await seedInvestmentTx(user, planId, { type: 'BUY', amount: '1000.50', date: iso(shift(now, -1), 3), paymentMethod: 'UPI' });
+  await seedInvestmentTx(user, planId, { type: 'REDEEM', amount: 300, date: iso(now, 4), paymentMethod: 'Net Banking' });
+  const inv = (await p.get('/investments')).body;
+  const before = await balances(user);
+  assert.equal((await p.post(`/investments/${planId}/transactions`, { type: 'BUY', amount: 100, date: iso(now), paymentMethod: 'UPI' })).status, 404);
+  assert.deepEqual(await balances(user), before);
 
   const expenses = await prisma.expense.findMany({ where: { userId: user.id }, orderBy: { expenseDate: 'asc' } });
   assert.equal(expenses.length, 3);
@@ -145,7 +163,7 @@ test('History edits and deletes of investment transactions are reflected; unlink
   const user = await createUser();
   const p = planner(user);
   const planId = (await p.post('/investments', { name: 'Gold', category: 'GOLD', monthlyPlannedAmount: 1000 })).body.investmentId;
-  await p.post(`/investments/${planId}/transactions`, { type: 'BUY', amount: 1000, date: iso(now, 3) });
+  await seedInvestmentTx(user, planId, { type: 'BUY', amount: 1000, date: iso(now, 3) });
   const [tx] = (await p.get(`/investments/${planId}/transactions`)).body.transactions;
 
   await request(app).put(`/api/expenses/${tx.expenseId}`).set(auth(user)).send({ amount: 1250 });
@@ -164,23 +182,30 @@ test('History edits and deletes of investment transactions are reflected; unlink
   assert.equal((await p.get('/investments')).body.plans[0].investedTotal, 0);
 });
 
-test('deleting an investment with transactions needs explicit confirmation; deleting one transaction removes its expense', async () => {
+test('the planner never deletes investment transactions: a plan with any cannot be deleted here', async () => {
   const user = await createUser();
   const p = planner(user);
   const planId = (await p.post('/investments', { name: 'Stocks', category: 'STOCK' })).body.investmentId;
-  await p.post(`/investments/${planId}/transactions`, { type: 'BUY', amount: 500, date: iso(now) });
-  await p.post(`/investments/${planId}/transactions`, { type: 'BUY', amount: 700, date: iso(now) });
+  await seedInvestmentTx(user, planId, { type: 'BUY', amount: 500, date: iso(now) });
+  await seedInvestmentTx(user, planId, { type: 'BUY', amount: 700, date: iso(now) });
   const [first] = (await p.get(`/investments/${planId}/transactions`)).body.transactions;
+  const before = await balances(user);
 
-  assert.equal((await p.del(`/investments/transactions/${first.id}`)).status, 200);
-  assert.equal(await expenseCount(user), 1);
-
-  const refused = await p.del(`/investments/${planId}`);
-  assert.equal(refused.status, 409);
-  assert.equal(refused.body.code, 'HAS_TRANSACTIONS');
+  assert.equal((await p.del(`/investments/transactions/${first.id}`)).status, 404);
+  for (const url of [`/investments/${planId}`, `/investments/${planId}?deleteTransactions=true`]) {
+    const refused = await p.del(url);
+    assert.equal(refused.status, 409);
+    assert.equal(refused.body.code, 'HAS_TRANSACTIONS');
+  }
+  assert.equal(await expenseCount(user), 2);
+  assert.deepEqual(await balances(user), before);
   assert.equal((await p.patch(`/investments/${planId}/active`, { active: false })).body.plans[0].active, false);
-  assert.equal((await p.del(`/investments/${planId}?deleteTransactions=true`)).status, 200);
-  assert.equal(await expenseCount(user), 0);
+
+  // Once its transactions are deleted in History, the plan itself can go.
+  for (const e of await prisma.expense.findMany({ where: { userId: user.id } })) {
+    await request(app).delete(`/api/expenses/${e.id}`).set(auth(user));
+  }
+  assert.equal((await p.del(`/investments/${planId}`)).status, 200);
   assert.equal(await prisma.investmentPlan.count(), 0);
 });
 
@@ -198,7 +223,7 @@ test('savings and investment lines linked to a goal/investment show this month\'
 
   await p.post(`/goals/${goal.id}/contributions`, { type: 'CONTRIBUTION', amount: 2500, date: iso(now) });
   await p.post(`/goals/${goal.id}/contributions`, { type: 'CONTRIBUTION', amount: 999, date: iso(shift(now, -1)) });
-  await p.post(`/investments/${goldId}/transactions`, { type: 'BUY', amount: 800, date: iso(now) });
+  await seedInvestmentTx(user, goldId, { type: 'BUY', amount: 800, date: iso(now) });
 
   const lines = Object.fromEntries((await p.get(`/budgets?${q(now)}`)).body.plan.allocations.map(a => [a.id, a]));
   assert.deepEqual([lines[saveLine].actualAmount, lines[saveLine].remainingAmount, lines[saveLine].utilization], [2500, -500, 125]);
@@ -251,7 +276,7 @@ test('a user cannot see or change another user\'s goals or investments', async (
   await v.post(`/goals/${goal.id}/contributions`, { type: 'CONTRIBUTION', amount: 100, date: iso(now) });
   const [contribution] = (await v.get(`/goals/${goal.id}/contributions`)).body.contributions;
   const planId = (await v.post('/investments', { name: 'Gold', category: 'GOLD' })).body.investmentId;
-  await v.post(`/investments/${planId}/transactions`, { type: 'BUY', amount: 100, date: iso(now) });
+  await seedInvestmentTx(victim, planId, { type: 'BUY', amount: 100, date: iso(now) });
   const [tx] = (await v.get(`/investments/${planId}/transactions`)).body.transactions;
   const a = planner(attacker);
 
@@ -277,11 +302,10 @@ test('a user cannot see or change another user\'s goals or investments', async (
   assert.equal(await prisma.expense.count({ where: { userId: attacker.id } }), 0);
 });
 
-test('invalid goal, contribution, investment and transaction input is rejected', async () => {
+test('invalid goal, contribution and investment input is rejected', async () => {
   const user = await createUser();
   const p = planner(user);
   const goal = (await p.post('/goals', { name: 'G', targetAmount: 100 })).body.goal;
-  const planId = (await p.post('/investments', { name: 'I', category: 'OTHER' })).body.investmentId;
   const bad = [
     p.post('/goals', { name: ' ', targetAmount: 100 }),
     p.post('/goals', { name: 'G', targetAmount: 0 }),
@@ -296,10 +320,6 @@ test('invalid goal, contribution, investment and transaction input is rejected',
     p.post('/investments', { name: 'X', category: 'CRYPTO' }),
     p.post('/investments', { name: '', category: 'GOLD' }),
     p.post('/investments', { name: 'X', category: 'GOLD', monthlyPlannedAmount: -1 }),
-    p.post(`/investments/${planId}/transactions`, { type: 'SELL', amount: 1, date: iso(now) }),
-    p.post(`/investments/${planId}/transactions`, { type: 'BUY', amount: 0, date: iso(now) }),
-    p.post(`/investments/${planId}/transactions`, { type: 'BUY', amount: 1, date: '2026-13-01' }),
-    p.post(`/investments/${planId}/transactions`, { type: 'BUY', amount: 1, date: iso(now), paymentMethod: 'Bitcoin' }),
     p.get('/goals?year=2026'),
   ];
   for (const res of await Promise.all(bad)) assert.equal(res.status, 400, `${res.req.method} ${res.req.path} ${JSON.stringify(res.body)}`);
@@ -315,8 +335,8 @@ test('a buy changed in History into a transfer or another category stops countin
   const budgetId = (await p.post('/budgets', now)).body.plan.id;
   await p.post(`/budgets/${budgetId}/allocations`, { group: 'INVESTMENT', name: 'Gold', plannedAmount: 1000, investmentPlanId: planId });
   await p.post(`/budgets/${budgetId}/allocations`, { group: 'VARIABLE', name: 'Food', plannedAmount: 3000, matchCategories: ['Food'] });
-  await p.post(`/investments/${planId}/transactions`, { type: 'BUY', amount: 1000, date: iso(now) });
-  await p.post(`/investments/${planId}/transactions`, { type: 'BUY', amount: 400, date: iso(now) });
+  await seedInvestmentTx(user, planId, { type: 'BUY', amount: 1000, date: iso(now) });
+  await seedInvestmentTx(user, planId, { type: 'BUY', amount: 400, date: iso(now) });
   const [first, second] = (await p.get(`/investments/${planId}/transactions`)).body.transactions;
 
   await request(app).put(`/api/expenses/${first.expenseId}`).set(auth(user)).send({ type: 'transfer', fromAccountType: 'Bank', toAccountType: 'Cash' });
@@ -338,18 +358,14 @@ test('a buy changed in History into a transfer or another category stops countin
   assert.equal((await p.put(`/transactions/${second.expenseId}/assignment`, { allocationId: foodLine })).status, 200);
 });
 
-test('a paused investment takes no new buys but can be redeemed; an archived goal takes no entries', async () => {
+test('a paused investment keeps its history; an archived goal takes no entries', async () => {
   const user = await createUser();
   const p = planner(user);
   const planId = (await p.post('/investments', { name: 'Stocks', category: 'STOCK' })).body.investmentId;
-  await p.post(`/investments/${planId}/transactions`, { type: 'BUY', amount: 1000, date: iso(now) });
+  await seedInvestmentTx(user, planId, { type: 'BUY', amount: 1000, date: iso(now) });
   await p.patch(`/investments/${planId}/active`, { active: false });
-  const buy = await p.post(`/investments/${planId}/transactions`, { type: 'BUY', amount: 1, date: iso(now) });
-  assert.equal(buy.status, 409);
-  assert.equal(buy.body.code, 'PAUSED');
-  assert.equal((await p.post(`/investments/${planId}/transactions`, { type: 'REDEEM', amount: 1500, date: iso(now) })).status, 201);
-  assert.equal((await p.get('/investments')).body.plans[0].investedTotal, -500);
-  assert.equal(await expenseCount(user), 2);
+  assert.equal((await p.get('/investments')).body.plans[0].investedTotal, 1000);
+  assert.equal(await expenseCount(user), 1);
 
   const goal = (await p.post('/goals', { name: 'Old goal', targetAmount: 100, initialAmount: 50 })).body.goal;
   await p.patch(`/goals/${goal.id}/archive`, { archived: true });
@@ -357,22 +373,5 @@ test('a paused investment takes no new buys but can be redeemed; an archived goa
     const res = await p.post(`/goals/${goal.id}/contributions`, { type, amount: 1, date: iso(now) });
     assert.equal(res.status, 409);
     assert.equal(res.body.code, 'ARCHIVED');
-  }
-});
-
-test('recording a buy while the investment is being deleted never leaves an orphaned transaction', async () => {
-  const user = await createUser();
-  const p = planner(user);
-  for (let i = 0; i < 5; i += 1) {
-    const planId = (await p.post('/investments', { name: `Fund ${i}`, category: 'MUTUAL_FUND' })).body.investmentId;
-    const [buy, del] = await Promise.all([
-      p.post(`/investments/${planId}/transactions`, { type: 'BUY', amount: 100, date: iso(now) }),
-      p.del(`/investments/${planId}`),
-    ]);
-    assert.ok([201, 404].includes(buy.status), `buy ${buy.status}`);
-    assert.ok([200, 409].includes(del.status), `delete ${del.status}`);
-    // Every Investment expense is still backed by an investment record.
-    const orphans = await prisma.expense.count({ where: { userId: user.id, category: 'Investment', investmentTransaction: { is: null } } });
-    assert.equal(orphans, 0);
   }
 });
