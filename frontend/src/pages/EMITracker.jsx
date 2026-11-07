@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CheckCircle, ChevronDown, ChevronUp, Pencil, Plus, Trash2, Calendar, Landmark, Coins, Landmark as LoanIcon, Info, Repeat, ChevronRight } from 'lucide-react'
+import { CheckCircle, ChevronDown, ChevronUp, Pencil, Plus, Trash2, Calendar, Landmark, Coins, Landmark as LoanIcon, Info, Repeat, ChevronRight, Wallet } from 'lucide-react'
 import { useEMI } from '../context/EMIContext'
 import { formatCurrency, formatShortDate, getLoanDetails } from '../utils/constants'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -613,7 +613,7 @@ function EMICard({ emi, onPay, onDelete, onEdit, onDeletePayment }) {
             !payMode && (
               <button
                 onClick={() => setPayMode(true)}
-                className="w-full flex items-center justify-center gap-1.5 py-2 px-4 rounded-xl bg-cyan-500/10 text-cyan-5  00 font-bold hover:bg-cyan-500/20 active:scale-[0.98] transition-all text-xs">
+                className="w-full flex items-center justify-center gap-1.5 py-2 px-4 rounded-xl bg-cyan-500/10 text-cyan-500 font-bold hover:bg-cyan-500/20 active:scale-[0.98] transition-all text-xs">
                 <Wallet size={14} /> Record Repayment
               </button>
             )
