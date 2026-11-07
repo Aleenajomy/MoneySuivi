@@ -1,10 +1,11 @@
 const logger = require('./logger');
 
 class HttpError extends Error {
-  constructor(status, message, code) {
+  constructor(status, message, code, details) {
     super(message);
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -16,7 +17,7 @@ const serverError = (res, error, context = 'request') => {
 
 const handleError = (res, error, context) => {
   if (error instanceof HttpError) {
-    return res.status(error.status).json({ success: false, message: error.message, ...(error.code && { code: error.code }) });
+    return res.status(error.status).json({ success: false, message: error.message, ...(error.code && { code: error.code }), ...error.details });
   }
   if (error?.code === 'P2025') return res.status(404).json({ success: false, message: 'Not found' });
   return serverError(res, error, context);

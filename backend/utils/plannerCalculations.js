@@ -222,9 +222,10 @@ const matchSpending = (allocations, spending) => {
  * - Investment-category rows, or rows linked to an InvestmentTransaction, are investments
  *   (buys add, redemptions subtract) and never count as income or spending;
  * - everything else is ordinary income or spending.
- * EMI payments live in EMIPayment, not Expense, so they are added as spending here.
+ * EMI payments live in EMIPayment, not Expense, so they are added as spending here. A History
+ * expense the user linked to one of those payments is the same money, so it is skipped.
  *
- * transactions: [{ id, type, title?, category, amountPaise, isInvestment?, assignedAllocationId? }]
+ * transactions: [{ id, type, title?, category, amountPaise, isInvestment?, emiLinked?, assignedAllocationId? }]
  * emiPayments:  [{ id, amountPaise }]
  */
 const classifyActuals = (transactions, emiPayments = []) => {
@@ -233,6 +234,7 @@ const classifyActuals = (transactions, emiPayments = []) => {
   const spending = [];
   transactions.forEach((t) => {
     if (t.type !== 'income' && t.type !== 'expense') return;
+    if (t.type === 'expense' && t.emiLinked) return;
     if (t.isInvestment || normalizeCategory(t.category) === INVESTMENT_CATEGORY) {
       investmentNet += t.type === 'expense' ? t.amountPaise : -t.amountPaise;
     } else if (t.type === 'income') {
@@ -274,7 +276,38 @@ const buildMonthSummary = ({ income, plan, actuals, savingsNet = 0n }) => {
   };
 };
 
+const DEFAULT_SAVINGS_PERCENT = 20;
+
+// Rounded down to the paisa, and never negative: there is nothing to save from a shortfall.
+const savingsShare = (remaining, percent) => (remaining > 0n ? (remaining * BigInt(percent)) / 100n : 0n);
+
+/**
+ * The simplified planner's two positions for one month. Pure arithmetic over figures that were
+ * already read; it never writes anything, so it cannot move money or change a balance.
+ *   planned: expected income - planned expenses
+ *   actual:  received income - actual expenses - money moved into investments (zero unless the
+ *            user recorded Investment-category transactions, which also leave their accounts)
+ */
+const planPosition = ({ expectedIncome, receivedIncome, plannedExpenses, actualExpenses, investedNet = 0n, savingsPercent = DEFAULT_SAVINGS_PERCENT }) => {
+  const plannedRemaining = expectedIncome - plannedExpenses;
+  const actualRemaining = receivedIncome - actualExpenses - investedNet;
+  return {
+    expectedIncome,
+    receivedIncome,
+    plannedExpenses,
+    actualExpenses,
+    investedNet,
+    plannedRemaining,
+    actualRemaining,
+    suggestedSavings: savingsShare(plannedRemaining, savingsPercent),
+    actualSavingsPotential: savingsShare(actualRemaining, savingsPercent),
+    savingsPercent,
+  };
+};
+
 module.exports = {
+  DEFAULT_SAVINGS_PERCENT,
+  planPosition,
   GROUPS,
   EXPENSE_GROUPS,
   INCOME_KINDS,

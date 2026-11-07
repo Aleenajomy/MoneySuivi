@@ -8,7 +8,7 @@ const { firstRunDate, firstOccurrenceOnOrAfter, todayInTimezone } = require('../
 const { config } = require('../config/env');
 const { handleError } = require('../utils/http');
 const logger = require('../utils/logger');
-const { resetInvalidSalaryLinks } = require('../services/plannerService');
+const { resetInvalidSalaryLinks, resetInvalidEmiLinks } = require('../services/plannerService');
 
 const toExpenseResponse = (e) => ({ ...e, _id: e.id });
 
@@ -163,10 +163,12 @@ const updateExpense = async (req, res) => {
       data.nextRunDate = nextRunAfterEdit(existing, data.expenseDate || existing.expenseDate, nextType);
     }
     // A Salary Planner record linked to this income stops counting as received if the edit makes it
-    // something else (an expense, an investment, or income in another month).
+    // something else (an expense, an investment, or income in another month); an EMI link stops
+    // when the edit means the expense is no longer that payment, so it counts as spending again.
     const expense = await prisma.$transaction(async (tx) => {
       const updated = await tx.expense.update({ where: { id: existing.id }, data });
       await resetInvalidSalaryLinks(tx, req.user.id, existing.id);
+      await resetInvalidEmiLinks(tx, req.user.id, existing.id);
       return updated;
     });
     if ((data.type || existing.type) === 'expense' && (data.amount !== undefined || data.category || data.type)) {

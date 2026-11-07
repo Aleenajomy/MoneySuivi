@@ -1,16 +1,11 @@
 import { EXPENSE_CATEGORIES } from './constants'
 
-// Categorical slots validated (dataviz validate_palette) against the app's card surfaces:
-// light #FFFFFF and dark #1E293B. Light-mode aqua/yellow sit below 3:1, so every chart that
-// uses them also prints names and amounts as text.
+// The simplified planner only plans spending; savings are a calculated suggestion, not a line.
 export const GROUP_META = {
-  FIXED: { label: 'Fixed Expenses', short: 'Fixed', light: '#2a78d6', dark: '#3987e5', hint: 'Rent, mess, bills and EMIs you pay every month' },
-  VARIABLE: { label: 'Variable Expenses', short: 'Variable', light: '#eb6834', dark: '#d95926', hint: 'Travel, shopping and other spending that changes' },
-  SAVINGS: { label: 'Savings', short: 'Savings', light: '#1baf7a', dark: '#199e70', hint: 'Money you set aside; it stays in your accounts' },
-  INVESTMENT: { label: 'Investments', short: 'Investments', light: '#eda100', dark: '#c98500', hint: 'Gold, mutual funds, stocks and other investments' },
+  FIXED: { label: 'Fixed Expenses', short: 'Fixed', hint: 'Rent, mess, bills and EMIs you pay every month' },
+  VARIABLE: { label: 'Variable Expenses', short: 'Variable', hint: 'Travel and other spending that changes' },
 }
 export const GROUPS = Object.keys(GROUP_META)
-export const UNALLOCATED_COLOR = { light: '#cbd5e1', dark: '#475569' }
 
 export const INCOME_KINDS = [
   { value: 'SALARY', label: 'Fixed Salary' },
@@ -19,51 +14,32 @@ export const INCOME_KINDS = [
   { value: 'INCENTIVE', label: 'Incentive' },
   { value: 'OTHER', label: 'Other Income' },
 ]
-export const INVESTMENT_CATEGORIES = [
-  { value: 'GOLD', label: 'Gold' },
-  { value: 'GOLD_ETF', label: 'Gold ETF' },
-  { value: 'MUTUAL_FUND', label: 'Mutual Fund' },
-  { value: 'INDEX_FUND', label: 'Index Fund' },
-  { value: 'STOCK', label: 'Stocks' },
-  { value: 'OTHER', label: 'Other' },
-]
-export const investmentCategoryLabel = (value) => INVESTMENT_CATEGORIES.find(c => c.value === value)?.label || 'Other'
-
 export const incomeKindLabel = (kind) => INCOME_KINDS.find(k => k.value === kind)?.label || 'Income'
 
 // EMI payments are not transactions; the backend matches them to lines that list "EMI".
-export const MATCHABLE_CATEGORIES = [...EXPENSE_CATEGORIES, 'EMI']
+export const EMI_CATEGORY = 'EMI'
+export const MATCHABLE_CATEGORIES = [...EXPENSE_CATEGORIES, EMI_CATEGORY]
+export const isEmiLine = (line) => (line.matchCategories || []).some(c => c.toLowerCase() === EMI_CATEGORY.toLowerCase())
 
 export const ALLOCATION_PRESETS = {
   FIXED: [
-    { name: 'Rent / Accommodation', matchCategories: [] },
+    { name: 'Rent', matchCategories: [] },
     { name: 'Mess / Food', matchCategories: ['Food'] },
     { name: 'Electricity', matchCategories: [] },
     { name: 'Internet', matchCategories: [] },
     { name: 'Mobile Recharge', matchCategories: [] },
-    { name: 'EMI / Loan', matchCategories: ['EMI'] },
+    { name: 'EMI', matchCategories: ['EMI'] },
     { name: 'Subscriptions', matchCategories: [] },
     { name: 'Other Bills', matchCategories: ['Bills'] },
   ],
   VARIABLE: [
     { name: 'Travel', matchCategories: ['Travel'] },
+    { name: 'Other Personal', matchCategories: ['Shopping', 'Entertainment', 'Healthcare', 'Other'] },
     { name: 'Shopping', matchCategories: ['Shopping'] },
     { name: 'Personal Care', matchCategories: [] },
     { name: 'Entertainment', matchCategories: ['Entertainment'] },
     { name: 'Medical', matchCategories: ['Healthcare'] },
     { name: 'Miscellaneous', matchCategories: ['Other'] },
-  ],
-  SAVINGS: [
-    { name: 'Emergency Fund', matchCategories: [] },
-    { name: 'Personal Savings', matchCategories: [] },
-    { name: 'Shopping Goals', matchCategories: [] },
-  ],
-  INVESTMENT: [
-    { name: 'Gold', matchCategories: [] },
-    { name: 'Mutual Funds', matchCategories: [] },
-    { name: 'Index Fund', matchCategories: [] },
-    { name: 'Stocks / ETFs', matchCategories: [] },
-    { name: 'Other Investments', matchCategories: [] },
   ],
 }
 
@@ -115,12 +91,22 @@ export const todayInput = () => {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
-// The dates income for this month can be recorded on: within the month (the server rejects any
-// other) and not in the future. `max` is null while the month hasn't started.
-export const receivedDateRange = ({ year, month }) => {
-  const mm = String(month).padStart(2, '0')
-  const min = `${year}-${mm}-01`
-  const end = `${year}-${mm}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`
+const lastDayInput = ({ year, month }) => `${year}-${String(month).padStart(2, '0')}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`
+
+// The dates this month's income can be received on: the earning month or the month after (salary
+// paid early next month), matching the server rule, and never in the future. `max` is null while
+// the month hasn't started.
+export const receivedDateRange = (period) => {
+  const min = `${periodToInput(period)}-01`
+  const end = lastDayInput(shiftPeriod(period, 1))
+  const today = todayInput()
+  return { min, max: today < min ? null : (end < today ? end : today) }
+}
+
+// Spending recorded for a month's plan must be dated in that month and not in the future.
+export const monthDateRange = (period) => {
+  const min = `${periodToInput(period)}-01`
+  const end = lastDayInput(period)
   const today = todayInput()
   return { min, max: today < min ? null : (end < today ? end : today) }
 }

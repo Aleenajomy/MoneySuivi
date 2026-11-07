@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const prisma = require('../lib/prisma');
 const { HttpError, handleError } = require('../utils/http');
-const { toPaise, paiseToDecimalString, EXPENSE_GROUPS } = require('../utils/plannerCalculations');
+const { toPaise, paiseToDecimalString, paiseToNumber, EXPENSE_GROUPS, EMI_CATEGORY } = require('../utils/plannerCalculations');
 const planner = require('../services/plannerService');
 
 const NOT_FOUND_PLAN = new HttpError(404, 'Budget plan not found');
@@ -116,7 +116,7 @@ const getBudget = async (req, res) => {
 const createBudget = async (req, res) => {
   try {
     const { year, month } = req.body;
-    const result = await planner.initializeMonth(req.user.id, year, month);
+    const result = await planner.initializeMonth(req.user.id, year, month, { defaults: req.body.defaults === true });
     await respondWithMonth(res, req.user.id, year, month, result.created ? 201 : 200, { initialized: result });
   } catch (error) {
     handleError(res, error, 'planner.createBudget');
@@ -139,7 +139,10 @@ const updateBudget = withDuplicateNameGuard(async (req, res) => {
   const plan = await findPlan(userId, req.params.id);
   const edits = req.body.allocations || [];
   await prisma.$transaction(async (tx) => {
-    if (req.body.note !== undefined) await tx.budgetPlan.update({ where: { id: plan.id }, data: { note: req.body.note || null } });
+    const planData = {};
+    if (req.body.note !== undefined) planData.note = req.body.note || null;
+    if (req.body.savingsPercent !== undefined) planData.savingsPercent = req.body.savingsPercent;
+    if (Object.keys(planData).length) await tx.budgetPlan.update({ where: { id: plan.id }, data: planData });
     for (const edit of edits) {
       const existing = await tx.budgetAllocation.findFirst({ where: { id: edit.id, planId: plan.id } });
       if (!existing) throw NOT_FOUND_ALLOCATION;
@@ -187,6 +190,70 @@ const deleteAllocation = async (req, res) => {
     await respondWithMonth(res, req.user.id, allocation.plan.year, allocation.plan.month);
   } catch (error) {
     handleError(res, error, 'planner.deleteAllocation');
+  }
+};
+
+const addDefaultLines = withDuplicateNameGuard(async (req, res) => {
+  const plan = await findPlan(req.user.id, req.params.id);
+  const added = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "BudgetPlan" WHERE id = ${plan.id} FOR UPDATE`;
+    return planner.addDefaultLines(tx, req.user.id, plan);
+  });
+  await respondWithMonth(res, req.user.id, plan.year, plan.month, 200, { added });
+}, 'planner.addDefaultLines');
+
+// A repeat of the same payment on the same line this soon is a double tap or a retried request,
+// not a second payment, so it returns the transaction already recorded.
+const REPEAT_WINDOW_MS = 15 * 1000;
+
+const isEmiLine = (allocation) => allocation.matchCategories.some(c => c.trim().toLowerCase() === EMI_CATEGORY.toLowerCase());
+
+/**
+ * Records one spending transaction for a planned line, pinned to that line. This and "Record new"
+ * salary are the only planner actions that add a transaction. The line's row lock serializes
+ * concurrent requests, so two identical taps cannot both pass the repeat check.
+ */
+const recordExpense = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const owned = await findAllocation(userId, req.params.allocationId);
+    if (!EXPENSE_GROUPS.includes(owned.group)) throw new HttpError(400, 'Only an expense line can record spending.');
+    if (isEmiLine(owned)) {
+      throw new HttpError(400, 'EMI payments are recorded in Loans & EMIs, which does not change your balances. If you also paid it from an account, add it in History and link it to the payment here.', 'EMI_LINE');
+    }
+    const { amount, date, paymentMethod, note } = req.body;
+    const day = new Date(`${date}T00:00:00.000Z`);
+    if (day.getUTCFullYear() !== owned.plan.year || day.getUTCMonth() + 1 !== owned.plan.month) {
+      throw new HttpError(400, 'Choose a date in this plan\'s month.', 'WRONG_MONTH');
+    }
+    const amountNumber = paiseToNumber(toPaise(amount));
+    const title = (req.body.title || owned.name).trim();
+    const category = owned.matchCategories[0] || 'Other';
+
+    const { expense, repeated } = await prisma.$transaction(async (tx) => {
+      const [line] = await tx.$queryRaw`SELECT "group" FROM "BudgetAllocation" WHERE id = ${owned.id} FOR UPDATE`;
+      if (!line) throw NOT_FOUND_ALLOCATION;
+      if (!EXPENSE_GROUPS.includes(line.group)) throw new HttpError(400, 'Only an expense line can record spending.');
+      const recent = await tx.expense.findFirst({
+        where: {
+          userId, type: 'expense', title, amount: amountNumber, expenseDate: day, paymentMethod,
+          allocationAssignment: { is: { allocationId: owned.id } },
+          createdAt: { gte: new Date(Date.now() - REPEAT_WINDOW_MS) },
+        },
+      });
+      if (recent) return { expense: recent, repeated: true };
+      const created = await tx.expense.create({
+        data: {
+          userId, title, amount: amountNumber, category, type: 'expense',
+          accountType: planner.accountTypeForPayment(paymentMethod), paymentMethod, note: note || null, expenseDate: day,
+        },
+      });
+      await tx.allocationAssignment.create({ data: { expenseId: created.id, allocationId: owned.id } });
+      return { expense: created, repeated: false };
+    });
+    await respondWithMonth(res, userId, owned.plan.year, owned.plan.month, repeated ? 200 : 201, { expenseId: expense.id, repeated });
+  } catch (error) {
+    handleError(res, error, 'planner.recordExpense');
   }
 };
 
@@ -259,5 +326,5 @@ const clearAssignment = async (req, res) => {
 
 module.exports = {
   getOverview, getBudget, createBudget, copyRecurring, updateBudget, addAllocation, updateAllocation, deleteAllocation,
-  getSpending, assignTransaction, clearAssignment,
+  getSpending, assignTransaction, clearAssignment, addDefaultLines, recordExpense,
 };
