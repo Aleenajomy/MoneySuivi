@@ -224,6 +224,40 @@ test.describe('Salary Planner', () => {
     expect(mock.transactionsCreated).toBe(0);
   });
 
+  test('Reset planner offers this month or everything, and everything needs RESET typed', async ({ page }) => {
+    const mock = await setupPlannerMock(page);
+    await page.goto('/#/planner');
+    await addSalarySource(page);
+    await page.getByRole('button', { name: 'Edit Rent' }).click();
+    await page.getByRole('dialog').getByLabel('Planned amount (₹)').fill('4000');
+    await page.getByRole('dialog').getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByTestId('expense-line').first()).toContainText('₹4,000');
+
+    await page.getByRole('button', { name: 'Reset planner' }).click();
+    let dialog = page.getByRole('dialog');
+    await expect(dialog.getByTestId('reset-kept')).toContainText('Transactions in History, account balances, EMIs');
+    await expect(dialog.getByRole('button', { name: 'Choose an option' })).toBeDisabled();
+    await dialog.getByRole('radio', { name: /only/ }).check();
+    await dialog.getByRole('button', { name: /^Reset .* \d{4}$/ }).click();
+    await expect(page.getByTestId('expense-line').first()).toContainText('₹2,500');
+    await expect(page.getByTestId('salary-record')).toContainText('Acme salary');
+    expect(mock.requests.find(r => r.path === '/reset').body).toEqual({ scope: 'month', ...thisMonth });
+
+    await page.getByRole('button', { name: 'Reset planner' }).click();
+    dialog = page.getByRole('dialog');
+    await dialog.getByRole('radio', { name: /whole planner/ }).check();
+    const confirm = dialog.getByRole('button', { name: 'Reset whole planner' });
+    await expect(confirm).toBeDisabled();
+    await dialog.getByLabel('Type RESET to confirm').fill('reset');
+    await expect(confirm).toBeDisabled();
+    await dialog.getByLabel('Type RESET to confirm').fill('RESET');
+    await confirm.click();
+    await expect(page.getByTestId('salary-record')).toHaveCount(0);
+    await expect(page.getByTestId('expense-line').first()).toContainText('₹2,500');
+    expect(mock.requests.filter(r => r.path === '/reset').at(-1).body).toEqual({ scope: 'all', confirm: 'RESET' });
+    expect(mock.transactionsCreated).toBe(0);
+  });
+
   test('month selector loads other months; a past month is not set up without asking', async ({ page }) => {
     const mock = await setupPlannerMock(page);
     await page.goto('/#/planner');

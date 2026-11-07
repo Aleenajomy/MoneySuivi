@@ -324,7 +324,23 @@ const clearAssignment = async (req, res) => {
   }
 };
 
+const resetPlanner = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    if (req.body.scope === 'all') {
+      const cleared = await planner.resetAll(userId);
+      return res.json({ success: true, scope: 'all', cleared });
+    }
+    const { year, month } = req.body;
+    const cleared = await planner.resetMonth(userId, year, month);
+    await respondWithMonth(res, userId, year, month, 200, { scope: 'month', cleared });
+  } catch (error) {
+    handleError(res, error, 'planner.resetPlanner');
+  }
+};
+
 module.exports = {
+  resetPlanner,
   getOverview, getBudget, createBudget, copyRecurring, updateBudget, addAllocation, updateAllocation, deleteAllocation,
   getSpending, assignTransaction, clearAssignment, addDefaultLines, recordExpense,
 };

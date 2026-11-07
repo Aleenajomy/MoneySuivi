@@ -176,6 +176,15 @@ export function PlannerProvider({ children }) {
     await refresh()
   }, [mutate, refresh])
 
+  // Planner data only; the server never touches transactions, balances, EMIs or Lend/Borrow.
+  const resetPlanner = useCallback(async (scope) => {
+    await mutate(() => api.post('/planner/reset', scope === 'all' ? { scope, confirm: 'RESET' } : { scope, ...period }),
+      scope === 'all' ? 'Planner reset' : 'This month\'s plan was reset')
+    // Cached month set-ups refer to plans that may no longer exist.
+    setUps.current = new Map()
+    await refresh()
+  }, [mutate, refresh, period])
+
   const startPlan = useCallback(async () => {
     await mutate(() => api.post('/planner/budgets', { ...period, defaults: true }), 'Plan created for this month')
     await refresh()
@@ -187,7 +196,7 @@ export function PlannerProvider({ children }) {
       saveIncomeSource, setSourceActive, deleteIncomeSource, addOneOffIncome, updateSalary,
       receiveSalary, undoSalary, deleteSalary, getLinkCandidates, getSalaryHistory,
       saveAllocation, deleteAllocation, addDefaultLines, recordExpense, saveSavingsPercent,
-      getEmiCandidates, linkEmiPayment,
+      getEmiCandidates, linkEmiPayment, resetPlanner,
     }}>
       {children}
     </PlannerContext.Provider>

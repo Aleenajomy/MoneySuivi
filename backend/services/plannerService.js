@@ -493,7 +493,39 @@ const initializeMonth = (userId, year, month, { defaults = false } = {}) => pris
   return { created: planCreated === 1, copiedAllocations, defaultLines, addedSalaries };
 });
 
+/**
+ * Clears planner data only. Every row removed here is planner bookkeeping (plans, lines, pins,
+ * salary records, sources, EMI links); no cascade from them reaches an Expense, EMI, EMI payment
+ * or Lend/Borrow row, so History and every balance stay exactly as they were. Older savings-goal
+ * and investment records are left alone because investment records are tied to real transactions.
+ */
+const resetMonth = (userId, year, month) => prisma.$transaction(async (tx) => {
+  const range = monthRange(year, month);
+  const { count: salaries } = await tx.monthlySalary.deleteMany({ where: { userId, year, month } });
+  const restored = await initializeSalaries(tx, userId, year, month);
+  const plan = await tx.budgetPlan.findUnique({ where: { userId_year_month: { userId, year, month } } });
+  let lines = 0;
+  if (plan) {
+    await tx.$queryRaw`SELECT id FROM "BudgetPlan" WHERE id = ${plan.id} FOR UPDATE`;
+    ({ count: lines } = await tx.budgetAllocation.deleteMany({ where: { planId: plan.id } }));
+    await tx.budgetPlan.update({ where: { id: plan.id }, data: { savingsPercent: calc.DEFAULT_SAVINGS_PERCENT, note: null } });
+    await addDefaultLines(tx, userId, plan);
+  }
+  const { count: emiLinks } = await tx.eMIPayment.updateMany({ where: { emi: { userId }, paidAt: range, expenseId: { not: null } }, data: { expenseId: null } });
+  return { salaries, restoredSalaries: restored, lines, emiLinks };
+});
+
+const resetAll = (userId) => prisma.$transaction(async (tx) => {
+  const { count: plans } = await tx.budgetPlan.deleteMany({ where: { userId } });
+  const { count: salaries } = await tx.monthlySalary.deleteMany({ where: { userId } });
+  const { count: sources } = await tx.incomeSource.deleteMany({ where: { userId } });
+  const { count: emiLinks } = await tx.eMIPayment.updateMany({ where: { emi: { userId }, expenseId: { not: null } }, data: { expenseId: null } });
+  return { plans, salaries, sources, emiLinks };
+});
+
 module.exports = {
+  resetMonth,
+  resetAll,
   accountTypeForPayment,
   isInvestmentCategory,
   isValidSalaryLink,
