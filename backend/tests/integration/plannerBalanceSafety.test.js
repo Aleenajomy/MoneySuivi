@@ -468,3 +468,88 @@ test('isolation: another user cannot link, record or read EMI candidates on some
   assert.deepEqual(await snapshot(user), start);
   assert.ok(mine.id);
 });
+
+// ---------------------------------------------------------------- R: planner reset
+
+const populatePlanner = async (user, emi, p) => {
+  const { planId, salary, view } = await setUpMonth(p);
+  await p.put(`/budgets/allocations/${view.plan.allocations[0].id}`, { plannedAmount: 4000 });
+  await p.post(`/budgets/${planId}/allocations`, { group: 'VARIABLE', name: 'Gym', plannedAmount: 800 });
+  await p.put(`/budgets/${planId}`, { savingsPercent: 35 });
+  await p.post('/salaries', { ...now, label: 'Bonus', kind: 'BONUS', expectedAmount: 2000 });
+  await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 15000, receivedAt: iso(now, 1), paymentMethod: 'UPI' });
+  const mess = view.plan.allocations.find(l => l.name === 'Mess / Food');
+  await p.post(`/budgets/allocations/${mess.id}/record`, { amount: 2500, date: iso(now, 2), paymentMethod: 'Cash' });
+  await api(user).patch(`/api/emis/${emi.id}/pay`, { paidAt: iso(now, 3) });
+  const historyEmi = await addTx(user, { title: 'Phone EMI', amount: 2000, expenseDate: iso(now, 3) });
+  const payment = (await p.get(`/overview?${q(now)}`)).body.emi.payments[0];
+  await p.put(`/emi-payments/${payment.id}/link`, { expenseId: historyEmi.id });
+  return { planId };
+};
+
+test('R1: resetting this month restores defaults and pending salary; money, History, EMI and Lend/Borrow are untouched', async () => {
+  const { user, emi, p } = await seedUser();
+  await populatePlanner(user, emi, p);
+  const prevPlan = (await p.post('/budgets', { ...prev, defaults: true })).body.plan;
+  await p.put(`/budgets/allocations/${prevPlan.allocations[0].id}`, { plannedAmount: 9999 });
+  const start = await snapshot(user, { ignoreEmiLink: true });
+
+  const res = await p.post('/reset', { scope: 'month', ...now });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.deepEqual(await snapshot(user, { ignoreEmiLink: true }), start, 'no transaction, balance, EMI, Lend/Borrow or Net Worth change');
+
+  const month = res.body;
+  assert.deepEqual(month.plan.allocations.map(l => [l.name, l.plannedAmount]), [['Rent', 2500], ['EMI', 2000], ['Mess / Food', 0], ['Travel', 0], ['Other Personal', 0]]);
+  assert.equal(month.position.savingsPercent, 20);
+  assert.deepEqual(month.salaries.map(s => [s.label, s.status]), [['Salary', 'PENDING']]);
+  assert.equal(month.emi.payments[0].linkedTransaction, null);
+  assert.equal(await prisma.allocationAssignment.count(), 0);
+  // The recorded salary and mess expense are still real transactions, now counted as other income / spending.
+  assert.equal(month.position.receivedIncome, 15000);
+  assert.equal(month.position.actualExpenses, 6500);
+
+  const other = (await p.get(`/overview?${q(prev)}`)).body;
+  assert.equal(other.plan.allocations[0].plannedAmount, 9999, 'other months are untouched');
+  assert.equal((await p.get('/income-sources')).body.incomeSources.length, 1, 'sources are kept');
+});
+
+test('R2: resetting the whole planner clears all planner data only, and needs the confirmation word', async () => {
+  const { user, emi, p } = await seedUser();
+  await populatePlanner(user, emi, p);
+  await p.post('/budgets', { ...prev, defaults: true });
+  const bystander = await seedUser();
+  await setUpMonth(bystander.p);
+  const start = await snapshot(user, { ignoreEmiLink: true });
+  const theirs = await snapshot(bystander.user);
+  const theirPlans = await prisma.budgetPlan.count({ where: { userId: bystander.user.id } });
+
+  assert.equal((await p.post('/reset', { scope: 'all' })).status, 400);
+  assert.equal((await p.post('/reset', { scope: 'all', confirm: 'reset please' })).status, 400);
+  assert.equal(await prisma.budgetPlan.count({ where: { userId: user.id } }), 2, 'nothing cleared without confirmation');
+
+  const res = await p.post('/reset', { scope: 'all', confirm: 'RESET' });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.deepEqual(res.body.cleared, { plans: 2, salaries: 2, sources: 1, emiLinks: 1 });
+  assert.deepEqual(await snapshot(user, { ignoreEmiLink: true }), start, 'no transaction, balance, EMI, Lend/Borrow or Net Worth change');
+  for (const model of ['budgetPlan', 'monthlySalary', 'incomeSource']) {
+    assert.equal(await prisma[model].count({ where: { userId: user.id } }), 0, model);
+  }
+  assert.equal(await prisma.eMIPayment.count({ where: { emi: { userId: user.id }, expenseId: { not: null } } }), 0);
+
+  assert.deepEqual(await snapshot(bystander.user), theirs, 'another user is untouched');
+  assert.equal(await prisma.budgetPlan.count({ where: { userId: bystander.user.id } }), theirPlans);
+
+  const fresh = (await p.post('/budgets', { ...now, defaults: true })).body;
+  assert.equal(fresh.plan.allocations[0].plannedAmount, 2500, 'starts again from the defaults');
+});
+
+test('R3: reset validates its input and never resets on a bad request', async () => {
+  const { user, p } = await seedUser();
+  await setUpMonth(p);
+  const start = await snapshot(user);
+  for (const bad of [{}, { scope: 'everything' }, { scope: 'month' }, { scope: 'month', year: now.year, month: 13 }]) {
+    assert.equal((await p.post('/reset', bad)).status, 400, JSON.stringify(bad));
+  }
+  assert.equal((await p.get(`/overview?${q(now)}`)).body.plan.allocations.length, 5);
+  assert.deepEqual(await snapshot(user), start);
+});

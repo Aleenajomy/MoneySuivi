@@ -161,6 +161,25 @@ export async function setupPlannerMock(page, options = {}) {
       initSalaries(year, month);
       return json(route, created ? 201 : 200, { ...monthBody(year, month), initialized: { created } });
     }
+    if (method === 'POST' && path === '/reset') {
+      if (body.scope === 'all') {
+        if (body.confirm !== 'RESET') return json(route, 400, { success: false, message: 'Type RESET to reset the whole planner' });
+        state.plans = {};
+        state.salaries = [];
+        state.sources = [];
+        state.emiPayments.forEach((p) => { p.linkedId = null; });
+        return json(route, 200, { success: true, scope: 'all' });
+      }
+      const k = key(year, month);
+      state.salaries = state.salaries.filter(s => !(s.year === year && s.month === month));
+      initSalaries(year, month);
+      if (state.plans[k]) {
+        state.plans[k].allocations = [];
+        state.plans[k].savingsPercent = 20;
+        addLines(state.plans[k], DEFAULT_LINES);
+      }
+      return json(route, 200, { ...monthBody(year, month), scope: 'month' });
+    }
     if (method === 'GET' && path === '/income-sources') return json(route, 200, { success: true, incomeSources: state.sources });
     if (method === 'POST' && path === '/income-sources') {
       const src = { id: uuid(), active: true, ...body, expectedAmount: Number(body.expectedAmount) };

@@ -118,6 +118,17 @@ returns `spending[]`:
 EMI payments have the id `emi:<paymentId>` and `reassignable: false`. They come from the EMI
 tracker, so there is no transaction to pin.
 
+## Reset
+
+`POST /reset` clears planner data only. It never deletes or changes a transaction, a balance, an
+EMI or EMI payment (other than removing its planner link), Lend/Borrow or Net Worth. Older savings
+goals and investments are left alone.
+
+| Body | Effect |
+|---|---|
+| `{ scope: "month", year, month }` | That month's salary records are rebuilt as pending from active sources, its lines go back to the defaults, savings goes back to 20%, and EMI links for payments that month are removed. Returns the month. |
+| `{ scope: "all", confirm: "RESET" }` | Deletes every plan, salary record and income source, and removes every EMI link. Returns `cleared` counts. Without the exact confirmation word it returns 400 and changes nothing. |
+
 ## Income sources
 
 An income source is income the user expects every month.

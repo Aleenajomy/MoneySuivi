@@ -160,6 +160,14 @@ router.use(protect);
 
 router.get('/overview', yearMonthQuery, validate, budget.getOverview);
 
+// Resetting everything is destructive for planner data, so the client must echo a confirmation word.
+router.post('/reset', [
+  body('scope').isIn(['month', 'all']).withMessage('scope must be month or all'),
+  body('year').if(body('scope').equals('month')).exists().withMessage('year is required').bail().isInt(YEAR).withMessage('year must be between 2000 and 2100').toInt(),
+  body('month').if(body('scope').equals('month')).exists().withMessage('month is required').bail().isInt({ min: 1, max: 12 }).withMessage('month must be between 1 and 12').toInt(),
+  body('confirm').if(body('scope').equals('all')).equals('RESET').withMessage('Type RESET to reset the whole planner'),
+], validate, budget.resetPlanner);
+
 router.get('/income-sources', income.listIncomeSources);
 router.post('/income-sources', sourceRules(false), validate, income.createIncomeSource);
 router.put('/income-sources/:id', v.uuidParam(), sourceRules(true), validate, income.updateIncomeSource);

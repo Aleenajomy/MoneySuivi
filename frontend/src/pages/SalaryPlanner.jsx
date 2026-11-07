@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
-import { AlertTriangle, CalendarPlus } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { AlertTriangle, CalendarPlus, RotateCcw } from 'lucide-react'
 import { usePlanner } from '../context/PlannerContext'
 import PageHeader from '../components/common/PageHeader'
 import EmptyState from '../components/common/EmptyState'
@@ -9,6 +9,7 @@ import MonthlyOverview from '../components/planner/MonthlyOverview'
 import SalaryPanel from '../components/planner/SalaryPanel'
 import ExpensesPanel from '../components/planner/ExpensesPanel'
 import SavingsPanel from '../components/planner/SavingsPanel'
+import ResetPlannerDialog from '../components/planner/ResetPlannerDialog'
 import { periodLabel } from '../utils/planner'
 
 function Section({ id, title, subtitle, children }) {
@@ -36,6 +37,7 @@ function LoadingState() {
 
 export default function SalaryPlanner() {
   const { period, setPeriod, month, loading, error, refresh, startPlan } = usePlanner()
+  const [resetting, setResetting] = useState(false)
 
   useEffect(() => { refresh(period) }, [period, refresh])
 
@@ -47,6 +49,14 @@ export default function SalaryPlanner() {
       <PageHeader title="Salary Planner" subtitle="Plan your month. Planning never changes your account balances." />
 
       <MonthSelector period={period} onChange={setPeriod} />
+      {month.summary && !error && (
+        <div className="flex justify-end -mt-3">
+          <button type="button" onClick={() => setResetting(true)} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-red-500/10 text-red-500 active:scale-95 transition-all">
+            <RotateCcw size={12} /> Reset planner
+          </button>
+        </div>
+      )}
+      {resetting && <ResetPlannerDialog onClose={() => setResetting(false)} />}
 
       <div className={`space-y-8 ${loading && month.summary ? 'opacity-60 transition-opacity' : ''}`}>
         {error ? (
