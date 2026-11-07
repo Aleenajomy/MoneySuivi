@@ -22,24 +22,38 @@ test.describe('Planner review fixes (UI)', () => {
     await setupApiMocks(page, { loggedIn: true });
   });
 
-  test('"Received on" is limited to the record\'s month and to today', async ({ page }) => {
+  test('"Received on" starts at the record\'s month and stops at today', async ({ page }) => {
     await setupPlannerMock(page);
-    await page.goto('/#/planner?tab=salary');
+    await page.goto('/#/planner');
     await addSalary(page);
     await page.getByRole('button', { name: 'Mark received' }).click();
+    await page.getByRole('dialog').getByRole('radio', { name: /Record new/ }).check();
     const date = page.getByRole('dialog').getByLabel('Received on');
     await expect(date).toHaveAttribute('min', `${thisMonth}-01`);
     await expect(date).toHaveAttribute('max', today);
   });
 
+  test('last month\'s salary can be received up to today in this month', async ({ page }) => {
+    await setupPlannerMock(page);
+    await page.goto('/#/planner');
+    await addSalary(page);
+    await page.getByRole('button', { name: 'Previous month' }).click();
+    await page.getByRole('button', { name: 'Start plan for this month' }).click();
+    await page.getByRole('button', { name: 'Mark received' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('radio', { name: /Already in my balance/ }).check();
+    await expect(dialog.getByLabel('Received on')).toHaveAttribute('max', today);
+  });
+
   test('a month that has not started cannot be marked received yet', async ({ page }) => {
     const mock = await setupPlannerMock(page);
-    await page.goto('/#/planner?tab=salary');
+    await page.goto('/#/planner');
     await addSalary(page);
     await page.getByRole('button', { name: 'Next month' }).click();
     await expect(page.getByTestId('salary-record')).toContainText('Pending');
     await page.getByRole('button', { name: 'Mark received' }).click();
     const dialog = page.getByRole('dialog');
+    await dialog.getByRole('radio', { name: /Already in my balance/ }).check();
     await expect(dialog.getByRole('status')).toContainText("hasn't started yet");
     await expect(dialog.getByRole('button', { name: 'Mark received' })).toBeDisabled();
     expect(mock.requests.some(r => r.path.endsWith('/receive'))).toBe(false);

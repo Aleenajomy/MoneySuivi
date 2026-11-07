@@ -269,3 +269,32 @@ test('goal status: progress, remaining and the monthly amount still needed, coun
   // No target date.
   assert.deepEqual([calc.goalStatus({ targetPaise: 100n, savedPaise: 0n, today }).monthsLeft, calc.goalStatus({ targetPaise: 100n, savedPaise: 0n, today }).requiredMonthly], [null, null]);
 });
+
+test('planPosition: planned and actual positions with a savings share that is never negative', () => {
+  const p = calc.planPosition({ expectedIncome: 1500000n, receivedIncome: 1400000n, plannedExpenses: 800000n, actualExpenses: 450000n });
+  assert.equal(p.plannedRemaining, 700000n);
+  assert.equal(p.actualRemaining, 950000n);
+  assert.equal(p.suggestedSavings, 140000n);
+  assert.equal(p.actualSavingsPotential, 190000n);
+  assert.equal(p.savingsPercent, 20);
+
+  const short = calc.planPosition({ expectedIncome: 100000n, receivedIncome: 0n, plannedExpenses: 250000n, actualExpenses: 1000n, savingsPercent: 50 });
+  assert.equal(short.plannedRemaining, -150000n);
+  assert.equal(short.suggestedSavings, 0n);
+  assert.equal(short.actualSavingsPotential, 0n);
+
+  // Rounded down to the paisa: 20% of ₹0.99 is ₹0.19.
+  assert.equal(calc.planPosition({ expectedIncome: 99n, receivedIncome: 0n, plannedExpenses: 0n, actualExpenses: 0n }).suggestedSavings, 19n);
+  // Money moved into investments is not left over to save.
+  assert.equal(calc.planPosition({ expectedIncome: 0n, receivedIncome: 100000n, plannedExpenses: 0n, actualExpenses: 0n, investedNet: 40000n }).actualRemaining, 60000n);
+});
+
+test('classifyActuals: an expense linked to an EMI payment is counted once, as the payment', () => {
+  const tx = [
+    { id: 'a', type: 'expense', category: 'Bills', amountPaise: 200000n, emiLinked: true },
+    { id: 'b', type: 'expense', category: 'Shopping', amountPaise: 200000n },
+  ];
+  const r = calc.classifyActuals(tx, [{ id: 'p', amountPaise: 200000n }]);
+  assert.equal(r.expenses, 400000n);
+  assert.deepEqual(r.spending.map(s => s.id), ['b', 'emi:p']);
+});

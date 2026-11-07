@@ -67,7 +67,7 @@ test('income sources: create, list, update, pause and delete, with pending recor
 test('deleting a source keeps its received history but drops pending months', async () => {
   const user = await createUser();
   const { p, source, salary } = await setUpSalary(user);
-  await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 15000, receivedAt: iso(now, 1) });
+  await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 15000, receivedAt: iso(now, 1) });
   await p.post('/salaries/initialize', next);
   assert.equal(await prisma.monthlySalary.count({ where: { userId: user.id } }), 2);
 
@@ -107,7 +107,7 @@ test('marking salary received creates exactly one income transaction in the chos
   const balances = (await request(app).get('/api/expenses/balances').set(auth(user))).body.balances;
   assert.equal(balances.netBankingBalance, 14999.99);
 
-  const again = await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 15000, receivedAt: iso(now, 1) });
+  const again = await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 15000, receivedAt: iso(now, 1) });
   assert.equal(again.status, 409);
   assert.equal(again.body.code, 'ALREADY_RECEIVED');
   assert.equal(await incomeCount(user), 1);
@@ -117,7 +117,7 @@ test('concurrent "received" taps create one transaction; the rest roll back', as
   const user = await createUser();
   const { p, salary } = await setUpSalary(user);
   const results = await Promise.all(Array.from({ length: 5 }, () =>
-    p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 15000, receivedAt: iso(now, 1) })));
+    p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 15000, receivedAt: iso(now, 1) })));
   assert.deepEqual(results.map(r => r.status).sort(), [200, 409, 409, 409, 409]);
   assert.equal(await incomeCount(user), 1);
 });
@@ -133,7 +133,7 @@ test('a failure part-way through receiving leaves no orphan transaction', async 
       : target[key]),
   })), opts);
   try {
-    const res = await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 15000, receivedAt: iso(now, 1) });
+    const res = await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 15000, receivedAt: iso(now, 1) });
     assert.equal(res.status, 500);
   } finally {
     prisma.$transaction = original;
@@ -186,7 +186,7 @@ test('only the user\'s own income transactions can be linked', async () => {
 test('undo keeps the transaction unless asked to delete it', async () => {
   const user = await createUser();
   const { p, salary } = await setUpSalary(user);
-  await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 15000, receivedAt: iso(now, 1) });
+  await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 15000, receivedAt: iso(now, 1) });
   const undone = await p.post(`/salaries/${salary.id}/undo`, {});
   assert.equal(undone.body.salary.status, 'PENDING');
   assert.equal(await incomeCount(user), 1);
@@ -203,14 +203,14 @@ test('undo keeps the transaction unless asked to delete it', async () => {
 test('received records cannot be deleted until undone', async () => {
   const user = await createUser();
   const { p, salary } = await setUpSalary(user);
-  await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 15000, receivedAt: iso(now, 1) });
+  await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 15000, receivedAt: iso(now, 1) });
   assert.equal((await p.del(`/salaries/${salary.id}`)).status, 409);
 });
 
 test('salary history totals each month', async () => {
   const user = await createUser();
   const { p, salary } = await setUpSalary(user);
-  await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 15000, receivedAt: iso(now, 1) });
+  await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 15000, receivedAt: iso(now, 1) });
   await p.post('/salaries', { ...now, label: 'Bonus', kind: 'BONUS', expectedAmount: '2500.25' });
   await p.post('/salaries/initialize', next);
   const history = (await p.get(`/salaries/history?months=3&${q(next)}`)).body.history;
@@ -272,7 +272,7 @@ test('actuals: transfers, investments and savings stay out of spending; EMIs cou
     { group: 'FIXED', name: 'Loan', plannedAmount: 2000, matchCategories: ['EMI'] },
     { group: 'VARIABLE', name: 'Food', plannedAmount: 1000, matchCategories: ['Food'] },
   ]);
-  await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 15000, receivedAt: iso(now, 1) });
+  await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 15000, receivedAt: iso(now, 1) });
   await tx(user, { title: 'Rent', amount: 3500, type: 'expense', category: 'Bills' });
   await tx(user, { title: 'Lunch', amount: 1200.75, type: 'expense', category: 'Food' });
   await tx(user, { title: 'Movie', amount: 300, type: 'expense', category: 'Entertainment' });
@@ -382,7 +382,7 @@ test('a user cannot see or change another user\'s planner data', async () => {
     a.del(`/income-sources/${source.id}`),
     a.put(`/salaries/${salary.id}`, { expectedAmount: 1 }),
     a.get(`/salaries/${salary.id}/candidates`),
-    a.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 1, receivedAt: iso(now) }),
+    a.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 1, receivedAt: iso(now) }),
     a.post(`/salaries/${salary.id}/undo`, {}),
     a.del(`/salaries/${salary.id}`),
     a.put(`/budgets/${planId}`, { note: 'x' }),
@@ -430,9 +430,9 @@ test('invalid amounts, dates, months and pay days are rejected', async () => {
     p.get('/overview?year=2026&month=13'),
     p.get('/budgets?year=2026'),
     p.post('/budgets', { year: 2026, month: 0 }),
-    p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 0, receivedAt: iso(now) }),
-    p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 100, receivedAt: 'yesterday' }),
-    p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 100 }),
+    p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 0, receivedAt: iso(now) }),
+    p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 100, receivedAt: 'yesterday' }),
+    p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 100 }),
     p.post(`/salaries/${salary.id}/receive`, { mode: 'link' }),
     p.post(`/salaries/${salary.id}/receive`, { mode: 'magic' }),
     p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 100, receivedAt: iso(now), paymentMethod: 'Bitcoin' }),

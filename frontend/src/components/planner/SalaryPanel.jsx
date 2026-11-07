@@ -121,7 +121,7 @@ export default function SalaryPanel() {
     <div className="space-y-6">
       <section className="space-y-2.5" aria-labelledby="month-income-title">
         <div className="flex items-center justify-between gap-3">
-          <h3 id="month-income-title" className="text-sm font-bold dark:text-white text-slate-800">Income for {periodLabel(period)}</h3>
+          <h3 id="month-income-title" className="text-sm font-bold dark:text-white text-slate-800">Earned in {periodLabel(period)}</h3>
           <button type="button" onClick={() => setOneOff(true)} className={`${chip} bg-sky-500/10 text-sky-600 dark:text-sky-400`}>
             <Plus size={13} /> One-off income
           </button>
@@ -142,6 +142,7 @@ export default function SalaryPanel() {
                   <p className="text-[11px] dark:text-gray-400 text-slate-500 mt-0.5">
                     {incomeKindLabel(s.kind)}{s.payDay ? ` · pay day ${s.payDay}` : ''}
                     {s.receivedAt ? ` · received ${formatDate(s.receivedAt)}` : ''}
+                    {s.receivedVia === 'ALREADY_IN_BALANCE' ? ' · already in balance, no transaction' : s.transaction ? ` · ${s.transaction.paymentMethod}` : ''}
                   </p>
                 </div>
                 <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md flex-shrink-0 ${status.className}`}>{status.label}</span>
@@ -229,7 +230,7 @@ export default function SalaryPanel() {
       <ConfirmDialog
         open={Boolean(undoing)}
         title="Mark as not received?"
-        message={undoing ? `${undoing.label} goes back to pending.` : ''}
+        message={undoing ? `${undoing.label} goes back to pending.${undoing.expenseId ? '' : ' No transaction is involved, so your balance does not change.'}` : ''}
         confirmText="Undo"
         variant="warning"
         onConfirm={confirmUndo}
@@ -238,7 +239,7 @@ export default function SalaryPanel() {
         {undoing?.expenseId && (
           <label className="flex items-start gap-2 mt-4 text-xs dark:text-gray-300 text-slate-600 cursor-pointer">
             <input type="checkbox" className="mt-0.5 accent-red-500" checked={alsoDelete} onChange={e => setAlsoDelete(e.target.checked)} />
-            <span>Also delete the {formatAmount(undoing.receivedAmount)} income transaction from History. Leave this off if the money really arrived and you only linked the wrong record.</span>
+            <span>Also delete the {formatAmount(undoing.receivedAmount)} income transaction from History. This lowers your balance by that amount. Leave this off if the money really arrived and you only linked the wrong record.</span>
           </label>
         )}
       </ConfirmDialog>

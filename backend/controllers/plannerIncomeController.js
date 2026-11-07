@@ -12,7 +12,7 @@ const decimal = (value) => paiseToDecimalString(toPaise(value));
 
 const transactionCategoryFor = (kind) => (kind === 'OTHER' ? 'Other' : 'Salary');
 
-const WRONG_MONTH = new HttpError(400, 'The income must be dated in the same month as this record.', 'WRONG_MONTH');
+const WRONG_MONTH = new HttpError(400, 'The income must be dated in this record\'s month or the month after it.', 'WRONG_MONTH');
 
 // Stored like every transaction date: UTC midnight of the calendar day the user picked, whatever
 // time zone the client sent, so the month check matches how the planner groups transactions.
@@ -20,7 +20,19 @@ const calendarDay = (value) => new Date(`${String(value).slice(0, 10)}T00:00:00.
 
 // A record left marked received after its transaction stopped backing it (deleted, or edited into
 // another month or type before the History-side reset existed) is put back to pending.
-const STALE_RESET = { receivedAmount: '0', receivedAt: null, expenseId: null };
+const STALE_RESET = { receivedAmount: '0', receivedAt: null, expenseId: null, countedInBalance: false };
+
+// Income in the record's received window that no record counts yet: what the user may already
+// have entered in History for this salary.
+const unlinkedIncomeWhere = (userId, record) => ({
+  userId,
+  type: 'income',
+  expenseDate: planner.receivedWindow(record.year, record.month),
+  monthlySalary: { is: null },
+  investmentTransaction: { is: null },
+  NOT: { category: { equals: 'Investment', mode: 'insensitive' } },
+});
+const CANDIDATE_SELECT = { id: true, title: true, amount: true, category: true, expenseDate: true, paymentMethod: true };
 
 const findSource = async (userId, id, db = prisma) => {
   const source = await db.incomeSource.findFirst({ where: { id, userId } });
@@ -179,15 +191,17 @@ const updateSalary = async (req, res) => {
 };
 
 /**
- * Marks income as received, either by creating the income transaction or by linking one the user
- * already recorded in History. The conditional update only succeeds while the record is still
- * unreceived, so a double tap or a concurrent request rolls back instead of creating a second
- * income transaction.
+ * Marks income as received in exactly one of three ways the user chose explicitly:
+ *   link             - an income transaction already in History backs it; nothing is created;
+ *   alreadyInBalance - the money is already reflected in their balances; nothing is created;
+ *   create           - one new income transaction is recorded.
+ * The conditional claim only succeeds while the record is unreceived, so a double tap or a
+ * concurrent request rolls back instead of creating a second income transaction.
  */
 const receiveSalary = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { mode, expenseId, receivedAmount, receivedAt, paymentMethod, note } = req.body;
+    const { mode, expenseId, receivedAmount, receivedAt, paymentMethod, note, confirmDuplicate } = req.body;
 
     const record = await prisma.$transaction(async (tx) => {
       const existing = await findSalary(userId, req.params.id, tx);
@@ -196,12 +210,12 @@ const receiveSalary = async (req, res) => {
         await tx.monthlySalary.updateMany({ where: { id: existing.id, receivedAt: existing.receivedAt, expenseId: existing.expenseId }, data: STALE_RESET });
       }
 
-      let transaction;
+      let claim;
       if (mode === 'link') {
         // Lock the transaction so a concurrent History edit or delete either completes first (and is
         // seen by the checks below) or waits until the link exists (and then resets it).
         await tx.$queryRaw`SELECT id FROM "Expense" WHERE id = ${expenseId} AND "userId" = ${userId} FOR UPDATE`;
-        transaction = await tx.expense.findFirst({
+        const transaction = await tx.expense.findFirst({
           where: { id: expenseId, userId },
           include: { monthlySalary: { select: { id: true } }, investmentTransaction: { select: { id: true } } },
         });
@@ -212,32 +226,48 @@ const receiveSalary = async (req, res) => {
         }
         if (!planner.isValidSalaryLink(transaction, existing)) throw WRONG_MONTH;
         if (transaction.monthlySalary) throw ALREADY_LINKED;
+        claim = { receivedAmount: decimal(transaction.amount), receivedAt: transaction.expenseDate, expenseId: transaction.id };
       } else {
         const receivedOn = calendarDay(receivedAt);
-        if (receivedOn.getUTCFullYear() !== existing.year || receivedOn.getUTCMonth() + 1 !== existing.month) throw WRONG_MONTH;
-        const method = paymentMethod || 'Net Banking';
-        transaction = await tx.expense.create({
-          data: {
-            userId,
-            title: existing.label,
-            amount: paiseToNumber(toPaise(receivedAmount)),
-            category: transactionCategoryFor(existing.kind),
-            type: 'income',
-            accountType: planner.accountTypeForPayment(method),
-            paymentMethod: method,
-            note: note || null,
-            expenseDate: receivedOn,
-          },
-        });
+        if (!planner.inReceivedWindow(receivedOn, existing)) throw WRONG_MONTH;
+        if (mode === 'alreadyInBalance') {
+          claim = { receivedAmount: decimal(receivedAmount), receivedAt: receivedOn, countedInBalance: true };
+        } else {
+          // The likeliest way to double a balance is recording a salary that is already in History
+          // under a slightly different amount or date, so that has to be confirmed explicitly.
+          if (!confirmDuplicate) {
+            const lookalikes = await tx.expense.findMany({
+              where: { ...unlinkedIncomeWhere(userId, existing), category: { equals: transactionCategoryFor(existing.kind), mode: 'insensitive' } },
+              select: CANDIDATE_SELECT,
+              orderBy: { expenseDate: 'desc' },
+              take: 5,
+            });
+            if (lookalikes.length) {
+              throw new HttpError(409, 'An income transaction that may be this salary is already in History. Link it instead, or confirm to record another one.', 'POSSIBLE_DUPLICATE', {
+                candidates: lookalikes.map(c => ({ ...c, amount: toApiAmount(toPaise(c.amount)) })),
+              });
+            }
+          }
+          const transaction = await tx.expense.create({
+            data: {
+              userId,
+              title: existing.label,
+              amount: paiseToNumber(toPaise(receivedAmount)),
+              category: transactionCategoryFor(existing.kind),
+              type: 'income',
+              accountType: planner.accountTypeForPayment(paymentMethod),
+              paymentMethod,
+              note: note || null,
+              expenseDate: receivedOn,
+            },
+          });
+          claim = { receivedAmount: decimal(transaction.amount), receivedAt: transaction.expenseDate, expenseId: transaction.id };
+        }
       }
 
       const claimed = await tx.monthlySalary.updateMany({
         where: { id: existing.id, userId, receivedAt: null, expenseId: null },
-        data: {
-          receivedAmount: decimal(transaction.amount),
-          receivedAt: transaction.expenseDate,
-          expenseId: transaction.id,
-        },
+        data: claim,
       });
       if (claimed.count !== 1) throw ALREADY_RECEIVED;
       return tx.monthlySalary.findUnique({ where: { id: existing.id }, include: planner.SALARY_INCLUDE });
@@ -260,7 +290,7 @@ const undoReceived = async (req, res) => {
       await tx.monthlySalary.update({ where: { id: existing.id }, data: STALE_RESET });
       // Only a transaction that still backs the record is deleted; one the user has since turned into
       // something else in History is left alone.
-      if (req.body.deleteTransaction && planner.isReceived(existing)) {
+      if (req.body.deleteTransaction && planner.isReceived(existing) && existing.expenseId) {
         await tx.expense.deleteMany({ where: { id: existing.expenseId, userId } });
       }
       return tx.monthlySalary.findUnique({ where: { id: existing.id }, include: planner.SALARY_INCLUDE });
@@ -282,29 +312,28 @@ const deleteSalary = async (req, res) => {
   }
 };
 
-// Income transactions in the record's month that are not yet linked to any income record, so the
-// user can link the salary they already entered instead of recording it twice. Same month only:
-// that is the rule receiveSalary enforces.
+// Every unlinked income transaction in the record's received window (its month and the next),
+// closest to the expected amount first, so a salary entered with a slightly different amount or
+// date is still offered for linking instead of being recorded twice.
 const getLinkCandidates = async (req, res) => {
   try {
     const record = await findSalary(req.user.id, req.params.id);
     const candidates = await prisma.expense.findMany({
-      where: {
-        userId: req.user.id,
-        type: 'income',
-        expenseDate: planner.monthRange(record.year, record.month),
-        monthlySalary: { is: null },
-        investmentTransaction: { is: null },
-        NOT: { category: { equals: 'Investment', mode: 'insensitive' } },
-      },
-      select: { id: true, title: true, amount: true, category: true, expenseDate: true, paymentMethod: true },
+      where: unlinkedIncomeWhere(req.user.id, record),
+      select: CANDIDATE_SELECT,
       orderBy: { expenseDate: 'desc' },
-      take: 20,
+      take: 50,
     });
     const expected = toPaise(record.expectedAmount);
+    const gap = (c) => { const d = toPaise(c.amount) - expected; return d < 0n ? -d : d; };
+    const ranked = [...candidates].sort((a, b) => {
+      const ga = gap(a);
+      const gb = gap(b);
+      return ga === gb ? b.expenseDate - a.expenseDate : (ga < gb ? -1 : 1);
+    });
     res.json({
       success: true,
-      candidates: candidates.map(c => ({ ...c, amount: toApiAmount(toPaise(c.amount)), matchesExpected: toPaise(c.amount) === expected })),
+      candidates: ranked.slice(0, 20).map(c => ({ ...c, amount: toApiAmount(toPaise(c.amount)), matchesExpected: toPaise(c.amount) === expected })),
     });
   } catch (error) {
     handleError(res, error, 'planner.getLinkCandidates');

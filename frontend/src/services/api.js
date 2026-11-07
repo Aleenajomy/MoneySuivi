@@ -75,6 +75,7 @@ api.interceptors.response.use(
     if (err.response) {
       rejectError.status = status
       rejectError.code = err.response.data?.code
+      rejectError.data = err.response.data
     }
     return Promise.reject(rejectError)
   }

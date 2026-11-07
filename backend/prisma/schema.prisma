@@ -112,6 +112,7 @@ model Expense {
   monthlySalary         MonthlySalary?
   allocationAssignment  AllocationAssignment?
   investmentTransaction InvestmentTransaction?
+  emiPayment            EMIPayment?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -163,6 +164,10 @@ model EMIPayment {
   amount      Float
   paidAt      DateTime @default(now())
   note        String?  @db.VarChar(500)
+  // Set only when the user confirms this payment is the same money as a History expense, so that
+  // expense is not counted a second time in the planner. Unique: one transaction backs one payment.
+  expenseId   String?  @unique
+  expense     Expense? @relation(fields: [expenseId], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -276,6 +281,8 @@ model MonthlySalary {
   expectedAmount Decimal       @db.Decimal(14, 2)
   receivedAmount Decimal       @default(0) @db.Decimal(14, 2)
   receivedAt     DateTime?
+  // "Already in my balance": received with no transaction behind it, so nothing is added to History.
+  countedInBalance Boolean     @default(false)
   // The income transaction that records the money arriving; unique so one transaction backs one record.
   expenseId      String?       @unique
   expense        Expense?      @relation(fields: [expenseId], references: [id], onDelete: SetNull)
@@ -293,6 +300,7 @@ model BudgetPlan {
   year        Int
   month       Int // 1-12
   note        String?            @db.VarChar(500)
+  savingsPercent Int             @default(20)
   allocations BudgetAllocation[]
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt

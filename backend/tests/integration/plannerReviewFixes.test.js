@@ -14,6 +14,7 @@ const shift = ({ year, month }, by) => {
 };
 const prev = shift(now, -1);
 const next = shift(now, 1);
+const afterNext = shift(now, 2);
 const iso = ({ year, month }, day = 5) => `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 const q = ({ year, month }) => `year=${year}&month=${month}`;
 
@@ -100,12 +101,12 @@ test('finding 1: pinning and changing the line\'s group concurrently never leave
 
 // ---------------------------------------------------------------- finding 2
 
-test('finding 2: an income from another month cannot be linked, and is not offered', async () => {
+test('finding 2: an income outside the record\'s month and the month after cannot be linked, and is not offered', async () => {
   const user = await createUser();
   const { p, salary } = await setUpSalary(user);
   const old = await tx(user, { title: 'Salary credit', amount: 15000, type: 'income', category: 'Salary', expenseDate: iso(prev, 28) });
   const lastDay = await tx(user, { title: 'Early salary', amount: 15000, type: 'income', category: 'Salary', expenseDate: iso(prev, new Date(Date.UTC(prev.year, prev.month, 0)).getUTCDate()) });
-  const later = await tx(user, { title: 'Next salary', amount: 15000, type: 'income', category: 'Salary', expenseDate: iso(next, 1) });
+  const later = await tx(user, { title: 'Next salary', amount: 15000, type: 'income', category: 'Salary', expenseDate: iso(afterNext, 1) });
 
   for (const t of [old, lastDay, later]) {
     const res = await p.post(`/salaries/${salary.id}/receive`, { mode: 'link', expenseId: t.id });
@@ -119,17 +120,17 @@ test('finding 2: an income from another month cannot be linked, and is not offer
   assert.equal((await p.post(`/salaries/${salary.id}/receive`, { mode: 'link', expenseId: ok.id })).status, 200);
 });
 
-test('finding 2: a new income must be received within the record\'s month; the calendar day is what counts', async () => {
+test('finding 2: a new income must be received in the record\'s month or the next; the calendar day is what counts', async () => {
   const user = await createUser();
   const { p, salary } = await setUpSalary(user);
-  for (const receivedAt of [iso(prev, 28), iso(next, 1), '1999-01-01']) {
-    const res = await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 15000, receivedAt });
+  for (const receivedAt of [iso(prev, 28), iso(afterNext, 1), '1999-01-01']) {
+    const res = await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 15000, receivedAt });
     assert.equal(res.status, 400, receivedAt);
   }
   assert.equal(await prisma.expense.count({ where: { userId: user.id } }), 0);
 
   // An offset that would be the previous day in UTC still means the 1st of this month.
-  const res = await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 15000, receivedAt: `${iso(now, 1)}T00:30:00+05:30` });
+  const res = await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 15000, receivedAt: `${iso(now, 1)}T00:30:00+05:30` });
   assert.equal(res.status, 200, JSON.stringify(res.body));
   const created = await prisma.expense.findFirst({ where: { userId: user.id } });
   assert.equal(created.expenseDate.toISOString(), `${iso(now, 1)}T00:00:00.000Z`);
@@ -149,7 +150,7 @@ const salaryRow = (id) => prisma.monthlySalary.findUnique({ where: { id } });
 for (const [label, change] of [
   ['into an expense', { type: 'expense' }],
   ['into an investment', { category: 'Investment' }],
-  ['into another month', { expenseDate: iso(next, 2) }],
+  ['outside its received window', { expenseDate: iso(afterNext, 2) }],
 ]) {
   test(`finding 3: editing a linked income ${label} puts the salary back to pending, counted once`, async () => {
     const user = await createUser();
@@ -190,7 +191,7 @@ test('finding 3: deleting a linked income in History resets the salary and its t
   assert.equal(month.salaries[0].status, 'PENDING');
   assert.equal(month.summary.income.received, 0);
   // It can be received again straight away.
-  assert.equal((await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 15000, receivedAt: iso(now, 2) })).status, 200);
+  assert.equal((await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 15000, receivedAt: iso(now, 2) })).status, 200);
 });
 
 test('finding 3: a stale "received" row is shown as pending and can be re-received, deleted or undone safely', async () => {
@@ -209,7 +210,7 @@ test('finding 3: a stale "received" row is shown as pending and can be re-receiv
   assert.ok(await prisma.expense.findUnique({ where: { id: income.id } }));
 
   await prisma.monthlySalary.update({ where: { id: salary.id }, data: { receivedAt: new Date(), expenseId: income.id, receivedAmount: '15000' } });
-  const again = await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 15000, receivedAt: iso(now, 1) });
+  const again = await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 15000, receivedAt: iso(now, 1) });
   assert.equal(again.status, 200, JSON.stringify(again.body));
   assert.equal(again.body.salary.status, 'RECEIVED');
   assert.notEqual(again.body.salary.expenseId, income.id);
@@ -300,7 +301,7 @@ test('impossible or partial dates are rejected instead of rolling into the next 
   const user = await createUser();
   const { p, salary } = await setUpSalary(user);
   for (const receivedAt of [`${now.year}-02-30`, `${iso(now).slice(0, 7)}`, `${iso(now).slice(0, 7)}-32`, 'yesterday']) {
-    const res = await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', receivedAmount: 100, receivedAt });
+    const res = await p.post(`/salaries/${salary.id}/receive`, { mode: 'create', paymentMethod: 'UPI', receivedAmount: 100, receivedAt });
     assert.equal(res.status, 400, receivedAt);
   }
   assert.equal(await prisma.expense.count({ where: { userId: user.id } }), 0);

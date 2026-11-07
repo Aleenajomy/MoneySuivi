@@ -32,6 +32,22 @@ const currentPeriod = (now = new Date()) => {
 
 const periodIndex = ({ year, month }) => year * 12 + (month - 1);
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const dayNumber = (date) => Math.floor(date.getTime() / DAY_MS);
+const daysApart = (a, b) => Math.abs(dayNumber(a) - dayNumber(b));
+
+// Salary for a month is often paid early the next month (October's salary on 5 November), so the
+// money may arrive in the earning month or the one after. The record stays in its earning month;
+// the transaction keeps its real date, so balances move on the day the money actually arrived.
+const receivedWindow = (year, month) => ({
+  gte: new Date(Date.UTC(year, month - 1, 1)),
+  lt: new Date(Date.UTC(year, month + 1, 1)),
+});
+const inReceivedWindow = (date, { year, month }) => {
+  const { gte, lt } = receivedWindow(year, month);
+  return date >= gte && date < lt;
+};
+
 // Matches (year, month) at or after the given period.
 const fromPeriodWhere = ({ year, month }) => ({ OR: [{ year: { gt: year } }, { year, month: { gte: month } }] });
 
@@ -50,18 +66,41 @@ const isInvestment = (expense) => Boolean(expense.investmentTransaction) || isIn
 
 /**
  * A salary record is backed by its transaction only while that transaction is a non-investment
- * income dated in the record's own month. Otherwise "received" and actual income would disagree:
- * the money would be counted in another month, or as spending/investment, as well as received.
+ * income dated in the record's received window. Otherwise the money could be counted as spending
+ * or investment as well as received.
  */
-const isValidSalaryLink = (expense, { year, month }) => Boolean(expense)
+const isValidSalaryLink = (expense, period) => Boolean(expense)
   && expense.type === 'income'
   && !isInvestment(expense)
-  && expense.expenseDate.getUTCFullYear() === year
-  && expense.expenseDate.getUTCMonth() + 1 === month;
+  && inReceivedWindow(expense.expenseDate, period);
 
 // The linked transaction is the source of truth, so a later edit to its amount shows here and a
-// link that stopped being valid (see isValidSalaryLink) reads as not received.
-const isReceived = (record) => Boolean(record.receivedAt) && isValidSalaryLink(record.expense, record);
+// link that stopped being valid (see isValidSalaryLink) reads as not received. A record marked
+// "already in my balance" has no transaction and stands on its own stored amount.
+const isReceived = (record) => Boolean(record.receivedAt)
+  && (record.countedInBalance ? !record.expenseId : isValidSalaryLink(record.expense, record));
+
+/**
+ * An EMI payment and a History expense are the same money only when the user linked them and the
+ * expense still looks like that payment: spending (not income, a transfer or an investment), the
+ * exact amount, and dated within EMI_LINK_MAX_DAYS. Amount and date alone never create a link.
+ */
+const EMI_LINK_MAX_DAYS = 31;
+const EMI_SUGGEST_MAX_DAYS = 3;
+const isValidEmiLink = (expense, payment) => Boolean(expense) && Boolean(payment)
+  && expense.type === 'expense'
+  && !isInvestment(expense)
+  && toPaise(expense.amount) === toPaise(payment.amount)
+  && daysApart(expense.expenseDate, payment.paidAt) <= EMI_LINK_MAX_DAYS;
+
+// Called inside a History edit's transaction: a link the edit invalidated is removed, so that
+// expense counts as ordinary spending again instead of silently disappearing from the planner.
+const resetInvalidEmiLinks = async (tx, userId, expenseId) => {
+  const payment = await tx.eMIPayment.findFirst({ where: { expenseId, emi: { userId } }, include: { expense: { include: { investmentTransaction: { select: { id: true } } } } } });
+  if (payment && !isValidEmiLink(payment.expense, payment)) {
+    await tx.eMIPayment.update({ where: { id: payment.id }, data: { expenseId: null } });
+  }
+};
 /**
  * Puts back to pending any salary record whose linked transaction no longer qualifies after a
  * History edit, inside the caller's transaction so the two can never disagree.
@@ -73,7 +112,15 @@ const resetInvalidSalaryLinks = async (tx, userId, expenseId) => {
   }
 };
 
-const salaryReceivedPaise = (record) => (isReceived(record) ? toPaise(record.expense.amount) : 0n);
+const salaryReceivedPaise = (record) => {
+  if (!isReceived(record)) return 0n;
+  return record.countedInBalance ? toPaise(record.receivedAmount) : toPaise(record.expense.amount);
+};
+
+const receivedVia = (record) => {
+  if (!isReceived(record)) return null;
+  return record.countedInBalance ? 'ALREADY_IN_BALANCE' : 'TRANSACTION';
+};
 
 const salaryStatus = (record, expectedPaise, receivedPaise) => {
   if (!isReceived(record)) return 'PENDING';
@@ -95,8 +142,10 @@ const serializeSalary = (record) => {
     receivedAmount: toApiAmount(receivedPaise),
     status: salaryStatus(record, expectedPaise, receivedPaise),
     receivedAt: isReceived(record) ? record.receivedAt : null,
+    receivedVia: receivedVia(record),
+    countedInBalance: isReceived(record) && record.countedInBalance,
     expenseId: isReceived(record) ? record.expenseId : null,
-    transaction: isReceived(record) ? (({ id, title, amount, expenseDate, paymentMethod, accountType }) => ({
+    transaction: isReceived(record) && !record.countedInBalance ? (({ id, title, amount, expenseDate, paymentMethod, accountType }) => ({
       id, title, amount: toApiAmount(toPaise(amount)), expenseDate, paymentMethod, accountType,
     }))(record.expense) : null,
   };
@@ -134,6 +183,8 @@ const serializeSummary = (summary, unplannedByCategory) => {
     unplanned: unplannedByCategory.map(u => ({ category: u.category, amount: toApiAmount(u.paise) })),
   };
 };
+
+const serializePosition = ({ savingsPercent, ...money }) => ({ ...rupees(money), savingsPercent });
 
 const serializeAllocation = (allocation, spentPaise, transactionCount, linkedNet) => {
   const plannedPaise = toPaise(allocation.plannedAmount);
@@ -183,6 +234,105 @@ const serializeSpending = (resolved, transactions, emiPayments) => {
 
 const ALLOCATION_ORDER = [{ sortOrder: 'asc' }, { createdAt: 'asc' }];
 
+const EMI_LINK_EXPENSE_SELECT = {
+  id: true, title: true, amount: true, expenseDate: true, type: true, category: true, paymentMethod: true,
+  investmentTransaction: { select: { id: true } },
+};
+
+const serializeLinkableExpense = (e) => ({
+  id: e.id, title: e.title, amount: toApiAmount(toPaise(e.amount)), date: e.expenseDate, category: e.category, paymentMethod: e.paymentMethod,
+});
+
+/**
+ * The month's EMI-tracker payments, each with the History expense the user linked to it, or with
+ * expenses that merely look like it (same amount within EMI_SUGGEST_MAX_DAYS). Suggestions are
+ * hints for the user to review; they never change a total.
+ */
+const emiMonth = async (db, userId, year, month, payments) => {
+  const unlinked = payments.filter(p => !isValidEmiLink(p.expense, p));
+  let nearby = [];
+  if (unlinked.length) {
+    const { gte, lt } = monthRange(year, month);
+    nearby = await db.expense.findMany({
+      where: {
+        userId,
+        type: 'expense',
+        emiPayment: { is: null },
+        investmentTransaction: { is: null },
+        NOT: { category: { equals: 'Investment', mode: 'insensitive' } },
+        amount: { in: [...new Set(unlinked.map(p => p.amount))] },
+        expenseDate: { gte: new Date(gte.getTime() - EMI_SUGGEST_MAX_DAYS * DAY_MS), lt: new Date(lt.getTime() + EMI_SUGGEST_MAX_DAYS * DAY_MS) },
+      },
+      select: EMI_LINK_EXPENSE_SELECT,
+      orderBy: { expenseDate: 'asc' },
+    });
+  }
+  const list = payments.map((p) => {
+    const linked = isValidEmiLink(p.expense, p);
+    return {
+      id: p.id,
+      emiId: p.emiId,
+      title: p.emi.title,
+      amount: toApiAmount(toPaise(p.amount)),
+      paidAt: p.paidAt,
+      linkedTransaction: linked ? serializeLinkableExpense(p.expense) : null,
+      possibleDuplicates: linked ? [] : nearby
+        .filter(e => toPaise(e.amount) === toPaise(p.amount) && daysApart(e.expenseDate, p.paidAt) <= EMI_SUGGEST_MAX_DAYS)
+        .map(serializeLinkableExpense),
+    };
+  });
+  return {
+    payments: list,
+    paid: toApiAmount(calc.sumPaise(payments.map(p => toPaise(p.amount)))),
+    possibleDoubleCounts: list.filter(p => p.possibleDuplicates.length).length,
+  };
+};
+
+// The starting lines of a brand-new plan. Rent and EMI are fixed costs; the rest vary. All are
+// planned amounts only and can be edited or deleted.
+const DEFAULT_RENT = '2500.00';
+const DEFAULT_LINES = [
+  { group: 'FIXED', name: 'Rent', matchCategories: [] },
+  { group: 'FIXED', name: 'EMI', matchCategories: [calc.EMI_CATEGORY] },
+  { group: 'FIXED', name: 'Mess / Food', matchCategories: ['Food'] },
+  { group: 'VARIABLE', name: 'Travel', matchCategories: ['Travel'] },
+  { group: 'VARIABLE', name: 'Other Personal', matchCategories: ['Shopping', 'Entertainment', 'Healthcare', 'Other'] },
+];
+
+// What the user's active fixed EMIs ask for each month, as a starting figure for the EMI line.
+const plannedEmiAmount = async (tx, userId) => {
+  const emis = await tx.eMI.findMany({ where: { userId, active: true, type: 'FIXED' }, select: { emiAmount: true } });
+  return calc.paiseToDecimalString(calc.sumPaise(emis.map(e => e.emiAmount || 0)));
+};
+
+/**
+ * Adds the default lines a plan does not already cover. A line counts as covered when an existing
+ * spending line shares its name or a distinctive word of it ("Rent / Accommodation" covers Rent),
+ * so pressing the button on a plan the user built never adds a second rent or EMI line.
+ */
+const addDefaultLines = async (tx, userId, plan) => {
+  const existing = await tx.budgetAllocation.findMany({ where: { planId: plan.id }, select: { name: true, group: true, sortOrder: true } });
+  const spendingWords = new Set(existing.filter(a => calc.EXPENSE_GROUPS.includes(a.group)).flatMap(a => calc.nameKeywords(a.name)));
+  const names = new Set(existing.map(a => a.name.toLowerCase()));
+  const missing = DEFAULT_LINES.filter(d => !names.has(d.name.toLowerCase()) && !calc.nameKeywords(d.name).some(w => spendingWords.has(w)));
+  if (!missing.length) return 0;
+  const emiAmount = missing.some(d => d.name === 'EMI') ? await plannedEmiAmount(tx, userId) : '0.00';
+  const start = existing.reduce((max, a) => Math.max(max, a.sortOrder + 1), 0);
+  const { count } = await tx.budgetAllocation.createMany({
+    data: missing.map((d, i) => ({
+      planId: plan.id,
+      group: d.group,
+      name: d.name,
+      plannedAmount: d.name === 'Rent' ? DEFAULT_RENT : d.name === 'EMI' ? emiAmount : '0.00',
+      matchCategories: d.matchCategories,
+      recurring: true,
+      sortOrder: start + i,
+    })),
+    skipDuplicates: true,
+  });
+  return count;
+};
+
 /**
  * Everything the planner shows for one month. Read-only: it never creates plans or records, and
  * it only reads the user's existing transactions, so nothing recorded in History is duplicated.
@@ -190,7 +340,7 @@ const ALLOCATION_ORDER = [{ sortOrder: 'asc' }, { createdAt: 'asc' }];
  */
 const getMonth = async (userId, year, month, { includeSpending = false } = {}, db = prisma) => {
   const range = monthRange(year, month);
-  const [salaries, plan, transactions, emiPayments, contributions] = await Promise.all([
+  const [salaries, plan, transactions, emiPayments, contributions, salaryBacked] = await Promise.all([
     db.monthlySalary.findMany({ where: { userId, year, month }, include: SALARY_INCLUDE, orderBy: [{ createdAt: 'asc' }] }),
     db.budgetPlan.findUnique({ where: { userId_year_month: { userId, year, month } }, include: { allocations: { orderBy: ALLOCATION_ORDER } } }),
     db.expense.findMany({
@@ -198,15 +348,19 @@ const getMonth = async (userId, year, month, { includeSpending = false } = {}, d
       select: {
         id: true, type: true, title: true, category: true, amount: true, expenseDate: true, paymentMethod: true,
         investmentTransaction: { select: { id: true, planId: true } }, allocationAssignment: { select: { allocationId: true } },
+        emiPayment: { select: { id: true, amount: true, paidAt: true } },
       },
       orderBy: [{ expenseDate: 'desc' }, { createdAt: 'desc' }],
     }),
     db.eMIPayment.findMany({
       where: { emi: { userId }, paidAt: range },
-      select: { id: true, amount: true, paidAt: true, emi: { select: { title: true } } },
+      select: { id: true, emiId: true, amount: true, paidAt: true, emi: { select: { title: true } }, expense: { select: EMI_LINK_EXPENSE_SELECT } },
       orderBy: { paidAt: 'desc' },
     }),
     db.savingsContribution.findMany({ where: { goal: { userId }, date: range }, select: { goalId: true, type: true, amount: true } }),
+    // Income dated this month that a received record (this month's or last month's salary paid
+    // late) already counts, so it is not counted again as other income.
+    db.monthlySalary.findMany({ where: { userId, expense: { is: { expenseDate: range, type: 'income' } } }, include: SALARY_INCLUDE }),
   ]);
 
   const allocations = plan?.allocations || [];
@@ -220,6 +374,7 @@ const getMonth = async (userId, year, month, { includeSpending = false } = {}, d
       // The category decides, exactly as in Analytics: a buy recategorised in History is no longer
       // an investment anywhere, and nothing is counted as both.
       isInvestment: false,
+      emiLinked: isValidEmiLink(t, t.emiPayment),
       assignedAllocationId: t.allocationAssignment?.allocationId,
     })),
     emiPayments.map(p => ({ id: p.id, amountPaise: toPaise(p.amount) })),
@@ -236,8 +391,13 @@ const getMonth = async (userId, year, month, { includeSpending = false } = {}, d
   contributions.forEach(c => addNet(c.goalId, c.type === 'WITHDRAWAL' ? -toPaise(c.amount) : toPaise(c.amount)));
   transactions.filter(t => t.investmentTransaction && isInvestmentCategory(t.category)).forEach(t => addNet(t.investmentTransaction.planId, t.type === 'income' ? -toPaise(t.amount) : toPaise(t.amount)));
   const savingsNet = calc.sumPaise(contributions.map(c => (c.type === 'WITHDRAWAL' ? -toPaise(c.amount) : toPaise(c.amount))));
+  const income = calc.summarizeIncome(incomeInput(salaries));
+  const countedByRecord = new Set(salaryBacked.filter(isReceived).map(r => r.expenseId));
+  const otherIncome = calc.sumPaise(transactions
+    .filter(t => t.type === 'income' && !isInvestmentCategory(t.category) && !countedByRecord.has(t.id))
+    .map(t => toPaise(t.amount)));
   const summary = calc.buildMonthSummary({
-    income: calc.summarizeIncome(incomeInput(salaries)),
+    income,
     plan: calc.summarizePlan(allocations.map(a => ({ group: a.group, plannedPaise: toPaise(a.plannedAmount) }))),
     actuals,
     savingsNet,
@@ -251,10 +411,21 @@ const getMonth = async (userId, year, month, { includeSpending = false } = {}, d
       year: plan.year,
       month: plan.month,
       note: plan.note,
+      savingsPercent: plan.savingsPercent,
       allocations: allocations.map(a => serializeAllocation(a, matched.byAllocation.get(a.id) ?? 0n, counts.get(a.id) || 0, linkedNet)),
     } : null,
     salaries: salaries.map(serializeSalary),
     summary: serializeSummary(summary, plan ? matched.unplannedByCategory : []),
+    position: serializePosition(calc.planPosition({
+      expectedIncome: income.expected,
+      receivedIncome: income.received + otherIncome,
+      plannedExpenses: summary.plan.plannedExpenses,
+      actualExpenses: actuals.expenses,
+      investedNet: actuals.investmentNet,
+      savingsPercent: plan?.savingsPercent ?? calc.DEFAULT_SAVINGS_PERCENT,
+    })),
+    receivedBreakdown: rupees({ fromRecords: income.received, otherIncome }),
+    emi: await emiMonth(db, userId, year, month, emiPayments),
     ...(includeSpending && { spending: serializeSpending(matched.resolved, transactions, emiPayments) }),
   };
 };
@@ -306,12 +477,20 @@ const initializeSalaries = async (tx, userId, year, month) => {
  * concurrent calls cannot create two plans or duplicate salary records, and only the call that
  * actually created the plan copies allocations into it.
  */
-const initializeMonth = (userId, year, month) => prisma.$transaction(async (tx) => {
+const initializeMonth = (userId, year, month, { defaults = false } = {}) => prisma.$transaction(async (tx) => {
   const { count: planCreated } = await tx.budgetPlan.createMany({ data: [{ userId, year, month }], skipDuplicates: true });
   const plan = await tx.budgetPlan.findUnique({ where: { userId_year_month: { userId, year, month } } });
   const copiedAllocations = planCreated ? await copyRecurringAllocations(tx, userId, plan) : 0;
+  if (planCreated) {
+    const earlier = await latestEarlierPlan(tx, userId, year, month);
+    if (earlier && earlier.savingsPercent !== plan.savingsPercent) {
+      await tx.budgetPlan.update({ where: { id: plan.id }, data: { savingsPercent: earlier.savingsPercent } });
+    }
+  }
+  // When asked, a plan with nothing to carry forward (the user's first) starts from the default lines.
+  const defaultLines = defaults && planCreated && copiedAllocations === 0 ? await addDefaultLines(tx, userId, plan) : 0;
   const addedSalaries = await initializeSalaries(tx, userId, year, month);
-  return { created: planCreated === 1, copiedAllocations, addedSalaries };
+  return { created: planCreated === 1, copiedAllocations, defaultLines, addedSalaries };
 });
 
 module.exports = {
@@ -320,6 +499,16 @@ module.exports = {
   isValidSalaryLink,
   isReceived,
   resetInvalidSalaryLinks,
+  isValidEmiLink,
+  resetInvalidEmiLinks,
+  EMI_LINK_MAX_DAYS,
+  EMI_LINK_EXPENSE_SELECT,
+  serializeLinkableExpense,
+  daysApart,
+  receivedWindow,
+  inReceivedWindow,
+  addDefaultLines,
+  DAY_MS,
   monthRange,
   currentPeriod,
   periodIndex,

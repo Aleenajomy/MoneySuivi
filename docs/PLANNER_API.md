@@ -4,6 +4,14 @@ All endpoints are under `/api/planner`, need `Authorization: Bearer <token>`, an
 change the signed-in user's records. A record that belongs to someone else returns **404**, the
 same as one that doesn't exist.
 
+The simplified planner screen uses the overview, income, salary, budget, record and EMI-link
+endpoints. The spending-reassignment, savings-goal, investment and bills endpoints below are kept
+unchanged, and so are their records, but the screen no longer calls them.
+
+Only two planner actions add a transaction: `receive` with `mode: "create"`, and `record` on an
+expense line. Undo with `deleteTransaction: true` and the investment endpoints are the only ones
+that remove or add transactions otherwise. Every other endpoint leaves balances untouched.
+
 ## Conventions
 
 - **Amounts.** Send numbers or strings with at most 2 decimals, from 0 up to 999,999,999,999.99.
@@ -23,8 +31,28 @@ same as one that doesn't exist.
 
 `GET /overview?year=&month=`
 
-Returns `{ year, month, plan, salaries, summary }`. It is read-only: it never creates a plan or a
-salary record. `plan` is `null` if the month hasn't been set up.
+Returns `{ year, month, plan, salaries, summary, position, receivedBreakdown, emi }`. It is
+read-only: it never creates a plan or a salary record. `plan` is `null` if the month hasn't been
+set up.
+
+`position` is what the simplified planner shows. It is calculated on every read and never stored
+or written anywhere, so it can't change a balance, create a transaction or move money:
+
+| Field | Meaning |
+|---|---|
+| `expectedIncome` | Expected amount of this month's salary records. |
+| `receivedIncome` | Received salary records for this month (linked, or "already in my balance") **plus** other non-investment income dated this month that no record counts. A salary for this month paid early next month counts here, not in the month it arrived. |
+| `plannedExpenses` | FIXED + VARIABLE lines. |
+| `actualExpenses` | Spending transactions this month plus EMI-tracker payments, with each EMI-linked History expense counted once (as the payment). |
+| `investedNet` | Net Investment-category money this month (0 unless the user records such transactions). |
+| `plannedRemaining` | `expectedIncome − plannedExpenses`. |
+| `actualRemaining` | `receivedIncome − actualExpenses − investedNet`. |
+| `suggestedSavings` / `actualSavingsPotential` | `savingsPercent`% of the planned / actual remaining, rounded down to the paisa, never negative. |
+| `savingsPercent` | The plan's share (default 20). |
+
+`emi.payments[]` lists this month's EMI-tracker payments with `linkedTransaction` (set only when
+the user linked it) and `possibleDuplicates` (same amount within 3 days, a hint that changes no
+total). `emi.possibleDoubleCounts` counts payments that have such hints.
 
 `summary` contains:
 
@@ -111,32 +139,62 @@ An income source is income the user expects every month.
 | POST | `/salaries/initialize` | `year`, `month` | Adds a pending record for each active source created by the end of that month. Safe to repeat or run concurrently. |
 | POST | `/salaries` | `year`, `month`, `label`, `expectedAmount`, `kind?` | One-off income for one month. |
 | PUT | `/salaries/:id` | `expectedAmount?`, `label?` | Changes this month only. |
-| GET | `/salaries/:id/candidates` | | Income transactions from 7 days before the month to its end that aren't linked to any record, so the user can link one instead of recording the income twice. `matchesExpected` flags exact amount matches. |
-| POST | `/salaries/:id/receive` | `{ mode: "create", receivedAmount, receivedAt, paymentMethod?, note? }` or `{ mode: "link", expenseId }` | See below. |
+| GET | `/salaries/:id/candidates` | | Unlinked, non-investment income transactions dated in the record's month or the month after, closest to the expected amount first. `matchesExpected` flags exact amount matches. |
+| POST | `/salaries/:id/receive` | `{ mode: "link", expenseId }`, `{ mode: "alreadyInBalance", receivedAmount, receivedAt }` or `{ mode: "create", receivedAmount, receivedAt, paymentMethod, confirmDuplicate?, note? }` | See below. There is no default mode and no default account. |
 | POST | `/salaries/:id/undo` | `deleteTransaction?` (boolean) | Sets the record back to pending. The linked transaction is kept unless `deleteTransaction` is true. |
 | DELETE | `/salaries/:id` | | Pending records only. A received record returns 409 until it is undone. |
 
-How `receive` works:
+How `receive` works. The received date may be in the record's (earning) month or the month after;
+anything else returns 400 `WRONG_MONTH`. The record always stays in its earning month.
 
-- `mode: "create"` adds one income transaction. Its category is Salary, or Other for the
-  `OTHER` kind. Its account comes from `paymentMethod`, the same way the Add Transaction form
-  sets it.
 - `mode: "link"` uses an existing income transaction that belongs to the user. It can't be an
-  investment, and it can't already be linked to another record.
-- Either way, it all runs in one database transaction that only succeeds while the record is
-  still pending. A double tap or a second device gets 409, and nothing extra is created.
+  investment, and it can't already be linked to another record. Nothing is created.
+- `mode: "alreadyInBalance"` marks the record received with the given amount and date and sets
+  `countedInBalance`. No transaction is created and no balance changes. Undo simply clears it.
+- `mode: "create"` adds one income transaction dated on `receivedAt`, so the balance moves on the
+  day the money arrived. `paymentMethod` is required and sets the account. Its category is Salary,
+  or Other for the `OTHER` kind. If an unlinked income of that category already exists in the
+  window, it returns 409 `POSSIBLE_DUPLICATE` with `candidates`, and creates nothing; send
+  `confirmDuplicate: true` only when the user confirms it is a different payment.
+- Each mode runs in one database transaction that only succeeds while the record is still pending.
+  A double tap or a second device gets 409, and nothing extra is created.
+
+Each salary in a response has `receivedVia`: `TRANSACTION`, `ALREADY_IN_BALANCE` or `null`.
 
 ## Monthly budgets
 
 | Method | Path | Body | Notes |
 |---|---|---|---|
 | GET | `/budgets?year=&month=` | | `{ plan, summary }`. Read-only. |
-| POST | `/budgets` | `year`, `month` | Sets up the month and is idempotent. It creates the plan if missing (201, else 200) and copies **only** the lines marked `recurring` from the latest earlier plan, and only when the plan is new. It also adds pending salary records. It never copies transactions. |
-| PUT | `/budgets/:id` | `note?`, `allocations?: [{ id, ...fields }]` | Bulk edit. Either all of it is saved or none of it is. |
+| POST | `/budgets` | `year`, `month`, `defaults?` | Sets up the month and is idempotent. It creates the plan if missing (201, else 200) and copies **only** the lines marked `recurring` from the latest earlier plan, and only when the plan is new. With `defaults: true`, a new plan with nothing to copy starts with the default lines (below). It also adds pending salary records. It never copies or creates transactions. |
+| PUT | `/budgets/:id` | `note?`, `savingsPercent?` (0-100), `allocations?: [{ id, ...fields }]` | Bulk edit. Either all of it is saved or none of it is. |
+| POST | `/budgets/:id/default-lines` | | Adds the default lines this plan doesn't already cover (by name or a distinctive word: "Rent / Accommodation" covers Rent). Returns `added`. |
+| POST | `/budgets/allocations/:allocationId/record` | `amount`, `date` (in the plan's month), `paymentMethod`, `title?`, `note?` | Records **one** spending transaction pinned to that line. 201 with `expenseId`. The same payment repeated on the same line within 15 seconds returns the first one (200, `repeated: true`). Not allowed on an EMI line (400 `EMI_LINE`). |
 | POST | `/budgets/:id/copy-recurring` | | Adds recurring lines from the latest earlier plan that this month doesn't have, matched by name. Lines already in this month aren't changed. Returns `copied`. |
 | POST | `/budgets/:id/allocations` | `group`, `name`, `plannedAmount`, `matchCategories?`, `recurring?` (default true), `sortOrder?` | `name` must be unique within the month (409). |
 | PUT | `/budgets/allocations/:allocationId` | any allocation field | Changes this month only. |
 | DELETE | `/budgets/allocations/:allocationId` | | Changes this month only. |
+
+Default lines: Rent (FIXED, ₹2,500), EMI (FIXED, the sum of the user's active fixed EMI amounts,
+matches `EMI`), Mess / Food (FIXED, matches Food), Travel (VARIABLE) and Other Personal
+(VARIABLE, matches Shopping, Entertainment, Healthcare, Other). All are planned amounts only and
+can be edited or deleted.
+
+## EMI payment links
+
+An EMI-tracker payment never creates a transaction, so a user who also adds the payment in
+History would see it twice in the planner. The user can link the two; nothing is matched
+automatically, and linking never changes a transaction, EMI or balance.
+
+| Method | Path | Body | Notes |
+|---|---|---|---|
+| GET | `/emi-payments/:paymentId/candidates` | | Unlinked spending within 31 days of the payment, exact amount first, then nearest date. Each has `sameAmount` and `daysApart`. |
+| PUT | `/emi-payments/:paymentId/link` | `expenseId` | Refused unless the transaction is the user's spending (not income, a transfer or an investment, 400 `NOT_SPENDING`), has exactly the payment's amount (`AMOUNT_MISMATCH`) and is within 31 days (`TOO_FAR_APART`). One transaction backs one payment (409). Returns the payment's month. |
+| DELETE | `/emi-payments/:paymentId/link` | | Removes only the link. |
+
+A linked expense is left out of spending, because the payment already counts it. If the user later
+edits it in History so it no longer qualifies, or deletes it, the link is removed in the same step
+and the expense counts as ordinary spending again.
 
 Allocation fields:
 

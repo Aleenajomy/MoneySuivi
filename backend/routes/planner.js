@@ -9,6 +9,7 @@ const budget = require('../controllers/plannerBudgetController');
 const goals = require('../controllers/plannerGoalController');
 const investments = require('../controllers/plannerInvestmentController');
 const bills = require('../controllers/plannerBillsController');
+const emi = require('../controllers/plannerEmiController');
 
 const PAYMENT_METHODS = ['UPI', 'Cash', 'Credit Card', 'Debit Card', 'Net Banking', 'Other'];
 const YEAR = { min: 2000, max: 2100 };
@@ -128,15 +129,30 @@ const allocationRules = (prefix, optional) => [
   linkId(`${prefix}investmentPlanId`),
 ];
 
+// There is no default mode and no default account: the user always chooses how the money is
+// counted, and which balance a new transaction lands in.
+const RECEIVE_MODES = ['link', 'alreadyInBalance', 'create'];
+const notLink = body('mode').isIn(['alreadyInBalance', 'create']);
 const receiveRules = [
-  body('mode').isIn(['create', 'link']).withMessage('mode must be create or link'),
+  body('mode').isIn(RECEIVE_MODES).withMessage(`mode must be one of: ${RECEIVE_MODES.join(', ')}`),
   body('expenseId').if(body('mode').equals('link')).isUUID().withMessage('expenseId is required to link a transaction'),
-  money('receivedAmount', { allowZero: false, when: body('mode').equals('create') }),
-  body('receivedAt').if(body('mode').equals('create')).exists({ values: 'falsy' }).withMessage('receivedAt is required').bail()
+  money('receivedAmount', { allowZero: false, when: notLink }),
+  body('receivedAt').if(notLink).exists({ values: 'falsy' }).withMessage('receivedAt is required').bail()
     // Strict: an impossible day such as 2026-02-30 is rejected rather than rolled into March.
     .matches(/^\d{4}-\d{2}-\d{2}/).withMessage('receivedAt must be a date like 2026-11-01').bail()
     .isISO8601({ strict: true, strictSeparator: true }).withMessage('receivedAt must be a valid date'),
-  body('paymentMethod').optional({ values: 'null' }).isIn(PAYMENT_METHODS).withMessage(`paymentMethod must be one of: ${PAYMENT_METHODS.join(', ')}`),
+  body('paymentMethod').if(body('mode').equals('create')).exists({ values: 'falsy' }).withMessage('Choose the account the money arrived in').bail()
+    .isIn(PAYMENT_METHODS).withMessage(`paymentMethod must be one of: ${PAYMENT_METHODS.join(', ')}`),
+  body('confirmDuplicate').optional().isBoolean({ strict: true }).withMessage('confirmDuplicate must be true or false'),
+  v.text('note', { max: 500 }),
+];
+
+const recordRules = [
+  money('amount', { allowZero: false }),
+  strictDate('date'),
+  body('paymentMethod').exists({ values: 'falsy' }).withMessage('Choose the account you paid from').bail()
+    .isIn(PAYMENT_METHODS).withMessage(`paymentMethod must be one of: ${PAYMENT_METHODS.join(', ')}`),
+  name('title'),
   v.text('note', { max: 500 }),
 ];
 
@@ -166,13 +182,16 @@ router.delete('/salaries/:id', v.uuidParam(), validate, income.deleteSalary);
 
 router.get('/budgets', yearMonthQuery, validate, budget.getBudget);
 router.get('/budgets/spending', yearMonthQuery, validate, budget.getSpending);
-router.post('/budgets', yearMonthBody, validate, budget.createBudget);
+router.post('/budgets', [...yearMonthBody, body('defaults').optional().isBoolean({ strict: true }).withMessage('defaults must be true or false')], validate, budget.createBudget);
 router.put('/budgets/allocations/:allocationId', v.uuidParam('allocationId'), allocationRules('', true), validate, budget.updateAllocation);
 router.delete('/budgets/allocations/:allocationId', v.uuidParam('allocationId'), validate, budget.deleteAllocation);
 router.post('/budgets/:id/copy-recurring', v.uuidParam(), validate, budget.copyRecurring);
 router.post('/budgets/:id/allocations', v.uuidParam(), allocationRules('', false), validate, budget.addAllocation);
+router.post('/budgets/allocations/:allocationId/record', v.uuidParam('allocationId'), recordRules, validate, budget.recordExpense);
+router.post('/budgets/:id/default-lines', v.uuidParam(), validate, budget.addDefaultLines);
 router.put('/budgets/:id', v.uuidParam(), [
   v.text('note', { max: 500 }),
+  body('savingsPercent').optional().isInt({ min: 0, max: 100 }).withMessage('savingsPercent must be a whole number from 0 to 100').toInt(),
   body('allocations').optional().isArray({ max: 100 }).withMessage('allocations must be a list of at most 100 items'),
   body('allocations.*.id').isUUID().withMessage('Each allocation needs a valid id'),
   ...allocationRules('allocations.*.', true),
@@ -183,6 +202,11 @@ router.put('/transactions/:expenseId/assignment', v.uuidParam('expenseId'),
 router.delete('/transactions/:expenseId/assignment', v.uuidParam('expenseId'), validate, budget.clearAssignment);
 
 router.get('/bills', optionalPeriodQuery, validate, bills.getBills);
+
+router.get('/emi-payments/:paymentId/candidates', v.uuidParam('paymentId'), validate, emi.getCandidates);
+router.put('/emi-payments/:paymentId/link', v.uuidParam('paymentId'),
+  body('expenseId').isUUID().withMessage('expenseId must be a valid id'), validate, emi.linkPayment);
+router.delete('/emi-payments/:paymentId/link', v.uuidParam('paymentId'), validate, emi.unlinkPayment);
 
 router.get('/goals', optionalPeriodQuery, validate, goals.listGoals);
 router.post('/goals', goalRules(false), validate, goals.createGoal);
