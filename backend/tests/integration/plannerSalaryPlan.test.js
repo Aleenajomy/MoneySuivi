@@ -208,7 +208,7 @@ test('editing EMI in the planner changes only the plan, never the EMI records or
   const { user, p } = await seedUser();
   await p.init(now);
   const start = await snapshot(user);
-  const { plan: values, emiTrackerTotal, summary } = (await p.put(now, { emiAmount: 3000, rentAmount: 3000 })).body;
+  const { plan: values, emiTrackerTotal, summary } = (await p.put(now, { salaryAmount: 15000, emiAmount: 3000, rentAmount: 3000 })).body;
   assert.equal(values.emiAmount, 3000);
   assert.equal(emiTrackerTotal, 4100);
   assert.equal(summary.afterFixed, 9000);
