@@ -288,8 +288,9 @@ const emiMonth = async (db, userId, year, month, payments) => {
   };
 };
 
-// The starting lines of a brand-new plan. All planned amounts default to 0.00 and can be edited or deleted.
-const DEFAULT_RENT = '0.00';
+// The starting lines of a brand-new plan. Rent and EMI are fixed costs; the rest vary. All are
+// planned amounts only and can be edited or deleted.
+const DEFAULT_RENT = '2500.00';
 const DEFAULT_LINES = [
   { group: 'FIXED', name: 'Rent', matchCategories: [] },
   { group: 'FIXED', name: 'EMI', matchCategories: [calc.EMI_CATEGORY] },

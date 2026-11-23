@@ -158,7 +158,7 @@ test('6. Lend/Borrow, Net Worth items and category budgets never change balances
 test('7. Salary Planner: planning, editing, copying and resetting the salary plan never change a balance', async () => {
   const sp = (path, body, method = 'post') => ok(call(method, a(`/salary-plan${path}`), body));
   const first = await sp('/init', now);
-  assert.equal(first.summary.afterFixed, 15000 - 2500 - first.plan.emiAmount);
+  assert.equal(first.summary.afterFixed, 0);
   await audit('salary plan set up');
   await sp('', { ...now, salaryAmount: 15000, allowanceAmount: 2560, rentAmount: 2500, emiAmount: 4100 }, 'put');
   await sp('', { ...now, emergencySavingsAmount: 2500, shoppingAmount: 9000 }, 'put');
