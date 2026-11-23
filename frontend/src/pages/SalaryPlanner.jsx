@@ -158,7 +158,7 @@ function Plan() {
       <ConfirmDialog
         open={confirmReset}
         title="Reset to your default plan?"
-        message="This month's amounts go back to Salary ₹15,000, Allowance ₹2,560, Rent ₹2,500, EMI from Loans & EMIs, and savings/spending of ₹2,000, ₹2,000, ₹1,500, ₹1,000 and ₹1,000. Only planned amounts change; no transaction or balance is touched."
+        message="This month's planned amounts will be reset to ₹0. Only planned amounts change; no transaction or balance is touched."
         confirmText="Reset"
         variant="warning"
         onConfirm={() => { setConfirmReset(false); resetToDefault() }}

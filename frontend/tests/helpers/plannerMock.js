@@ -7,8 +7,8 @@ const rupees = (p) => p / 100;
 const percent = (part, whole) => (whole > 0 ? Math.round((part * 100) / whole) : null);
 
 export const DEFAULT_PLAN = {
-  salaryAmount: 15000, allowanceAmount: 2560, rentAmount: 2500, emiAmount: 4100,
-  emergencySavingsAmount: 2000, generalSavingsAmount: 2000, shoppingAmount: 1500, travelAmount: 1000, foodAmount: 1000,
+  salaryAmount: 0, allowanceAmount: 0, rentAmount: 0, emiAmount: 0,
+  emergencySavingsAmount: 0, generalSavingsAmount: 0, shoppingAmount: 0, travelAmount: 0, foodAmount: 0,
 };
 
 const summarize = (plan) => {
@@ -73,7 +73,7 @@ export async function setupPlannerMock(page, options = {}) {
       if (state.loadDelayMs) await new Promise(r => setTimeout(r, state.loadDelayMs));
       if (state.failLoad) return json(route, 500, { success: false, message: 'Something went wrong. Please try again.' });
       const created = !state.plans[key(period)];
-      if (created) state.plans[key(period)] = { ...(latestEarlier(period) || { ...DEFAULT_PLAN, emiAmount: state.emiTrackerTotal }) };
+      if (created) state.plans[key(period)] = { ...(latestEarlier(period) || { ...DEFAULT_PLAN }) };
       return json(route, created ? 201 : 200, { ...body(period), created });
     }
     if (path === '/salary-plan' && method === 'PUT') {
@@ -86,7 +86,7 @@ export async function setupPlannerMock(page, options = {}) {
       return json(route, 200, body(period));
     }
     if (path === '/salary-plan/reset' && method === 'POST') {
-      state.plans[key(period)] = { ...DEFAULT_PLAN, emiAmount: state.emiTrackerTotal };
+      state.plans[key(period)] = { ...DEFAULT_PLAN };
       return json(route, 200, body(period));
     }
     state.otherPlannerCalls.push(`${method} ${path}`);

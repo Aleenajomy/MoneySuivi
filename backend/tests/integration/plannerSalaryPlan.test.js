@@ -71,11 +71,11 @@ const seedUser = async () => {
 };
 
 const DEFAULTS = {
-  salaryAmount: 15000, allowanceAmount: 2560, rentAmount: 2500, emiAmount: 4100,
-  emergencySavingsAmount: 2000, generalSavingsAmount: 2000, shoppingAmount: 1500, travelAmount: 1000, foodAmount: 1000,
+  salaryAmount: 0, allowanceAmount: 0, rentAmount: 0, emiAmount: 0,
+  emergencySavingsAmount: 0, generalSavingsAmount: 0, shoppingAmount: 0, travelAmount: 0, foodAmount: 0,
 };
 
-test('first month starts from the default plan, with EMI taken from active fixed EMIs', async () => {
+test('first month starts from the default plan with all amounts at 0', async () => {
   const { user, p } = await seedUser();
   const start = await snapshot(user);
   const res = await p.init(now);
@@ -88,7 +88,18 @@ test('first month starts from the default plan, with EMI taken from active fixed
 
 test('the calculation: ₹15,000 − ₹2,500 − ₹4,100 = ₹8,400; extra balance ₹900; savings ₹4,000; expenses ₹10,100', async () => {
   const { p } = await seedUser();
-  const { summary } = (await p.init(now)).body;
+  await p.init(now);
+  const { summary } = (await p.put(now, {
+    salaryAmount: 15000,
+    allowanceAmount: 2560,
+    rentAmount: 2500,
+    emiAmount: 4100,
+    emergencySavingsAmount: 2000,
+    generalSavingsAmount: 2000,
+    shoppingAmount: 1500,
+    travelAmount: 1000,
+    foodAmount: 1000,
+  })).body;
   assert.deepEqual(summary, {
     salary: 15000,
     allowance: 2560,
@@ -116,6 +127,16 @@ test('the calculation: ₹15,000 − ₹2,500 − ₹4,100 = ₹8,400; extra bal
 test('the company allowance is shown separately and never enters the salary budget', async () => {
   const { p } = await seedUser();
   await p.init(now);
+  await p.put(now, {
+    salaryAmount: 15000,
+    rentAmount: 2500,
+    emiAmount: 4100,
+    emergencySavingsAmount: 2000,
+    generalSavingsAmount: 2000,
+    shoppingAmount: 1500,
+    travelAmount: 1000,
+    foodAmount: 1000,
+  });
   const base = (await p.get(now)).body.summary;
   const { summary } = (await p.put(now, { allowanceAmount: 9999 })).body;
   assert.equal(summary.incomeWithAllowance, 15000 + 9999);
@@ -128,6 +149,15 @@ test('the company allowance is shown separately and never enters the salary budg
 test('extra balance is calculated, and allocating more than is left shows the over-budget amount', async () => {
   const { p } = await seedUser();
   await p.init(now);
+  await p.put(now, {
+    salaryAmount: 15000,
+    rentAmount: 2500,
+    emiAmount: 4100,
+    emergencySavingsAmount: 2000,
+    generalSavingsAmount: 2000,
+    travelAmount: 1000,
+    foodAmount: 1000,
+  });
   let { summary } = (await p.put(now, { shoppingAmount: 2400 })).body;
   assert.equal(summary.extraBalance, 0);
   assert.equal(summary.overBudget, 0, 'exactly the full ₹8,400');
@@ -148,8 +178,8 @@ test('amounts in paise are exact', async () => {
   const { p } = await seedUser();
   await p.init(now);
   const { summary } = (await p.put(now, { salaryAmount: '15000.10', rentAmount: '2500.20', foodAmount: '999.99' })).body;
-  assert.equal(summary.afterFixed, 8399.9);
-  assert.equal(summary.extraBalance, 899.91);
+  assert.equal(summary.afterFixed, 12499.9);
+  assert.equal(summary.extraBalance, 11499.91);
 });
 
 test('a new month copies the previous month; editing one month never changes another', async () => {
@@ -185,7 +215,7 @@ test('editing EMI in the planner changes only the plan, never the EMI records or
   assert.deepEqual(await snapshot(user), start);
 });
 
-test('reset restores the default plan with the current EMI total; nothing else changes', async () => {
+test('reset restores the default plan with all amounts at 0; nothing else changes', async () => {
   const { user, p } = await seedUser();
   await p.init(now);
   await p.put(now, { salaryAmount: 1, allowanceAmount: 0, emiAmount: 0, foodAmount: 7 });

@@ -3,16 +3,17 @@ const calc = require('../utils/plannerCalculations');
 
 const { SALARY_PLAN_FIELDS, toPaise, toApiAmount, paiseToDecimalString } = calc;
 
-// The user's starting plan, used only for their very first month. EMI comes from Loans & EMIs.
+// The user's starting plan, used only for their very first month. All default planner values are 0.
 const INITIAL_PLAN = {
-  salaryAmount: '15000.00',
-  allowanceAmount: '2560.00',
-  rentAmount: '2500.00',
-  emergencySavingsAmount: '2000.00',
-  generalSavingsAmount: '2000.00',
-  shoppingAmount: '1500.00',
-  travelAmount: '1000.00',
-  foodAmount: '1000.00',
+  salaryAmount: '0.00',
+  allowanceAmount: '0.00',
+  rentAmount: '0.00',
+  emiAmount: '0.00',
+  emergencySavingsAmount: '0.00',
+  generalSavingsAmount: '0.00',
+  shoppingAmount: '0.00',
+  travelAmount: '0.00',
+  foodAmount: '0.00',
 };
 
 /**
@@ -24,9 +25,8 @@ const emiTrackerTotal = async (userId, db = prisma) => {
   return calc.sumPaise(emis.map(e => e.emiAmount || 0));
 };
 
-const defaultValues = async (userId, db) => ({
+const defaultValues = async () => ({
   ...INITIAL_PLAN,
-  emiAmount: paiseToDecimalString(await emiTrackerTotal(userId, db)),
 });
 
 const isSetUp = (plan) => Boolean(plan) && plan.salaryAmount !== null;

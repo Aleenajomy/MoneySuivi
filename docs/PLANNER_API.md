@@ -32,9 +32,8 @@ Fields: `salaryAmount`, `allowanceAmount`, `rentAmount`, `emiAmount`, `emergency
 `generalSavingsAmount`, `shoppingAmount`, `travelAmount`, `foodAmount`.
 
 **Default plan:**
-- Salary ₹15,000 and company mess allowance ₹2,560.
-- Rent ₹2,500, and EMI = the total of the user's active fixed EMIs (`emiTrackerTotal`).
-- Emergency and general savings ₹2,000 each, shopping ₹1,500, travel ₹1,000, food ₹1,000.
+- All planned figures (`salaryAmount`, `allowanceAmount`, `rentAmount`, `emiAmount`, `emergencySavingsAmount`, `generalSavingsAmount`, `shoppingAmount`, `travelAmount`, `foodAmount`) start at 0 (`0.00`).
+- `emiTrackerTotal` returns the total of the user's active fixed EMIs so the user can import it with one click if desired.
 
 Editing `emiAmount` changes the plan only, never an EMI or its payments.
 

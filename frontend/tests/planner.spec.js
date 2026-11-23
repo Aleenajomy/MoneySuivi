@@ -28,30 +28,29 @@ test.describe('Salary Planner', () => {
     await setupApiMocks(page, { loggedIn: true });
   });
 
-  test('shows the four sections and the default plan with the agreed calculation', async ({ page }) => {
+  test('shows the four sections and the default plan with all values as 0', async ({ page }) => {
     const mock = await setupPlannerMock(page);
     await page.goto('/#/');
     await page.locator('nav[aria-label="Mobile Bottom Navigation"]').getByRole('button', { name: 'Salary Planner' }).click();
     await expect(page).toHaveURL(/#\/planner$/);
 
-    for (const name of ['A. Monthly Salary', 'B. Fixed Expenses', 'C. Monthly Budget (from ₹8,400)', 'D. Savings Summary']) {
+    for (const name of ['A. Monthly Salary', 'B. Fixed Expenses', 'C. Monthly Budget (from ₹0)', 'D. Savings Summary']) {
       await expect(page.getByRole('heading', { name })).toBeVisible();
     }
-    await expect(field(page, 'Salary')).toHaveValue('15000');
-    await expect(field(page, 'Company mess allowance')).toHaveValue('2560');
-    await expect(field(page, 'EMI')).toHaveValue('4100');
-    await expect(field(page, 'Room rent')).toHaveValue('2500');
+    await expect(field(page, 'Salary')).toHaveValue('0');
+    await expect(field(page, 'Company mess allowance')).toHaveValue('0');
+    await expect(field(page, 'EMI')).toHaveValue('0');
+    await expect(field(page, 'Room rent')).toHaveValue('0');
     await expect(page.getByTestId('income-with-allowance')).toContainText('Total Income + Allowance');
-    await expect(page.getByTestId('income-with-allowance')).toContainText('₹17,560');
-    await expect(page.getByTestId('after-fixed')).toContainText('₹8,400');
-    await expect(page.getByTestId('extra-balance')).toContainText('₹900');
-    await expect(page.getByTestId('budget-total')).toContainText('₹8,400');
-    await expect(page.getByTestId('planned-savings')).toContainText('₹4,000');
-    await expect(page.getByTestId('planned-expenses')).toContainText('₹10,100');
-    await expect(page.getByTestId('money-remaining')).toContainText('₹900');
+    await expect(page.getByTestId('income-with-allowance')).toContainText('₹0');
+    await expect(page.getByTestId('after-fixed')).toContainText('₹0');
+    await expect(page.getByTestId('extra-balance')).toContainText('₹0');
+    await expect(page.getByTestId('budget-total')).toContainText('₹0');
+    await expect(page.getByTestId('planned-savings')).toContainText('₹0');
+    await expect(page.getByTestId('planned-expenses')).toContainText('₹0');
+    await expect(page.getByTestId('money-remaining')).toContainText('₹0');
     const bar = page.getByTestId('salary-breakdown');
-    await expect(bar).toContainText('Where your ₹15,000 goes');
-    for (const text of ['₹6,600', '44%', '₹3,500', '23%', '₹4,000', '27%', '₹900', '6%']) await expect(bar).toContainText(text);
+    await expect(bar).toContainText('Where your ₹0 goes');
 
     for (const gone of ['Mark received', 'Record', 'Add source', 'Invest', 'Goals', 'Reset planner']) {
       await expect(page.getByRole('button', { name: gone, exact: true })).toHaveCount(0);
@@ -66,13 +65,15 @@ test.describe('Salary Planner', () => {
   test('editing amounts saves the plan, recalculates, and never touches money', async ({ page }) => {
     const mock = await setupPlannerMock(page);
     await page.goto('/#/planner');
+    await setAmount(page, 'Salary', 15000);
     await setAmount(page, 'Travel', 800);
     await expect(page.getByRole('status')).toContainText('Saved');
-    await expect(page.getByTestId('extra-balance')).toContainText('₹1,100');
+    await expect(page.getByTestId('extra-balance')).toContainText('₹14,200');
     await setAmount(page, 'Room rent', 3000);
-    await expect(page.getByTestId('after-fixed')).toContainText('₹7,900');
-    await expect(page.getByTestId('extra-balance')).toContainText('₹600');
+    await expect(page.getByTestId('after-fixed')).toContainText('₹12,000');
+    await expect(page.getByTestId('extra-balance')).toContainText('₹11,200');
     expect(mock.requests.filter(r => r.method === 'PUT').map(r => r.body)).toEqual([
+      { ...thisMonth, salaryAmount: '15000' },
       { ...thisMonth, travelAmount: '800' },
       { ...thisMonth, rentAmount: '3000' },
     ]);
@@ -82,16 +83,19 @@ test.describe('Salary Planner', () => {
   test('the allowance changes only "Total Income + Allowance", never the budget', async ({ page }) => {
     const mock = await setupPlannerMock(page);
     await page.goto('/#/planner');
+    await setAmount(page, 'Salary', 15000);
+    await setAmount(page, 'Room rent', 2500);
     await setAmount(page, 'Company mess allowance', 3000);
     await expect(page.getByTestId('income-with-allowance')).toContainText('₹18,000');
-    await expect(page.getByTestId('after-fixed')).toContainText('₹8,400');
-    await expect(page.getByTestId('money-remaining')).toContainText('₹900');
+    await expect(page.getByTestId('after-fixed')).toContainText('₹12,500');
+    await expect(page.getByTestId('money-remaining')).toContainText('₹12,500');
     noMoneyTouched(mock);
   });
 
   test('allocating more than is left shows the over-budget amount instead of a balance', async ({ page }) => {
     const mock = await setupPlannerMock(page);
     await page.goto('/#/planner');
+    await setAmount(page, 'Salary', 2400);
     await setAmount(page, 'Shopping / personal needs', 2500);
     const warning = page.getByTestId('over-budget');
     await expect(warning).toContainText('Over budget by ₹100');
@@ -129,12 +133,12 @@ test.describe('Salary Planner', () => {
     const mock = await setupPlannerMock(page);
     await page.goto('/#/planner');
     await setAmount(page, 'Salary', 20000);
-    await expect(page.getByTestId('after-fixed')).toContainText('₹13,400');
+    await expect(page.getByTestId('after-fixed')).toContainText('₹20,000');
     await page.getByRole('button', { name: 'Reset to my default plan' }).click();
     await expect(page.getByText('no transaction or balance is touched')).toBeVisible();
     await page.getByRole('button', { name: 'Reset', exact: true }).click();
-    await expect(field(page, 'Salary')).toHaveValue('15000');
-    await expect(page.getByTestId('after-fixed')).toContainText('₹8,400');
+    await expect(field(page, 'Salary')).toHaveValue('0');
+    await expect(page.getByTestId('after-fixed')).toContainText('₹0');
     noMoneyTouched(mock);
   });
 
@@ -151,7 +155,7 @@ test.describe('Salary Planner', () => {
     await page.getByTestId('planner-month').fill(monthInput(shift(thisMonth, -3)));
     await expect(page.getByText(/No plan for/)).toBeVisible();
     await page.getByRole('button', { name: 'Create plan for this month' }).click();
-    await expect(field(page, 'Salary')).toHaveValue('15000');
+    await expect(field(page, 'Salary')).toHaveValue('0');
     noMoneyTouched(mock);
   });
 
@@ -162,7 +166,7 @@ test.describe('Salary Planner', () => {
     await expect(page.getByRole('alert')).toContainText('Could not load');
     mock.failLoad = false;
     await page.getByRole('button', { name: 'Try again' }).click();
-    await expect(field(page, 'Salary')).toHaveValue('15000');
+    await expect(field(page, 'Salary')).toHaveValue('0');
   });
 
   test('very large and fractional amounts are shown to the paisa', async ({ page }) => {
